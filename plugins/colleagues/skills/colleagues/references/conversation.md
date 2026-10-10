@@ -9,3 +9,5 @@
 - The plugin's hook reminds at every prompt who is speaking, and brings them back after a compaction.
 
 **Out**: each one leaving updates their memory and todo in a few lines, in their own voice; when the last one leaves, Claude is back with two or three lines on what was decided and what remains.
+
+**Without Node** (or on a host without the plugin): Claude keeps the conversation by hand. On `talk` or `invite`, read the profile (`.claude/agents/<id>.md`), `MEMORY.md` and `todo.md` of whoever joins; keep the name in front of every message and remember who is in the conversation; on `leave` or `end`, have each one leaving update memory and todo, then Claude is back. Nothing reminds who is speaking at each prompt, and a compaction forgets it: say so to the user.

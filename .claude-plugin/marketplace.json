@@ -12,14 +12,14 @@
       "name": "colleagues",
       "source": "./plugins/colleagues",
       "description": "Skill and hook: set up a team of expert colleagues, hire, fire and portray them, run review rounds, talk with them one-to-one or in meetings.",
-      "version": "0.2.1",
+      "version": "0.2.2",
       "category": "skill"
     },
     {
       "name": "colleagues-mod",
       "source": "./plugins/colleagues-mod",
       "description": "Mod: a panel of the colleagues with portraits, who is at work and the steps they report, the week's budget; meetings drawn as a group chat, with controls to invite, let go and close.",
-      "version": "0.2.1",
+      "version": "0.2.2",
       "category": "mod"
     }
   ]

@@ -16,7 +16,7 @@ Two plugins, each working without the other:
 
 ## Requirements
 
-- **Node.js 20 or later on the PATH** (`node -v`): the hook and the conversation commands run it. Claude Code installed with its native installer does not bring it.
+- **Node.js 20 or later on the PATH** (`node -v`): the hook and the conversation commands run it. Claude Code installed with its native installer does not bring it. Without it the panel still works and Claude keeps conversations by hand, less reliably, and offers to install Node.
 - **Claude Code 2.1.287 or later** for the mod (the desktop app from 2.1.286). The panel shows in the terminal and in the desktop app's Code tab; in VS Code the hooks run but the panel does not show.
 - Install from a terminal `claude` session: the desktop app's Code tab does not take `/plugin install`. The commands run `node` through Bash: allow it once when Claude asks.
 - Optional, for painted portraits: the Codex CLI logged in with ChatGPT, or an image-generation connector. Without them, Claude draws pixel-art or cartoon portraits in SVG.

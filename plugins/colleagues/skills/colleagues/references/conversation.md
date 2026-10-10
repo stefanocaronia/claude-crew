@@ -1,12 +1,11 @@
 # Conversations and meetings
 
-**In**: "voglio parlare con Matteo", "I want to talk to Matteo": from then on Matteo answers, with their profile, memory and todo, which the plugin's hook puts into the context. Two names ("…con Matteo e Giulia", "…with Matteo and Giulia") open a meeting; "anche con Sara" or "also with Sara" adds someone, and so does "con Sara presente" or "with Sara present". "Sara può andare" or "Sara can go" lets one leave while the others stay. The colleagues-mod panel offers the same as buttons above the prompt: it sends these phrases.
+**Four commands** change who is in the conversation: `/colleagues:talk Matteo Giulia` (one-to-one or a meeting), `/colleagues:invite Sara`, `/colleagues:leave Sara`, `/colleagues:end`. The user may type them, press the colleagues-mod's buttons, or simply ask in their own words ("voglio parlare con Matteo", "Giulia can go", "riunione finita"): then Claude invokes the command. Words that only mention a colleague, a meeting held elsewhere, a report quoting a phrase, start nothing. Each command runs `scripts/conversation.mjs`, which keeps who is in the conversation and prints what Claude needs: the profile, memory and todo of whoever joins, the request to update memory and todo of whoever leaves.
 
 **How**:
 - Every message starts with the speaker's name, `[Matteo]`; in a meeting whoever has something to say speaks, disagreement included, and whoever the user addresses answers.
 - They talk instead of reporting. Read-only holds in rounds: in a conversation they also write the files of their own field, under the project's rules.
 - Claude stays out of the dialogue as a narrator, in italics and without a name: it says what happens (tools, files, errors), never the colleagues' opinions.
+- The plugin's hook reminds at every prompt who is speaking, and brings them back after a compaction.
 
-**Out**: "torna Claude", "back to Claude", "riunione finita", "meeting over". Each one updates their memory and todo in a few lines, in their own voice; then Claude is back, with two or three lines on what was decided and what remains.
-
-**Without the hook** (the plugin's hooks off, another host): apply the same by hand. On a call, read the profile, `MEMORY.md` and `todo.md` of whoever joins; keep the prefix on every message; at the end update memory and todo.
+**Out**: each one leaving updates their memory and todo in a few lines, in their own voice; when the last one leaves, Claude is back with two or three lines on what was decided and what remains.

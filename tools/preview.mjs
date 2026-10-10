@@ -66,8 +66,10 @@ function fixture()
             }
         }
 
-        if (existsSync(join(folder, "avatar.png"))) {
-            bytes[`/p/.claude/agent-memory/${id}/avatar.png`] = readFileSync(join(folder, "avatar.png")).toString("base64");
+        for (const portrait of ["avatar.png", "avatar.svg"]) {
+            if (existsSync(join(folder, portrait))) {
+                bytes[`/p/.claude/agent-memory/${id}/${portrait}`] = readFileSync(join(folder, portrait)).toString("base64");
+            }
         }
     }
 

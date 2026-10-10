@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { isEnding, isNarration, segmentsOf, speakersOf } from "./meeting.ts";
+import { isNarration, segmentsOf, speakersOf } from "./meeting.ts";
 import { cardFrom, colleagueFrom, colleagueOf, latestHeading, openTasks } from "./team.ts";
 import { formatAgo, formatUntil, languageOf, listNames, modelName, words } from "./text.ts";
 
@@ -56,10 +56,7 @@ describe("meetings in the chat", () => {
         assert.deepEqual(speakersOf("[Giulia] a\n\n[Matteo] b\n\n[Giulia] c", [matteo, giulia]).map(speaker => speaker.name), ["Giulia", "Matteo"]);
     });
 
-    it("knows the endings and the narrator lines", () => {
-        assert.ok(isEnding("ok, riunione finita"));
-        assert.ok(isEnding("back to Claude"));
-        assert.ok(!isEnding("parliamo della riunione"));
+    it("knows the narrator lines", () => {
         assert.ok(isNarration("*Claude legge il file.*"));
         assert.ok(!isNarration("Ecco il piano."));
     });

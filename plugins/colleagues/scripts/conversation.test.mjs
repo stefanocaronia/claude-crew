@@ -1,4 +1,5 @@
-// Runs the conversation hook as Claude Code does: a JSON input on stdin, the project in CLAUDE_PROJECT_DIR, the answer on stdout.
+// The conversation script as the skills run it (an action and names, the session in CLAUDE_CODE_SESSION_ID) and as the hook
+// (a JSON input on stdin): node --test plugins/colleagues/scripts/conversation.test.mjs
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -16,120 +17,125 @@ before(() => {
     project = join(sandbox, "project");
     writeColleague("matteo-conti", "Matteo Conti, code reviewer", "Matteo remembers the parser bug.", "- [ ] retest the parser");
     writeColleague("giulia-ferri", "Giulia Ferri, game master", "Giulia remembers the playtest.", "- [ ] read the transcript");
+    writeColleague("elodie-martin", "Élodie Martin, typographer", "Élodie remembers the kerning.", "", { comment: true, bom: true });
     writeAgent("helper-bot", "Helper Bot, a plain agent");
 });
 
 after(() => rmSync(sandbox, { recursive: true, force: true }));
 
-describe("conversation hook", () => {
-    it("hands the chat to one colleague, with their file, memory and todo, without the round-only sections", () => {
-        const context = prompt("one", "voglio parlare con Matteo del parser");
-        assert.match(context, /From here on Matteo speaks/);
-        assert.match(context, /Matteo remembers the parser bug/);
-        assert.match(context, /retest the parser/);
-        assert.match(context, /How you work/);
-        assert.doesNotMatch(context, /REPORT FORMAT|MEMORY RULES/);
+describe("the commands", () => {
+    it("talk hands the chat to one colleague, with their file, memory and todo, without the round-only sections", () => {
+        const text = run("one", "talk", "Matteo");
+        assert.match(text, /From here on Matteo speaks/);
+        assert.match(text, /Matteo remembers the parser bug/);
+        assert.match(text, /retest the parser/);
+        assert.match(text, /How you work/);
+        assert.doesNotMatch(text, /REPORT FORMAT|MEMORY RULES/);
+        assert.match(text, /\/colleagues:invite, \/colleagues:leave or \/colleagues:end/);
     });
 
-    it("reminds who is speaking on the next prompts", () => {
-        assert.match(prompt("one", "e il lexer?"), /Matteo is still speaking: the message starts with \[Matteo\]/);
+    it("invite adds a colleague, introducing only the newcomer", () => {
+        const text = run("one", "invite", "Giulia");
+        assert.match(text, /Meeting with Matteo and Giulia/);
+        assert.match(text, /Giulia remembers the playtest/);
+        assert.doesNotMatch(text, /Matteo remembers/);
     });
 
-    it("adds a colleague with 'anche', introducing only the newcomer", () => {
-        const context = prompt("one", "fammi parlare anche con Giulia");
-        assert.match(context, /Meeting with Matteo and Giulia/);
-        assert.match(context, /Giulia remembers the playtest/);
-        assert.doesNotMatch(context, /Matteo remembers/);
+    it("leave lets one go while the other stays, and the last one leaving closes", () => {
+        const text = run("one", "leave", "Giulia");
+        assert.match(text, /Giulia leaves/);
+        assert.match(text, /Matteo is still speaking/);
+        assert.match(run("one", "leave", "Matteo"), /Matteo leaves.*Claude is back/s);
+        assert.equal(hook({ hook_event_name: "UserPromptSubmit", session_id: "one", prompt: "ciao" }), "");
     });
 
-    it("ends the meeting: each updates memory and todo, then Claude is back", () => {
-        const context = prompt("one", "ok, riunione finita");
-        assert.match(context, /Matteo and Giulia leave/);
-        assert.match(context, /Claude is back/);
-        assert.equal(prompt("one", "grazie"), "");
+    it("end dismisses everyone and gives the chat back to Claude", () => {
+        run("two", "talk", "Matteo e Giulia");
+        assert.match(run("two", "end"), /Matteo and Giulia leave.*Claude is back/s);
+        assert.match(run("two", "end"), /Nobody was in the conversation/);
     });
 
-    it("understands English calls and endings", () => {
-        assert.match(prompt("two", "I'd like to talk to Giulia and Matteo about the log"), /Meeting with Giulia and Matteo/);
-        assert.match(prompt("two", "back to Claude"), /Giulia and Matteo leave/);
-        assert.match(prompt("three", "Let's talk with Matteo"), /From here on Matteo speaks/);
-        assert.match(prompt("three", "the meeting is over"), /Matteo leaves/);
+    it("finds names by first name in any case, by id, with accents, behind a YAML comment and a BOM", () => {
+        assert.match(run("three", "talk", "élodie, matteo-conti"), /Meeting with Élodie and Matteo/);
+        assert.match(run("three", "leave", "Élodie"), /Élodie leaves/);
     });
 
-    it("lets one colleague leave while the others stay, and ends with the last one", () => {
-        prompt("leave", "voglio parlare con Matteo e Giulia");
-        const context = prompt("leave", "grazie Giulia, puoi andare. Giulia può andare");
-        assert.match(context, /Giulia leaves/);
-        assert.match(context, /Matteo is still speaking/);
-        assert.match(prompt("leave", "Matteo può andare avanti col parser"), /Matteo is still speaking/);
-        assert.match(prompt("leave", "Matteo can go"), /Matteo leaves.*Claude is back/s);
-        assert.equal(prompt("leave", "ciao"), "");
+    it("refuses names that are not colleagues, saying who the team is, and changes nothing", () => {
+        assert.match(run("four", "talk", "Pippo"), /No colleague named Pippo.*the team is Élodie, Giulia, Matteo|No colleague named Pippo.*the team is/s);
+        assert.match(run("four", "talk", "Helper"), /Nothing changed/);
+        assert.equal(hook({ hook_event_name: "UserPromptSubmit", session_id: "four", prompt: "ciao" }), "");
+    });
+});
+
+describe("the hook", () => {
+    it("never starts a conversation from words: only the commands do", () => {
+        for (const prompt of ["voglio parlare con Matteo", "Ieri ho avuto una riunione con Giulia e Matteo", "I want to talk to Matteo"]) {
+            assert.equal(hook({ hook_event_name: "UserPromptSubmit", session_id: "five", prompt }), "");
+        }
     });
 
-    it("brings in whoever must be present", () => {
-        assert.match(prompt("four", "voglio parlare con Matteo, con Giulia presente"), /Meeting with Matteo and Giulia/);
-    });
-
-    it("ignores agents without a todo and words that are not names", () => {
-        assert.equal(prompt("five", "parliamo con Helper"), "");
-        assert.equal(prompt("five", "voglio parlare con te di Matteo"), "");
-        assert.equal(prompt("five", "torna Claude"), "");
+    it("reminds who is speaking at every prompt, notifications included", () => {
+        run("six", "talk", "Giulia");
+        assert.match(hook({ hook_event_name: "UserPromptSubmit", session_id: "six", prompt: "<task-notification>…" }), /Giulia is still speaking/);
     });
 
     it("gives the colleagues back after a compaction, and forgets them after /clear", () => {
-        prompt("six", "voglio parlare con Giulia");
-        const restored = run({ hook_event_name: "SessionStart", source: "compact", session_id: "six" });
+        run("seven", "talk", "Giulia");
+        const restored = hook({ hook_event_name: "SessionStart", source: "compact", session_id: "seven" });
         assert.match(restored, /The context was compacted/);
         assert.match(restored, /Giulia remembers the playtest/);
-        assert.equal(run({ hook_event_name: "SessionStart", source: "clear", session_id: "six" }), "");
-        assert.equal(prompt("six", "ciao"), "");
+        assert.equal(hook({ hook_event_name: "SessionStart", source: "clear", session_id: "seven" }), "");
+        assert.equal(hook({ hook_event_name: "UserPromptSubmit", session_id: "seven", prompt: "ciao" }), "");
     });
 
     it("names what does not fit, to be read, keeping memories and todos first", () => {
         writeColleague("sara-lombardi", "Sara Lombardi, game designer", "x".repeat(6000), "- [ ] y");
         writeAgent("sara-lombardi", "Sara Lombardi, game designer", "z".repeat(6000));
-        const context = prompt("seven", "voglio parlare con Sara");
-        assert.match(context, /Not everything fits: before answering, read in full, with Read, \.claude\/agents\/sara-lombardi\.md/);
-        assert.match(context, /x{6000}/);
-        assert.ok(context.length < 10000);
+        const text = run("eight", "talk", "Sara");
+        assert.match(text, /Not everything fits: before answering, read in full, with Read, \.claude\/agents\/sara-lombardi\.md/);
+        assert.match(text, /x{6000}/);
+        assert.ok(text.length < 10000);
     });
 });
 
-function prompt(sessionId, text)
-{
-    return run({ hook_event_name: "UserPromptSubmit", session_id: sessionId, prompt: text });
-}
-
-function run(input)
+function environment()
 {
     const temp = join(sandbox, "temp");
     mkdirSync(temp, { recursive: true });
-    const result = spawnSync(process.execPath, [script], {
-        input: JSON.stringify(input),
-        encoding: "utf8",
-        env: { ...process.env, CLAUDE_PROJECT_DIR: project, TMPDIR: temp, TEMP: temp, TMP: temp },
-    });
+    return { ...process.env, CLAUDE_PROJECT_DIR: project, TMPDIR: temp, TEMP: temp, TMP: temp };
+}
+
+function run(sessionId, action, names = "")
+{
+    const result = spawnSync(process.execPath, [script, action, ...names.split(" ").filter(Boolean)], { encoding: "utf8", env: { ...environment(), CLAUDE_CODE_SESSION_ID: sessionId } });
+    assert.equal(result.stderr, "");
+    return result.stdout.trim();
+}
+
+function hook(input)
+{
+    const result = spawnSync(process.execPath, [script], { input: JSON.stringify(input), encoding: "utf8", env: environment() });
     assert.equal(result.stderr, "");
     return result.stdout ? JSON.parse(result.stdout).hookSpecificOutput.additionalContext : "";
 }
 
-function writeColleague(id, heading, memory, todo)
+function writeColleague(id, heading, memory, todo, quirks = {})
 {
-    writeAgent(id, heading);
+    writeAgent(id, heading, "", quirks);
     const folder = join(project, ".claude", "agent-memory", id);
     mkdirSync(folder, { recursive: true });
     writeFileSync(join(folder, "MEMORY.md"), `# ${heading.split(" ")[0]}: memory\n\n${memory}\n`);
     writeFileSync(join(folder, "todo.md"), `# ${heading.split(" ")[0]}: todo\n\n${todo}\n`);
 }
 
-function writeAgent(id, heading, body = "")
+function writeAgent(id, heading, body = "", quirks = {})
 {
     const folder = join(project, ".claude", "agents");
     mkdirSync(folder, { recursive: true });
     const file = [
-        "---", `name: ${id}`, `description: "${heading}."`, "tools: Read, Grep, Glob", "memory: project", "---", "",
+        "---", `name: ${id}`, ...(quirks.comment ? ["# a yaml comment"] : []), `description: "${heading}."`, "tools: Read, Grep, Glob", "memory: project", "---", "",
         `# ${heading}`, "", "**Who you are.** Someone.", body, "", "## How you work", "", "- Carefully.", "",
         "## What you return", "", "REPORT FORMAT", "", "## Your memory", "", "MEMORY RULES", "",
     ];
-    writeFileSync(join(folder, `${id}.md`), file.join("\r\n"));
+    writeFileSync(join(folder, `${id}.md`), (quirks.bom ? "﻿" : "") + file.join("\r\n"));
 }

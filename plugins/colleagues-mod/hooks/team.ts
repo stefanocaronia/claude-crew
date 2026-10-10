@@ -17,8 +17,8 @@ const gray = "#888780";
 /** A colleague from their profile and their todo: the heading's name and role, the frontmatter's color, model and effort. */
 export function colleagueFrom(id: string, profile: string, todo: string, avatarStamp: number): Colleague
 {
-    const text = profile.replace(/\r\n/g, "\n");
-    const heading = /^# (.+)$/m.exec(text)?.[1]?.trim() ?? id;
+    const text = profile.replace(/^﻿/, "").replace(/\r\n/g, "\n");
+    const heading = /^# (.+)$/m.exec(text.replace(/^---\n[\s\S]*?\n---\n/, ""))?.[1]?.trim() ?? id;
     const [fullName = id, ...role] = heading.split(",");
     const color = field(text, "color");
     return {

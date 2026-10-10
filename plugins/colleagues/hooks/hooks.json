@@ -1,11 +1,27 @@
 {
-  "description": "Hands the chat to colleagues and back: \"voglio parlare con Matteo\", \"I want to talk to Matteo\", \"torna Claude\", \"back to Claude\".",
+  "description": "Reminds at every prompt which colleagues are speaking, and brings them back after a compaction or a resume.",
   "hooks": {
     "UserPromptSubmit": [
-      { "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/conversation.mjs\"", "timeout": 10 }] }
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/conversation.mjs\"",
+            "timeout": 10
+          }
+        ]
+      }
     ],
     "SessionStart": [
-      { "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/conversation.mjs\"", "timeout": 10 }] }
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/conversation.mjs\"",
+            "timeout": 10
+          }
+        ]
+      }
     ]
   }
 }

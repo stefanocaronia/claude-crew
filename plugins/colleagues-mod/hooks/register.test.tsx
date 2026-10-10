@@ -36,7 +36,7 @@ function world(on: On, members: string[]): string[]
     const sent: string[] = [];
     const files: Record<string, string> = { ...project, ...(members.length ? { "/tmp/claude-colleagues/s1.json": JSON.stringify({ active: members }) } : {}) };
     mock.env(on, { OS: "Linux", TMPDIR: "/tmp" });
-    mock.clock(on);
+    mock.clock(on, { now: Date.UTC(2026, 9, 10, 9, 0) });
     on("session.start", () => ({ cwd: "/p" }) as never);
     on("settings.read", () => ({ value: {} }) as never);
     on("tool.register", () => ({ value: {} }) as never);
@@ -54,14 +54,14 @@ function world(on: On, members: string[]): string[]
     });
     on("ui.open", () => ({ value: {} }) as never);
     on("agent.spawn", () => ({ model: "claude-opus-5-5", agentId: "a1" }) as never);
-    on("prompt.submit", (_, e) => {
-        sent.push(e.text);
-        return { text: e.text };
+    on("command.run", (_, e) => {
+        sent.push(`/${e.command}${e.args ? ` ${e.args}` : ""}`);
+        return { text: "" } as never;
     });
     return sent;
 }
 
-test("the meeting's controls let one go, invite another and close it, by the phrases the hook understands", async ($, on) => {
+test("the meeting's controls let one go, invite another and close it, through the colleagues' commands", async ($, on) => {
     const sent = world(on, ["matteo-conti", "giulia-ferri"]);
     await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
 
@@ -72,13 +72,13 @@ test("the meeting's controls let one go, invite another and close it, by the phr
         expect((await ui.find({ key: "leave-matteo-conti" }))?.props.label).toBe("✕ Matteo");
         await ui.press({ key: "leave-matteo-conti" });
         await ui.select({ key: "invite", value: "sara-lombardi" });
-        expect(sent).toEqual(["Matteo can go", "I also want to talk to Sara"]);
+        expect(sent).toEqual(["/colleagues:leave Matteo", "/colleagues:invite Sara"]);
         await ui.unmount();
     }
 
     const ui = await $.ui.mount({ plugin, surface: "desktop", component: "AbovePrompt", props: band });
     await ui.press({ key: "close" });
-    expect(sent.at(-1)).toBe("the meeting is over");
+    expect(sent.at(-1)).toBe("/colleagues:end");
     expect(await ui.find({ key: "close" })).toBeUndefined();
 });
 
@@ -137,6 +137,7 @@ test("under the team: the latest news, the open tasks by colleague, and phrases 
     for (const surface of surfaces) {
         const ui = await $.ui.mount({ plugin, surface, component: "Pane", requestId: "colleagues", props: { title: "Colleagues", isFocused: false, bodyColumns: 50, placement: "dock" } as never });
         expect(await ui.find({ type: "Text", text: "9 October" })).toBeDefined();
+        expect(await ui.find({ type: "Text", text: /62% ↻ 1d 20h/ })).toBeDefined();
         expect(await ui.find({ type: "Text", text: "Open tasks · 2" })).toBeDefined();
         expect(await ui.find({ type: "Markdown", text: /retest the parser/ })).toBeUndefined();
         await ui.press({ key: "toggle-matteo-conti" });

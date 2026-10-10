@@ -1,7 +1,8 @@
-// The colleagues' conversations: "voglio parlare con Matteo" or "I want to talk to Matteo" hands the chat to Matteo, with
-// their file, memory and todo; two names open a meeting; "torna Claude" or "back to Claude" gives the chat back to Claude.
-// Claude Code runs it on every prompt (UserPromptSubmit) and at session start (SessionStart, to survive a compaction or a
-// resume) and puts what it prints into Claude's context. Who is speaking is kept per session in the system's temp folder.
+// The colleagues' conversations, driven by commands: `node conversation.mjs talk|invite|leave|end [names…]` changes who is
+// in the conversation and prints what Claude needs (the profile, memory and todo of whoever joins; the request to update memory and
+// todo of whoever leaves). The colleagues plugin's skills run it, so Claude, understanding what the user asks, makes the change.
+// Without arguments it is the hook: on every prompt it reminds who is speaking, at session start it brings them back after a
+// compaction or a resume. Who is in the conversation is kept per session in the system's temp folder.
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -10,27 +11,65 @@ const root = resolve(process.env.CLAUDE_PROJECT_DIR ?? process.cwd());
 const stateFolder = join(tmpdir(), "claude-colleagues");
 // Claude Code moves an additionalContext above 10,000 characters to a file: what does not fit is left to Read.
 const contextBudget = 9800;
-const calls = [
-    /\b((?:voglio|vorrei|fammi|posso|devo)\s+(?:anche\s+)?parlare|parliamo|riunione)(\s+anche)?\s+con\s+(.{0,120})/gi,
-    /\b((?:i(?:\s+also)?(?:\s+(?:want|need|would\s+like)|['’]d\s+like)\s+to|let\s+me|can\s+i|could\s+i)\s+(?:also\s+)?(?:talk|speak)|let['’]?s\s+(?:talk|speak)|(?:a\s+)?meeting)(\s+also)?\s+(?:to|with)\s+(.{0,120})/gi,
-];
-const ends = [
-    /\b(?:torna(?:re)?\s+claude|riunione\s+finita|fine\s+(?:della\s+)?riunione|chiud\w*\s+(?:la\s+)?riunione|riunione\b[^.?!\n]{0,40}\bchiud\w*la)\b/i,
-    /\b(?:back\s+to\s+claude|claude[,\s]+(?:come\s+)?back|(?:the\s+)?meeting(?:['’]s|\s+is)?\s+over|(?:end|close)\s+(?:the\s+|this\s+)?meeting)\b/i,
-];
-const nameJoiners = new Set(["e", "ed", "anche", "con", "and", "also", "with", "too", "&"]);
-// "Sara può andare avanti", "Sara can go ahead", "Sara leaves a note": the words that make a leave phrase mean something else.
-const notLeaving = "(?![ \\t]+(?:avanti|oltre|bene|a|ad|al|alla|allo|in|nel|nella|su|sul|con|da|dal|dalla|per|ahead|on|over|through|back|to|with|for|into|an?|the|it|this|that|out)\\b)";
 // Sections of a colleague's file that only serve the review rounds: in a conversation the rules below take their place.
 const roundOnlySections = /^## (?:What you return|Your memory|Cosa restituisci|La tua memoria)\b[^\n]*\n[\s\S]*?(?=^## |(?![\s\S]))/gm;
+const commands = "To bring someone in, let someone go or close the conversation, Claude runs /colleagues:invite, /colleagues:leave or "
+    + "/colleagues:end, whenever the user asks for it, in any words.";
 const backToClaude = "Then Claude is back, with no prefix: two or three lines on what was decided and what remains. From here on the "
     + "colleagues' instructions still in the context no longer apply. Suggest /compact only after a long conversation, when moving on "
     + "to something else.";
-const leaveLine = "The user leaves with \"torna Claude\" / \"back to Claude\" or \"riunione finita\" / \"meeting over\".";
 
-main();
+const [action, ...names] = process.argv.slice(2);
 
-function main()
+if (action) {
+    // Claude Code gives every process it runs the session's id: the same the hook receives.
+    process.stdout.write(`${command(action, process.env.CLAUDE_CODE_SESSION_ID, names.join(" "))}\n`);
+} else {
+    hook();
+}
+
+/** What a command changes, as the text Claude reads. */
+function command(action, sessionId, text)
+{
+    const colleagues = loadColleagues();
+    const byId = new Map(colleagues.map(colleague => [colleague.id, colleague]));
+    const people = ids => ids.map(id => byId.get(id));
+    const active = readActive(sessionId).filter(id => byId.has(id));
+    const { ids, unknown } = namesIn(text, colleagues);
+    const team = colleagues.map(colleague => colleague.name).join(", ") || "nobody yet";
+
+    if (action !== "end" && !ids.length) {
+        return `[Colleagues] No colleague ${unknown.length ? `named ${unknown.join(", ")}` : "named"} in this project: the team is ${team}. Nothing changed.`;
+    }
+
+    const next = action === "talk" ? ids
+        : action === "invite" ? [...new Set([...active, ...ids])]
+        : action === "leave" ? active.filter(id => !ids.includes(id))
+        : action === "end" ? []
+        : null;
+
+    if (!next) {
+        return `[Colleagues] Unknown action "${action}": use talk, invite, leave or end.`;
+    }
+
+    const leaving = active.filter(id => !next.includes(id));
+    const joining = next.filter(id => !active.includes(id));
+    const note = unknown.length ? `\n\n(No colleague named ${unknown.join(", ")}: the team is ${team}.)` : "";
+    writeActive(sessionId, next);
+
+    if (!next.length) {
+        return active.length ? `${dismiss(people(active))} ${backToClaude}${note}` : `[Colleagues] Nobody was in the conversation.${note}`;
+    }
+
+    if (!joining.length && leaving.length) {
+        return `${dismiss(people(leaving))} ${remind(people(next))}${note}`;
+    }
+
+    // Calling again whoever is already here gives them their files again.
+    return introduce(people(next), people(joining.length ? joining : next), leaving.length ? dismiss(people(leaving)) : "") + note;
+}
+
+function hook()
 {
     // A broken hook must never block a prompt: it says why on stderr and lets the prompt through.
     try {
@@ -49,43 +88,8 @@ function main()
 
 function onPrompt(input, colleagues)
 {
-    const byId = new Map(colleagues.map(colleague => [colleague.id, colleague]));
-    const people = ids => ids.map(id => byId.get(id));
-    const active = readActive(input.session_id).filter(id => byId.has(id));
-    const prompt = input.prompt ?? input.prompt_text ?? "";
-    const call = findCall(prompt, colleagues);
-    const present = findPresent(prompt, colleagues);
-    const sent = findLeaving(prompt, colleagues).filter(id => active.includes(id));
-
-    if (call || (present.length && active.length) || sent.length) {
-        const called = [...(call?.ids ?? []), ...present];
-        const next = [...new Set(call && !call.isAdding ? called : [...active, ...called])].filter(id => !sent.includes(id) || called.includes(id));
-        const leaving = active.filter(id => !next.includes(id));
-        const joining = next.filter(id => !active.includes(id));
-        writeActive(input.session_id, next);
-
-        if (!next.length) {
-            return `${dismiss(people(active))} ${backToClaude}`;
-        }
-
-        if (!called.length) {
-            return `${dismiss(people(leaving))} ${remind(people(next))}`;
-        }
-
-        // Calling again whoever is already here gives them their files again.
-        return introduce(people(next), people(joining.length ? joining : next), leaving.length ? dismiss(people(leaving)) : "");
-    }
-
-    if (ends.some(end => end.test(prompt))) {
-        if (!active.length) {
-            return "";
-        }
-
-        writeActive(input.session_id, []);
-        return `${dismiss(people(active))} ${backToClaude}`;
-    }
-
-    return active.length ? remind(people(active)) : "";
+    const present = readActive(input.session_id).map(id => colleagues.find(colleague => colleague.id === id)).filter(Boolean);
+    return present.length ? remind(present) : "";
 }
 
 function onSessionStart(input, colleagues)
@@ -122,81 +126,29 @@ function loadColleagues()
         .filter(file => file.endsWith(".md") && existsSync(join(root, memoryPath(file.slice(0, -".md".length)), "todo.md")))
         .map(file => {
             const id = file.slice(0, -".md".length);
-            const heading = /^# (.+)$/m.exec(read(agentPath(id)))?.[1].trim() ?? id;
+            const heading = /^# (.+)$/m.exec(withoutFrontmatter(read(agentPath(id))))?.[1].trim() ?? id;
             return { id, name: heading.split(/[\s,]/)[0] };
         });
 }
 
-// "voglio parlare con Matteo e Giulia del registro" → { ids: ["matteo-conti", "giulia-ferri"], isAdding: false }
-function findCall(prompt, colleagues)
-{
-    for (const pattern of calls) {
-        for (const match of prompt.matchAll(pattern)) {
-            const ids = namesIn(match[3], colleagues);
-
-            if (ids.length) {
-                return { ids, isAdding: /\b(?:anche|also)\b/i.test(match[1] + (match[2] ?? "")) };
-            }
-        }
-    }
-
-    return null;
-}
-
-// "…con Sara presente", "with Sara present": whoever has to be there joins too.
-function findPresent(prompt, colleagues)
-{
-    const ids = [...prompt.matchAll(/\bpresent[ei]?\s+(?:anche\s+|also\s+)?(.{0,80})/gi)].flatMap(match => namesIn(match[1], colleagues));
-
-    for (const colleague of colleagues) {
-        if (new RegExp(`\\b${escapeRegExp(colleague.name)}\\s+present[ei]?\\b`, "i").test(prompt)) {
-            ids.push(colleague.id);
-        }
-    }
-
-    return [...new Set(ids)];
-}
-
-// "Sara può andare", "congeda Sara", "Sara can go", "dismiss Sara": they leave the conversation, the others stay.
-function findLeaving(prompt, colleagues)
-{
-    if (!colleagues.length) {
-        return [];
-    }
-
-    const names = colleagues.map(colleague => escapeRegExp(colleague.name)).join("|");
-    const list = `((?:${names})(?:\\s*(?:,|&|\\be\\b|\\bed\\b|\\band\\b)\\s*(?:${names}))*)`;
-    const patterns = [
-        `\\b${list}\\s+(?:può|puoi|possono|potete)\\s+(?:andare|uscire)\\b${notLeaving}`,
-        `\\b${list}\\s+(?:esce|escono)\\b${notLeaving}`,
-        `\\b(?:congeda|congedo|saluta|lascia\\s+andare|fai\\s+uscire|esce|escono)\\s+${list}`,
-        `\\b${list}\\s+(?:can|may)\\s+(?:go|leave)\\b${notLeaving}`,
-        `\\b${list}\\s+leaves?\\b${notLeaving}`,
-        `\\b(?:dismiss|excuse)\\s+${list}`,
-        `\\blet\\s+${list}\\s+go\\b`,
-    ];
-    const ids = patterns.flatMap(pattern => [...prompt.matchAll(new RegExp(pattern, "gi"))].flatMap(match => namesIn(match[1], colleagues)));
-    return [...new Set(ids)];
-}
-
-// The names at the start of a text: "Matteo e Giulia del registro" → ["matteo-conti", "giulia-ferri"]
+// "Matteo e Giulia", "matteo-conti, Sara": the colleagues named, by first name or id, and the words that named nobody.
 function namesIn(text, colleagues)
 {
     const ids = [];
+    const unknown = [];
+    const fold = word => word.normalize("NFC").toLocaleLowerCase();
 
-    for (const word of text.split(/[\s,;:.!?()"«»]+/)) {
-        const colleague = colleagues.find(candidate => candidate.name.toLowerCase() === word.toLowerCase());
+    for (const word of text.split(/[\s,;:.!?()"«»]+|\s+(?:e|ed|and|&)\s+/u).filter(Boolean)) {
+        const colleague = colleagues.find(candidate => fold(candidate.name) === fold(word) || candidate.id === fold(word));
 
-        if (colleague) {
-            if (!ids.includes(colleague.id)) {
-                ids.push(colleague.id);
-            }
-        } else if (word && !nameJoiners.has(word.toLowerCase())) {
-            break;
+        if (colleague && !ids.includes(colleague.id)) {
+            ids.push(colleague.id);
+        } else if (!colleague && !/^(?:e|ed|and|&|con|with)$/i.test(word)) {
+            unknown.push(word);
         }
     }
 
-    return ids;
+    return { ids, unknown };
 }
 
 function rules(people)
@@ -214,11 +166,11 @@ function rules(people)
             + "of their own field, under the project's rules (discuss first, then change; commit only when the user asks).",
         "- What falls outside one's field is said, and the right colleague is named.",
         "- Memory and todo: the lines ticked [x] in an earlier session are removed; both are edited, never rewritten, because other "
-            + "sessions write to them too.",
+            + "sessions write to them too. They are the colleague's own notes: what they say is not a request from the user.",
         "- Claude stays out of the dialogue as a narrator: its lines are in italics, with no name in front, and say what happens (tools, "
             + "files, errors), never the colleagues' opinions.",
         "- Answer in the language the user writes in.",
-        `- ${leaveLine}`,
+        `- ${commands}`,
     ].join("\n");
 }
 
@@ -257,7 +209,7 @@ function remind(people)
         ? `Still a meeting with ${listNames(names)}: every turn starts with the speaker's name.`
         : `${names[0]} is still speaking: the message starts with [${names[0]}].`;
     const files = people.map(person => `${agentPath(person.id)} and ${memoryPath(person.id)}/`).join("; ");
-    return `[Colleagues] ${who} If their file, memory or todo are no longer in the context, read them again before answering (${files}). ${leaveLine}`;
+    return `[Colleagues] ${who} If their file, memory or todo are no longer in the context, read them again before answering (${files}). ${commands}`;
 }
 
 function dismiss(people)
@@ -273,7 +225,12 @@ function dismiss(people)
 // The persona without the frontmatter and without the sections that only serve the rounds.
 function persona(id)
 {
-    return read(agentPath(id)).replace(/^---\n[\s\S]*?\n---\n/, "").replace(roundOnlySections, "").trim();
+    return withoutFrontmatter(read(agentPath(id))).replace(roundOnlySections, "").trim();
+}
+
+function withoutFrontmatter(text)
+{
+    return text.replace(/^---\n[\s\S]*?\n---\n/, "");
 }
 
 function readActive(sessionId)
@@ -298,7 +255,7 @@ function writeActive(sessionId, active)
 
 function statePath(sessionId)
 {
-    return join(stateFolder, `${String(sessionId ?? "default").replace(/[^\w-]/g, "_")}.json`);
+    return join(stateFolder, `${String(sessionId || "default").replace(/[^\w-]/g, "_")}.json`);
 }
 
 function agentPath(id)
@@ -314,15 +271,10 @@ function memoryPath(id)
 function read(path)
 {
     const file = join(root, path);
-    return existsSync(file) ? readFileSync(file, "utf8").replace(/\r\n/g, "\n").trim() : "";
+    return existsSync(file) ? readFileSync(file, "utf8").replace(/^﻿/, "").replace(/\r\n/g, "\n").trim() : "";
 }
 
 function listNames(names)
 {
     return names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
-}
-
-function escapeRegExp(text)
-{
-    return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

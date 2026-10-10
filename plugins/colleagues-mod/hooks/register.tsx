@@ -7,7 +7,7 @@ import type { EngineInterface, Register } from "claude-code";
 import type { Colleague, Run } from "../types";
 
 import { avatarSvg, barSvg } from "./draw.ts";
-import { isEnding, isNarration, segmentsOf, speakersOf } from "./meeting.ts";
+import { isNarration, segmentsOf, speakersOf } from "./meeting.ts";
 import { contextShare, progressOf, totalTime } from "./progress.ts";
 import { cardFrom, colleagueFrom, colleagueOf, latestHeading, openTasks } from "./team.ts";
 import { contextWindowOf, formatAgo, formatTime, formatTokens, formatUntil, languageOf, listNames, modelName, words } from "./text.ts";
@@ -199,13 +199,6 @@ export const register: Register = (on, options) => {
         return stored;
     });
 
-    on("prompt.submit", async ($, e, next) => {
-        if (isEnding(e.text)) {
-            await update($, meeting, () => ({ members: [] }));
-        }
-
-        return next(e);
-    });
 
     // The panel: the team, each with portrait, name (which opens their card), role and open tasks; who is at work above them.
     on("ui.render", { component: "Pane", requestId: pane }, async ($, e) => {
@@ -219,7 +212,7 @@ export const register: Register = (on, options) => {
         const panel = await read($, view);
         const stamp = await read($, gallery);
         const latest = await read($, board);
-        const at = Math.max(await read($, now), ...list.map(run => run.startedAt), 0);
+        const at = Math.max(await read($, now), latest.checkedAt, ...list.map(run => run.startedAt), 0);
         const byId = new Map(colleagues.map(colleague => [colleague.id, colleague]));
         const running = list.filter(run => run.status === "running").reverse();
         const finished = list.filter(run => run.status !== "running").reverse();
@@ -491,34 +484,32 @@ function bar(ui: Table, surface: string, share: number, color: string | undefine
     return <ui.Svg key="bar" source={barSvg(share, color, 120)} alt={`${Math.round(share * 100)}%`} width={120} height={6} />;
 }
 
-// The meeting's controls: a ✕ to let each one go, a menu to invite the others, a button to close it. Each sends the phrase the
-// colleagues plugin's hook understands, as if the user typed it.
+// The meeting's controls: a ✕ to let each one go, a menu to invite the others, a button to close it. Each sends the colleagues
+// plugin's command, as the user would type it.
 function meetingControls($: EngineInterface, ui: Table, members: Colleague[], colleagues: Colleague[])
 {
     const { Box, Button } = ui;
     const others = colleagues.filter(colleague => !members.includes(colleague));
-    // The meeting changes at once on screen; the hook's state file confirms it when the turn starts.
-    const send = (text: string, change: (ids: string[]) => string[]) => async () => {
+    // The meeting changes at once on screen; the command's state file confirms it at the next turn.
+    const send = (command: string, args: string, change: (ids: string[]) => string[]) => async () => {
         await update($, meeting, current => ({ members: change(current.members), last: current.last }));
-        await $.prompt.submit({ text, asUser: true });
+        await $.command.run({ command, args });
     };
-    const phrases = language === "it"
-        ? { invite: (name: string) => `voglio parlare anche con ${name}`, leave: (name: string) => `${name} può andare`, close: "riunione finita", inviteLabel: "Invita…", closeLabel: "Chiudi riunione" }
-        : { invite: (name: string) => `I also want to talk to ${name}`, leave: (name: string) => `${name} can go`, close: "the meeting is over", inviteLabel: "Invite…", closeLabel: "Close meeting" };
+    const labels = language === "it" ? { invite: "Invita…", close: "Chiudi riunione" } : { invite: "Invite…", close: "Close meeting" };
     return (
         <Box key="meeting-controls" flexDirection="row" flexWrap="wrap" gap={1}>
-            {members.map(member => <Button key={`leave-${member.id}`} label={`✕ ${member.name}`} plain onPress={send(phrases.leave(member.name), ids => ids.filter(id => id !== member.id))} />)}
+            {members.map(member => <Button key={`leave-${member.id}`} label={`✕ ${member.name}`} plain onPress={send("colleagues:leave", member.name, ids => ids.filter(id => id !== member.id))} />)}
             {others.length && "Select" in ui
                 ? (
                     <ui.Select
                         key="invite"
-                        label={phrases.inviteLabel}
+                        label={labels.invite}
                         options={others.map(colleague => ({ value: colleague.id, label: `${colleague.name} · ${colleague.role}` }))}
-                        onSelect={value => send(phrases.invite(others.find(colleague => colleague.id === value)?.name ?? value), ids => [...ids, value])()}
+                        onSelect={value => send("colleagues:invite", others.find(colleague => colleague.id === value)?.name ?? value, ids => [...ids, value])()}
                     />
                 )
                 : null}
-            <Button key="close" label={phrases.closeLabel} onPress={send(phrases.close, () => [])} />
+            <Button key="close" label={labels.close} onPress={send("colleagues:end", "", () => [])} />
         </Box>
     );
 }

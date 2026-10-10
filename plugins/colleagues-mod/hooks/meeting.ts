@@ -9,17 +9,6 @@ export type Segment = {
     isContinued?: boolean;
 };
 
-const ends = [
-    /\b(?:torna(?:re)?\s+claude|riunione\s+finita|fine\s+(?:della\s+)?riunione|chiud\w*\s+(?:la\s+)?riunione|riunione\b[^.?!\n]{0,40}\bchiud\w*la)\b/i,
-    /\b(?:back\s+to\s+claude|claude[,\s]+(?:come\s+)?back|(?:the\s+)?meeting(?:['’]s|\s+is)?\s+over|(?:end|close)\s+(?:the\s+|this\s+)?meeting)\b/i,
-];
-
-/** Whether the user's prompt closes the conversation, as the colleagues plugin's hook understands it. */
-export function isEnding(prompt: string): boolean
-{
-    return ends.some(end => end.test(prompt));
-}
-
 /** The reply cut at each "[Name]" that starts a line, Name being a colleague's first name; undefined when no colleague speaks in it. */
 export function segmentsOf(text: string, team: Colleague[]): Segment[] | undefined
 {

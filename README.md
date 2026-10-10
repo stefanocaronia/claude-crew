@@ -14,6 +14,13 @@ Two plugins, each working without the other:
 - **colleagues**: the skill (hiring and firing, portraits, review rounds, conversations and meetings) and the hook that hands the chat over to the colleagues and back.
 - **colleagues-mod**: a panel and a group chat. The panel shows the team with their portraits, roles and open tasks, and who is at work with the steps they report, their context, tokens and time; a click on a name opens their card (profile, open tasks, latest memory). In a meeting, each colleague's turn is drawn under their portrait and name, and above the prompt sit the participants with buttons to let one go, invite another, or close the meeting.
 
+## Requirements
+
+- **Node.js 20 or later on the PATH** (`node -v`): the hook and the conversation commands run it. Claude Code installed with its native installer does not bring it.
+- **Claude Code 2.1.287 or later** for the mod (the desktop app from 2.1.286). The panel shows in the terminal and in the desktop app's Code tab; in VS Code the hooks run but the panel does not show.
+- Install from a terminal `claude` session: the desktop app's Code tab does not take `/plugin install`. The commands run `node` through Bash: allow it once when Claude asks.
+- Optional, for painted portraits: the Codex CLI logged in with ChatGPT, or an image-generation connector. Without them, Claude draws pixel-art or cartoon portraits in SVG.
+
 ## Install
 
 ```
@@ -34,9 +41,9 @@ Ask Claude in your own words; the `colleagues` skill knows the operations:
 | "change Matteo's tools" | the profile changes, the memory notes why |
 | "a portrait for each colleague" | an image connector, the Codex CLI, or Claude drawing SVG, in one style for the team |
 | "run a review round" | the colleagues whose field the work touches review it in parallel; findings reach you as proposals, one at a time |
-| "voglio parlare con Matteo", "I want to talk to Matteo and Giulia" | they answer in the chat, each message starting with their name, until "torna Claude" / "back to Claude" |
+| "voglio parlare con Matteo", "I want to talk to Matteo and Giulia", or `/colleagues:talk Matteo Giulia` | they answer in the chat, each message starting with their name, until you close it ("back to Claude", `/colleagues:end`) |
 
-The hook recognises Italian and English phrases: *voglio / vorrei / fammi / posso parlare con*, *parliamo con*, *riunione con*, *I want to / I'd like to / let me talk to*, *let's talk with*, *meeting with*; *anche con* or *also with* adds someone; *Sara può andare* or *Sara can go* lets one leave; *torna Claude*, *riunione finita*, *back to Claude*, *meeting over* end it.
+Conversations go through four commands, `/colleagues:talk Matteo Giulia`, `/colleagues:invite Sara`, `/colleagues:leave Sara` and `/colleagues:end`. You can type them, press the panel's buttons, or just ask in your own words in any language: Claude invokes them. Nothing starts from a phrase that only mentions a colleague.
 
 The panel opens by itself at the start of a session in a project with colleagues; `/colleagues-panel` shows or hides it.
 

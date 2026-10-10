@@ -1,6 +1,6 @@
 {
   "name": "crew-mod",
-  "version": "0.3.39",
+  "version": "0.3.40",
   "description": "A panel for the crew plugin: the team with their portraits, who is at work and the steps they report, the week's budget; meetings drawn as a group chat, with controls to invite, let go and close.",
   "author": {
     "name": "Stefano Caronia",

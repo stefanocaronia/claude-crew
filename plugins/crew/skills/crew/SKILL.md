@@ -1,6 +1,6 @@
 ---
 name: crew
-description: A standing team of expert colleagues for a project, each a subagent with a profile, a memory and a todo, who review the work at milestones and talk with the user one-to-one or in meetings. Use it to set the team up in a project, hire, fire or change a colleague, draw their portraits, show the team, or run a review round. Conversations and meetings go through the plugin's commands talk, invite, leave and end, which Claude invokes when the user asks in any words.
+description: A standing team of expert colleagues for a project, each a subagent with a profile, a memory and a todo, who review the work at milestones and talk with the user one-to-one or in meetings. Use it to set the team up in a project, hire, fire or change a colleague, draw their portraits, show the team, run a review round, or hand a colleague a task in their field (a check, research, a test, a change) whenever it helps, within their permissions. Conversations and meetings go through the plugin's commands talk, invite, leave and end, which Claude invokes when the user asks in any words.
 ---
 
 # Crew

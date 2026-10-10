@@ -11,7 +11,7 @@
    - the field, and why the team needs it now; what they review and what they leave to whom (the borders with the others);
    - first and last name, plausible in the project's language and culture, the first name unique in the team; age, city and a career that makes them credible;
    - character: standards, what they cannot stand, how they disagree;
-   - tools: read-only by default (`Read, Grep, Glob`), `Bash` when they must run or reproduce things, `WebSearch, WebFetch` when they must check sources, `Edit, Write` only when they own files of their field; their memory and todo they always write; and, when the crew-mod is installed, `mcp__crew-mod__step`, with which they report their steps to the panel;
+   - tools: read-only by default (`Read, Grep, Glob`), `Bash` when they must run or reproduce things, `WebSearch, WebFetch` when they must check sources, `Edit, Write` only when they own files of their field; their memory and todo they always write. The panel shows these as four permissions the user can switch in the colleague's card: Read (`Grep, Glob`; `Read` is always listed, for their memory), Write (`Edit, Write`), Testing (`Bash`) and Web (`WebSearch, WebFetch`); without Read or Write the panel refuses their reading or writing outside their memory folder; and, when the crew-mod is installed, `mcp__crew-mod__step`, with which they report their steps to the panel;
    - a color among `red, blue, green, yellow, purple, orange, pink, cyan` that no colleague has;
    - `model` and `effort` only when the user asks: otherwise they inherit the session's.
 

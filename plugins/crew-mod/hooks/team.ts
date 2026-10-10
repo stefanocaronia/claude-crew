@@ -1,5 +1,5 @@
 // The project's colleagues as their files describe them: .claude/agents/<id>.md, and .claude/agent-memory/<id>/ with todo.md.
-import type { Card, Colleague } from "../types";
+import type { Card, Colleague, Permissions } from "../types";
 
 /** Claude Code's agent colors, as the panel draws them. */
 const colors: Record<string, string> = {
@@ -29,6 +29,7 @@ export function colleagueFrom(id: string, profile: string, todo: string, avatarS
         color: (color && colors[color.toLowerCase()]) ?? (color?.startsWith("#") ? color : gray),
         model: field(text, "model"),
         effort: field(text, "effort"),
+        permissions: permissionsOf(field(text, "tools")),
         openTasks: openTasks(todo).length,
         avatarStamp,
     };
@@ -80,6 +81,53 @@ export function withEffort(profile: string, level: string | undefined): string
     return lines.join(newline);
 }
 
+/** The permissions a tools line gives; no line means every tool, so every permission. */
+export function permissionsOf(tools: string | undefined): Permissions
+{
+    if (tools === undefined) {
+        return { read: true, write: true, test: true, web: true };
+    }
+
+    const names = toolsOf(tools);
+    return {
+        read: names.includes("Grep") || names.includes("Glob"),
+        write: names.includes("Edit") || names.includes("Write"),
+        test: names.includes("Bash"),
+        web: names.includes("WebSearch") || names.includes("WebFetch"),
+    };
+}
+
+/** The profile with its tools line written from the permissions: Read always, for their memory; the other tools it had, kept. */
+export function withPermissions(profile: string, permissions: Permissions): string
+{
+    const newline = profile.includes("\r\n") ? "\r\n" : "\n";
+    const lines = profile.replace(/\r\n/g, "\n").split("\n");
+    const end = lines[0]?.replace(/^\uFEFF/, "") === "---" ? lines.indexOf("---", 1) : -1;
+
+    if (end < 0) {
+        return profile;
+    }
+
+    const at = lines.findIndex((line, index) => index > 0 && index < end && /^tools\s*:/.test(line));
+    const others = at >= 0 ? toolsOf(lines[at]?.replace(/^tools\s*:/, "") ?? "").filter(name => !managedTools.includes(name)) : [stepTool];
+    const tools = [
+        "Read",
+        ...(permissions.read ? ["Grep", "Glob"] : []),
+        ...(permissions.write ? ["Edit", "Write"] : []),
+        ...(permissions.test ? ["Bash"] : []),
+        ...(permissions.web ? ["WebSearch", "WebFetch"] : []),
+        ...others,
+    ];
+
+    if (at >= 0) {
+        lines[at] = `tools: ${tools.join(", ")}`;
+    } else {
+        lines.splice(end, 0, `tools: ${tools.join(", ")}`);
+    }
+
+    return lines.join(newline);
+}
+
 /** Up to `limit` open tasks, each colleague's next one in turn; a task ending in "(effort: high)" names the effort it needs. */
 export function backlogOf(tasks: { colleague: string; lines: string[] }[], limit: number): { colleague: string; text: string; effort?: string }[]
 {
@@ -104,6 +152,15 @@ function taskOf(colleague: string, line: string): { colleague: string; text: str
 {
     const match = /\s*\(effort:\s*(low|medium|high|xhigh|max)\)\s*$/i.exec(line);
     return match ? { colleague, text: line.slice(0, match.index), effort: match[1]?.toLowerCase() } : { colleague, text: line };
+}
+
+// The tools the permissions stand for; the panel's own tool goes with every colleague it draws.
+const managedTools = ["Read", "Grep", "Glob", "Edit", "Write", "Bash", "WebSearch", "WebFetch"];
+const stepTool = "mcp__crew-mod__step";
+
+function toolsOf(line: string): string[]
+{
+    return line.replace(/["'\[\]]/g, "").split(",").map(name => name.trim()).filter(Boolean);
 }
 
 function field(text: string, key: string): string | undefined

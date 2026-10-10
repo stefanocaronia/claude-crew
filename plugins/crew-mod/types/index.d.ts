@@ -9,9 +9,19 @@ export type Colleague = {
     color: string;
     model?: string;
     effort?: string;
+    /** What they may do beyond their own memory and todo, from the profile's tools. */
+    permissions: Permissions;
     openTasks: number;
     /** Changes when the portrait file changes, so drawings that show it are redrawn. */
     avatarStamp: number;
+};
+
+/** A colleague's permissions: reading the project, changing its files, running commands, searching the web. */
+export type Permissions = {
+    read: boolean;
+    write: boolean;
+    test: boolean;
+    web: boolean;
 };
 
 export type RunStatus = "running" | "done" | "failed";

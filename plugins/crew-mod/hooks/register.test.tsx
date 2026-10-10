@@ -249,18 +249,26 @@ test("the panel shows who is at work and the team, and a colleague's card with i
         expect(Boolean(await ui.find({ type: "Svg", props: { alt: "Matteo Conti" } } as never))).toBe(surface === "desktop");
         await ui.press({ key: "open-matteo-conti" });
         expect(await ui.find({ type: "Markdown", text: /retest the parser/ })).toBeDefined();
-        expect((await ui.find({ key: "card-effort" }))?.props.label).toBe("session's effort");
-        await ui.press({ key: "card-effort" });
-        expect((await ui.find({ key: "card-effort" }))?.props.label).toBe("effort low");
-        await ui.press({ key: "card-effort" });
-        expect((await ui.find({ key: "card-effort" }))?.props.label).toBe("effort medium");
-        for (const level of ["high", "extra high", "max"]) {
+        expect((await ui.find({ key: "card-effort" }))?.props.label).toBe("as the session");
+
+        for (const level of ["low", "medium", "high", "extra high", "max", "as the session"]) {
             await ui.press({ key: "card-effort" });
-            expect((await ui.find({ key: "card-effort" }))?.props.label).toBe(`effort ${level === "extra high" ? "xhigh" : level}`);
+            expect((await ui.find({ key: "card-effort" }))?.props.label).toBe(level);
         }
 
-        await ui.press({ key: "card-effort" });
-        expect((await ui.find({ key: "card-effort" }))?.props.label).toBe("session's effort");
+        expect((await ui.find({ key: "permission-read" }))?.props.label).toBe("☐ Read");
+        await ui.press({ key: "permission-test" });
+        expect((await ui.find({ key: "permission-test" }))?.props.label).toBe("☑︎ Testing");
+        expect((await ui.find({ key: "permission-read" }))?.props.label).toBe("☑︎ Read");
+        await ui.press({ key: "permission-read" });
+        expect((await ui.find({ key: "permission-test" }))?.props.label).toBe("☐ Testing");
+        expect((await ui.find({ key: "permission-read" }))?.props.label).toBe("☐ Read");
+        await ui.press({ key: "permission-write" });
+        await ui.press({ key: "back" });
+        // Only Matteo may now change files: one pencil on the cards.
+        expect(Boolean(surface === "desktop" ? await ui.find({ type: "Svg", props: { alt: "can change the project's files" } } as never) : await ui.find({ type: "Text", text: "✎" }))).toBe(true);
+        await ui.press({ key: "open-matteo-conti" });
+        await ui.press({ key: "permission-write" });
         await ui.press({ key: "card-portrait-style" });
         await ui.press({ key: "card-portrait" });
         expect(submitted.at(-1)).toBe("draw the portraits of Matteo again, in 80s-90s anime style");
@@ -351,4 +359,23 @@ test("a meeting that starts sends whoever had finished to the coffee break", asy
     expect(await ui.find({ key: "finished" })).toBeUndefined();
     expect((await ui.find({ key: "meeting-toggle" }))?.props.label).toBe("▾ ☰ In the meeting · 1");
     expect((await ui.find({ key: "team-toggle" }))?.props.label).toBe("▾ ☕︎ On a coffee break · 2");
+});
+
+test("a colleague without reading or writing works only in their own memory folder", async ($, on) => {
+    world(on, []);
+    on("tool.call", () => ({ result: "ran" }) as never);
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+    await $.agent.spawn({ prompt: "Think about modes.", description: "modes", subagentType: "sara-lombardi" } as never);
+    const outside = await $.tool.call({ tool: "Read", file_path: "/p/src/index.ts", agentId: "a1" } as never);
+    expect((outside as { deny?: string }).deny).toMatch(/Sara reads only their own memory and todo/);
+    const own = await $.tool.call({ tool: "Read", file_path: "/p/.claude/agent-memory/sara-lombardi/todo.md", agentId: "a1" } as never);
+    expect((own as { deny?: string }).deny).toBeUndefined();
+    const search = await $.tool.call({ tool: "Grep", pattern: "mode", agentId: "a1" } as never);
+    expect((search as { deny?: string }).deny).toMatch(/reads only/);
+    const change = await $.tool.call({ tool: "Edit", file_path: "src/index.ts", old_string: "a", new_string: "b", agentId: "a1" } as never);
+    expect((change as { deny?: string }).deny).toMatch(/Propose the change in your answer/);
+    const note = await $.tool.call({ tool: "Edit", file_path: ".claude/agent-memory/sara-lombardi/MEMORY.md", old_string: "a", new_string: "b", agentId: "a1" } as never);
+    expect((note as { deny?: string }).deny).toBeUndefined();
+    const claude = await $.tool.call({ tool: "Read", file_path: "/p/src/index.ts" } as never);
+    expect((claude as { deny?: string }).deny).toBeUndefined();
 });

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { segmentsOf, speakersOf } from "./meeting.ts";
-import { backlogOf, cardFrom, colleagueFrom, colleagueOf, openTasks, withEffort } from "./team.ts";
+import { backlogOf, cardFrom, colleagueFrom, colleagueOf, openTasks, permissionsOf, withEffort, withPermissions } from "./team.ts";
 import { formatUntil, languageOf, listNames, modelName } from "./text.ts";
 
 const profile = "---\r\nname: matteo-conti\r\ndescription: \"Matteo Conti, architetto TypeScript. Usalo per le revisioni.\"\r\ntools: Read\r\nmemory: project\r\neffort: high\r\ncolor: red\r\n---\r\n\r\n# Matteo Conti, architetto TypeScript\r\n\r\nChi sei.";
@@ -12,7 +12,7 @@ const giulia = colleagueFrom("giulia-ferri", "---\ncolor: purple\n---\n# Giulia 
 
 describe("colleagues from their files", () => {
     it("reads name, role, color, effort and open tasks", () => {
-        assert.deepEqual(matteo, { id: "matteo-conti", name: "Matteo", fullName: "Matteo Conti", role: "architetto TypeScript", color: "#C0453A", model: undefined, effort: "high", openTasks: 2, avatarStamp: 7 });
+        assert.deepEqual(matteo, { id: "matteo-conti", name: "Matteo", fullName: "Matteo Conti", role: "architetto TypeScript", color: "#C0453A", model: undefined, effort: "high", permissions: { read: false, write: false, test: false, web: false }, openTasks: 2, avatarStamp: 7 });
     });
 
     it("finds a colleague by agent type, with or without a plugin's prefix", () => {
@@ -32,6 +32,19 @@ describe("colleagues from their files", () => {
         assert.deepEqual(backlogOf(tasks, 10).map(task => task.text), ["m1", "g1", "s1", "m2", "s2", "m3"]);
         assert.equal(backlogOf(tasks, 10)[4]?.effort, "low");
         assert.deepEqual(backlogOf([], 10), []);
+    });
+
+    it("reads the permissions from the tools line, every one without a line", () => {
+        assert.deepEqual(permissionsOf("Read, Grep, Glob, Bash, mcp__crew-mod__step"), { read: true, write: false, test: true, web: false });
+        assert.deepEqual(permissionsOf("[Read, Edit, WebFetch]"), { read: false, write: true, test: false, web: true });
+        assert.deepEqual(permissionsOf(undefined), { read: true, write: true, test: true, web: true });
+    });
+
+    it("writes the tools line from the permissions, keeping Read and the other tools", () => {
+        const profile = "---\r\nname: sara\r\ntools: Read, Grep, Glob, WebSearch, WebFetch, mcp__crew-mod__step\r\n---\r\n# Sara\r\n";
+        assert.equal(withPermissions(profile, { read: false, write: false, test: false, web: true }), "---\r\nname: sara\r\ntools: Read, WebSearch, WebFetch, mcp__crew-mod__step\r\n---\r\n# Sara\r\n");
+        assert.equal(withPermissions("---\nname: sara\n---\n# Sara\n", { read: true, write: true, test: true, web: false }), "---\nname: sara\ntools: Read, Grep, Glob, Edit, Write, Bash, mcp__crew-mod__step\n---\n# Sara\n");
+        assert.equal(withPermissions("# Sara, no frontmatter\n", { read: true, write: false, test: false, web: false }), "# Sara, no frontmatter\n");
     });
 
     it("sets a colleague's effort in the profile, adds it, or takes it out", () => {

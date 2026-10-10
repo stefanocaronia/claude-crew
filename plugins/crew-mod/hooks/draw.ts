@@ -35,13 +35,14 @@ export function barSvg(share: number, color: string | undefined, width: number):
 }
 
 /** A small line icon for the usage cards: a clock for the five hours, a calendar for the week, a bolt for the colleagues' work. */
-export function iconSvg(name: "clock" | "calendar" | "bolt", size: number): string
+export function iconSvg(name: "clock" | "calendar" | "bolt" | "pencil", size: number): string
 {
     const stroke = `fill="none" stroke="#8a8a86" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"`;
     const shapes = {
         clock: `<circle cx="12" cy="12" r="9" ${stroke}/><path d="M12 7v5l3 2" ${stroke}/>`,
         calendar: `<rect x="3.5" y="5" width="17" height="15" rx="2.5" ${stroke}/><path d="M3.5 10h17M8 3v4M16 3v4" ${stroke}/>`,
         bolt: `<path d="M13 3L5 13.5h6L10 21l8-10.5h-6z" ${stroke}/>`,
+        pencil: `<path d="M4 20h4L19 9l-4-4L4 16z" ${stroke}/><path d="M13.5 6.5l4 4" ${stroke}/>`,
     };
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24">${shapes[name]}</svg>`;
 }

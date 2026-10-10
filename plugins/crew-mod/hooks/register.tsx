@@ -4,12 +4,12 @@
 import { atom, read, update } from "claude-code";
 import type { EngineInterface, Register } from "claude-code";
 
-import type { Colleague, Meeting, Run } from "../types";
+import type { Colleague, Meeting, Permissions, Run } from "../types";
 
 import { avatarSvg, barSvg, blankSvg, captionSvg, effortSvg, iconSvg, nameSvg, wideBarSvg } from "./draw.ts";
 import { segmentsOf, speakersOf } from "./meeting.ts";
 import { contextShare, progressOf, totalTime } from "./progress.ts";
-import { backlogOf, cardFrom, colleagueFrom, colleagueOf, openTasks, withEffort } from "./team.ts";
+import { backlogOf, cardFrom, colleagueFrom, colleagueOf, openTasks, withEffort, withPermissions } from "./team.ts";
 import { contextWindowOf, formatTime, formatTokens, formatUntil, languageOf, listNames, modelName, words } from "./text.ts";
 import type { Language, Words } from "./text.ts";
 
@@ -50,6 +50,8 @@ const nameSize = 15;
 const cardNameSize = 18;
 // The portrait beside a colleague's turn in the chat.
 const chatFace = 32;
+// The permissions, in the order the card shows them.
+const permissionKinds = ["read", "write", "test", "web"] as const;
 // The efforts a colleague can work at; "inherit" takes the line out of the profile, and the session's effort holds.
 const effortLevels = ["inherit", "low", "medium", "high", "xhigh", "max"] as const;
 // The styles the portraits can be drawn again in.
@@ -161,6 +163,12 @@ export const register: Register = (on, options) => {
             return { ...run, stepTotal: total || undefined, stepDone: total ? Math.min(total, done) : done, stepNote: input.note?.trim() || undefined };
         }));
         return { result: say().stepDone };
+    });
+
+    // A colleague without reading or writing works only in their own memory folder: the panel refuses the rest.
+    on("tool.call", async ($, e, next) => {
+        const reason = e.agentId ? await refusalFor($, e.tool, e.agentId, e as unknown as Record<string, unknown>) : undefined;
+        return reason ? { deny: reason } : next(e);
     });
 
     on("agent.spawn", async ($, e, next) => {
@@ -334,9 +342,7 @@ export const register: Register = (on, options) => {
             };
             // A click on a colleague's effort moves it to the next level, round to the session's own.
             const effortButton = (key: string, colleague: Colleague) => {
-                const index = effortLevels.indexOf((colleague.effort ?? "inherit") as typeof effortLevels[number]);
-                const next = effortLevels[(index + 1) % effortLevels.length] ?? "inherit";
-                return <Button key={key} label={colleague.effort ? say.effort(colleague.effort) : say.sessionEffort} plain dimColor onPress={() => setEffort($, colleague.id, next === "inherit" ? undefined : next)} />;
+                return <Button key={key} label={colleague.effort ? say.effort(colleague.effort) : say.sessionEffort} plain dimColor onPress={() => setEffort($, colleague.id, nextEffort(colleague.effort))} />;
             };
             // New portraits: a click on the style moves to the next one, the button sends the request to Claude.
             const style = (portraitStyles as readonly string[]).includes(panel.style ?? "") ? panel.style as PortraitStyle : portraitStyles[0];
@@ -380,6 +386,16 @@ export const register: Register = (on, options) => {
             };
             // The button that opens a colleague's card.
             const opener = (key: string, colleague: Colleague) => <Button key={key} label="❯" plain onPress={open(colleague)} />;
+            // A pencil left of the opener, only for a colleague who may change the project's files.
+            const writeMark = (colleague: Colleague) => {
+                if (!colleague.permissions.write) {
+                    return null;
+                }
+
+                return isDesktop
+                    ? <ui.Svg key={`write-${colleague.id}`} source={iconSvg("pencil", 14)} alt={say.canWrite} width={14} height={14} />
+                    : <Text key={`write-${colleague.id}`} dimColor>✎</Text>;
+            };
             const about = (colleague: Colleague) => say.toDo(colleague.openTasks);
             // Each colleague in an outlined card, the portrait at its top left; the cards make a grid that takes a second column when the
             // pane is wide.
@@ -405,7 +421,6 @@ export const register: Register = (on, options) => {
                                 <Text dimColor>{roleOf(selected)}</Text>
                                 <Box flexDirection="row" flexWrap="wrap" alignItems="center">
                                     <Text dimColor>{[presence(selected), say.toDo(selected.openTasks), selected.model ? modelName(selected.model) : ""].filter(Boolean).join(" · ")}</Text>
-                                    {effortButton("card-effort", selected)}
                                 </Box>
                             </Box>
                         </Box>
@@ -414,6 +429,26 @@ export const register: Register = (on, options) => {
                             <Button key="card-round" label={`↻ ${say.roundWith(selected.name)}`} onPress={() => ask(say.roundPromptWith(selected.name))} />
                             {portraitButtons("card-portrait", say.portrait, selected.name)}
                             {fireButtons("card-fire", [selected])}
+                        </Box>
+                        <Box key="card-settings" flexDirection="column">
+                            <Text bold>{say.settings}</Text>
+                            {outlined("card-settings-list", [
+                                <Box key="effort-row" flexDirection="row" flexWrap="wrap" alignItems="center" columnGap={1}>
+                                    <Text dimColor>{say.effortTitle}</Text>
+                                    <Button key="card-effort" label={selected.effort ? (say.levels as Record<string, string>)[selected.effort] ?? selected.effort : say.sessionLevel} plain onPress={() => setEffort($, selected.id, nextEffort(selected.effort))} />
+                                </Box>,
+                                <Box key="permissions-row" flexDirection="row" flexWrap="wrap" alignItems="center" columnGap={1}>
+                                    <Text dimColor>{say.permissions}</Text>
+                                    {permissionKinds.map(kind => (
+                                        <Button
+                                            key={`permission-${kind}`}
+                                            label={`${selected.permissions[kind] ? "☑\uFE0E" : "☐"} ${say.permissionNames[kind]}`}
+                                            plain
+                                            onPress={() => setPermissions($, selected.id, toggled(selected.permissions, kind))}
+                                        />
+                                    ))}
+                                </Box>,
+                            ])}
                         </Box>
                         {details?.description ? <Text key="description" dimColor>{details.description}</Text> : null}
                         {details
@@ -455,6 +490,7 @@ export const register: Register = (on, options) => {
                             isRunning
                                 ? <Text key={`mark-${run.agentId}`} color={colleague.color}>{mark}</Text>
                                 : <Button key={`back-${run.agentId}`} label={mark} plain onPress={() => sendBack([colleague.id])} />,
+                            writeMark(colleague),
                             opener(isRunning ? `open-${colleague.id}` : `open-run-${run.agentId}`, colleague),
                         ])}
                         <Text key={`role-${run.agentId}`} dimColor wrap="truncate-end">{roleOf(colleague)}</Text>
@@ -473,7 +509,7 @@ export const register: Register = (on, options) => {
             const teamRow = (colleague: Colleague, canPick = true) => colleagueCard(`idle-${colleague.id}`, [
                 face(colleague, 40, true),
                 <Box key={`lines-${colleague.id}`} flexDirection="column" flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
-                    {nameRow(`open-${colleague.id}`, colleague, [opener(`open-${colleague.id}`, colleague)])}
+                    {nameRow(`open-${colleague.id}`, colleague, [writeMark(colleague), opener(`open-${colleague.id}`, colleague)])}
                     <Text key={`role-${colleague.id}`} dimColor wrap="truncate-end">{roleOf(colleague)}</Text>
                     <Box key={`about-${colleague.id}`} flexDirection="row" flexWrap="nowrap" alignItems="center" minWidth={0} overflow="hidden">
                         <Box flexShrink={1} minWidth={0} overflow="hidden">
@@ -922,6 +958,56 @@ async function readPortrait($: EngineInterface, folder: string): Promise<{ uri: 
 }
 
 // A colleague's effort written in their profile, so their next task runs at it; the panel reads the team again.
+async function setPermissions($: EngineInterface, id: string, permissions: Permissions): Promise<void>
+{
+    const path = `${await projectRoot($)}/.claude/agents/${id}.md`;
+    await $.fs.write(path, withPermissions(await $.fs.read(path), permissions));
+    await safeRefresh($);
+    await readCard($, id);
+}
+
+// One permission switched; running commands reads any file, so Testing comes with Read and goes without it.
+function toggled(permissions: Permissions, kind: keyof Permissions): Permissions
+{
+    const next = { ...permissions, [kind]: !permissions[kind] };
+    return kind === "test" && next.test ? { ...next, read: true } : kind === "read" && !next.read ? { ...next, test: false } : next;
+}
+
+// The next effort a click gives, round to the session's own.
+function nextEffort(effort: string | undefined): string | undefined
+{
+    const index = effortLevels.indexOf((effort ?? "inherit") as typeof effortLevels[number]);
+    const next = effortLevels[(index + 1) % effortLevels.length] ?? "inherit";
+    return next === "inherit" ? undefined : next;
+}
+
+// Why a colleague's tool call is refused: reading or changing the project's files without the permission. Their own memory folder
+// is always theirs.
+async function refusalFor($: EngineInterface, tool: string, agentId: string, args: Record<string, unknown>): Promise<string | undefined>
+{
+    const kind = ({ Read: "read", Grep: "read", Glob: "read", Edit: "write", Write: "write", MultiEdit: "write", NotebookEdit: "write" } as Record<string, "read" | "write">)[tool];
+    const run = kind ? (await read($, runs)).find(other => other.agentId === agentId) : undefined;
+    const colleague = run ? (await read($, team)).find(member => member.id === run.colleague) : undefined;
+
+    if (!kind || !colleague || colleague.permissions[kind]) {
+        return undefined;
+    }
+
+    const root = await projectRoot($);
+    const target = tool === "Glob" ? args.path ?? args.pattern : tool === "Grep" ? args.path : args.file_path ?? args.notebook_path;
+    const path = (typeof target === "string" && target ? target : root).replace(/\\/g, "/");
+    const absolute = (/^([a-z]:)?\//i.test(path) ? path : `${root}/${path}`).toLowerCase();
+    const folder = `.claude/agent-memory/${colleague.id}`;
+
+    if (absolute.includes(`/${folder}/`) || absolute.endsWith(`/${folder}`)) {
+        return undefined;
+    }
+
+    return kind === "read"
+        ? `${colleague.name} reads only their own memory and todo (${folder}/): the user gave them no reading of the project's files. Work from what the brief says, and name what you would need to read.`
+        : `${colleague.name} changes only their own memory and todo (${folder}/): the user gave them no writing of the project's files. Propose the change in your answer instead.`;
+}
+
 async function setEffort($: EngineInterface, id: string, level: string | undefined): Promise<void>
 {
     const path = `${await projectRoot($)}/.claude/agents/${id}.md`;

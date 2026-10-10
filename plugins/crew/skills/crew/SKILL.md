@@ -32,12 +32,14 @@ A colleague is an agent of `.claude/agents/` with a `todo.md` in its memory fold
 | to change one: field, tools, character, name | [references/edit.md](references/edit.md) |
 | a portrait, for one colleague or the whole team | [references/portrait.md](references/portrait.md) |
 | a review round, or a milestone is reached | [references/round.md](references/round.md) |
+| a task for a colleague, or Claude finds one useful: a check, research, a test, a change in their field | [references/task.md](references/task.md) |
 | to talk with one or more of them | [references/conversation.md](references/conversation.md) |
 | who is on the team | the team table and each `todo.md`: name, field, open tasks |
 
 ## Always
 
 - Propose, the user decides: who is hired or fired, which findings become work.
+- Use the colleagues as subagents whenever it helps, and keep to their permissions: a change to the project's files only to a colleague with Write, commands and tests only to one with Testing, the web only to one with Web ([references/task.md](references/task.md)).
 - Memory and todo are edited, never rewritten from scratch: other sessions write to them too.
 - When the user decides on a colleague's proposal, add the decision (date, what, why) to that colleague's `MEMORY.md` at once, and tick the todo lines it closes.
 - Name a colleague with their field the first time in a message ("Matteo, our code reviewer"), the name alone after.

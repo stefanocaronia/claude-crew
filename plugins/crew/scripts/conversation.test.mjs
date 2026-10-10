@@ -24,6 +24,13 @@ before(() => {
 after(() => rmSync(sandbox, { recursive: true, force: true }));
 
 describe("the commands", () => {
+    it("talk opens on the topic given after --, and takes no word of it for a name", () => {
+        const text = run("topic", "talk", "Matteo Giulia -- la mappa del luogo");
+        assert.match(text, /Meeting with Giulia and Matteo|Meeting with Matteo and Giulia/);
+        assert.match(text, /The user opens on this topic: la mappa del luogo\./);
+        assert.doesNotMatch(text, /No colleague named/);
+    });
+
     it("talk hands the chat to one colleague, with their file, memory and todo, without the round-only sections", () => {
         const text = run("one", "talk", "Matteo");
         assert.match(text, /From here on Matteo speaks/);

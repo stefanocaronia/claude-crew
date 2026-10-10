@@ -1,4 +1,4 @@
-// The colleagues' conversations, driven by commands: `node conversation.mjs talk|invite|leave|end [names…]` changes who is
+// The colleagues' conversations, driven by commands: `node conversation.mjs talk|invite|leave|end [names…] [-- topic]` changes who is
 // in the conversation and prints what Claude needs (the profile, memory and todo of whoever joins; the request to update memory and
 // todo of whoever leaves). The colleagues plugin's skills run it, so Claude, understanding what the user asks, makes the change.
 // Without arguments it is the hook: on every prompt it reminds who is speaking, at session start it brings them back after a
@@ -19,17 +19,21 @@ const backToClaude = "Then Claude is back, with no prefix: two or three lines on
     + "colleagues' instructions still in the context no longer apply. Suggest /compact only after a long conversation, when moving on "
     + "to something else.";
 
-const [action, ...names] = process.argv.slice(2);
+const [action, ...words] = process.argv.slice(2);
+// The names come first; after `--`, the topic the user opens the meeting on.
+const topicAt = words.indexOf("--");
+const names = topicAt < 0 ? words : words.slice(0, topicAt);
+const topic = topicAt < 0 ? "" : words.slice(topicAt + 1).join(" ").trim();
 
 if (action) {
     // Claude Code gives every process it runs the session's id: the same the hook receives.
-    process.stdout.write(`${command(action, process.env.CLAUDE_CODE_SESSION_ID, names.join(" "))}\n`);
+    process.stdout.write(`${command(action, process.env.CLAUDE_CODE_SESSION_ID, names.join(" "), topic)}\n`);
 } else {
     hook();
 }
 
 /** What a command changes, as the text Claude reads. */
-function command(action, sessionId, text)
+function command(action, sessionId, text, topic = "")
 {
     const colleagues = loadColleagues();
     const byId = new Map(colleagues.map(colleague => [colleague.id, colleague]));
@@ -66,7 +70,7 @@ function command(action, sessionId, text)
     }
 
     // Calling again whoever is already here gives them their files again.
-    return introduce(people(next), people(joining.length ? joining : next), leaving.length ? dismiss(people(leaving)) : "") + note;
+    return introduce(people(next), people(joining.length ? joining : next), leaving.length ? dismiss(people(leaving)) : "", topic) + note;
 }
 
 function hook()
@@ -176,9 +180,10 @@ function rules(people)
 
 // The rules, then the file, the memory and the todo of whoever joins; when they don't all fit, the memories and the todos win
 // (they change, the persona files hardly), and the rest is named to be read.
-function introduce(people, joining, opening = "")
+function introduce(people, joining, opening = "", topic = "")
 {
-    const header = [opening, rules(people)].filter(Boolean).join("\n\n");
+    const subject = topic ? `The user opens on this topic: ${topic}. Start from it, each from their own field.` : "";
+    const header = [opening, rules(people), subject].filter(Boolean).join("\n\n");
     const blocks = joining.flatMap(person => [
         { rank: 2, title: `${person.name}, who they are`, path: agentPath(person.id), text: persona(person.id) },
         { rank: 1, title: `${person.name}, memory`, path: `${memoryPath(person.id)}/MEMORY.md` },

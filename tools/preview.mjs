@@ -1,4 +1,4 @@
-// A preview of the colleagues-mod as the desktop gets it: the mod draws the panel, the meeting band and a group-chat reply from a
+// A preview of the crew-mod as the desktop gets it: the mod draws the panel, the meeting band and a group-chat reply from a
 // project's real colleagues, inside `claude plugin test`; the trees it hands over become an HTML page in the app's dark colors.
 // Not the app's own paint, but its layout, portraits and wrapping. Usage:
 //   node tools/preview.mjs <project> [--out page.html] [--meeting id,id] [--working id] [--language it|en]
@@ -12,7 +12,7 @@ const repo = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const args = process.argv.slice(2);
 const option = (name, fallback) => (args.includes(`--${name}`) ? args[args.indexOf(`--${name}`) + 1] : fallback);
 const project = resolve(args.find(arg => !arg.startsWith("--") && !args[args.indexOf(arg) - 1]?.startsWith("--")) ?? ".");
-const out = resolve(option("out", join(project, "tmp", "colleagues-preview.html")));
+const out = resolve(option("out", join(project, "tmp", "crew-preview.html")));
 const meeting = option("meeting", "").split(",").filter(Boolean);
 const working = option("working", "");
 const language = option("language", "it");
@@ -20,11 +20,11 @@ const language = option("language", "it");
 const symbols = new Map();
 let drawings = 0;
 
-const sandbox = mkdtempSync(join(tmpdir(), "colleagues-preview-"));
+const sandbox = mkdtempSync(join(tmpdir(), "crew-preview-"));
 
 try {
-    const mod = join(sandbox, "colleagues-mod");
-    cpSync(join(repo, "plugins", "colleagues-mod"), mod, { recursive: true, filter: source => !/\.test\.|[\\/]\.claude-plugin[\\/]types/.test(source) });
+    const mod = join(sandbox, "crew-mod");
+    cpSync(join(repo, "plugins", "crew-mod"), mod, { recursive: true, filter: source => !/\.test\.|[\\/]\.claude-plugin[\\/]types/.test(source) });
     writeFileSync(join(mod, "hooks", "fixture.ts"), fixture());
     writeFileSync(join(mod, "hooks", "preview.test.tsx"), previewTest());
     const run = spawnSync(`claude plugin test "${mod}"`, { encoding: "utf8", shell: true, maxBuffer: 64 * 1024 * 1024 });
@@ -74,7 +74,7 @@ function fixture()
     }
 
     if (meeting.length) {
-        files["/tmp/claude-colleagues/preview.json"] = JSON.stringify({ active: meeting });
+        files["/tmp/claude-crew/preview.json"] = JSON.stringify({ active: meeting });
     }
 
     return `export const files: Record<string, string> = ${JSON.stringify(files)};\nexport const bytes: Record<string, string> = ${JSON.stringify(bytes)};\nexport const times: Record<string, number> = ${JSON.stringify(times)};\n`;
@@ -117,11 +117,11 @@ test("preview", { options: { language: "${language}" }, timeoutMs: 20000 }, asyn
     world(on);
     await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
     ${working ? `await $.agent.spawn({ prompt: "Review.", description: "revisione del passo 13", subagentType: "${working}" } as never);` : ""}
-    const pane = await $.ui.mount({ plugin: "colleagues-mod", surface: "desktop", component: "Pane", requestId: "colleagues", props: { title: "Colleghi", isFocused: false, bodyColumns: 50, placement: "dock" } as never });
+    const pane = await $.ui.mount({ plugin: "crew-mod", surface: "desktop", component: "Pane", requestId: "crew", props: { title: "Crew", isFocused: false, bodyColumns: 50, placement: "dock" } as never });
     console.log("PREVIEW pane " + JSON.stringify(await pane.find({})));
-    ${speakers.length ? `const band = await $.ui.mount({ plugin: "colleagues-mod", surface: "desktop", component: "AbovePrompt", props: { hasSurvey: false, isWorking: false, maxRows: 8, bodyColumns: 100 } as never });
+    ${speakers.length ? `const band = await $.ui.mount({ plugin: "crew-mod", surface: "desktop", component: "AbovePrompt", props: { hasSurvey: false, isWorking: false, maxRows: 8, bodyColumns: 100 } as never });
     console.log("PREVIEW band " + JSON.stringify(await band.find({})));` : ""}
-    const chat = await $.ui.mount({ plugin: "colleagues-mod", surface: "desktop", component: "AssistantMessage", props: { text: ${JSON.stringify(chatSample())}, isFirstOfReply: true } });
+    const chat = await $.ui.mount({ plugin: "crew-mod", surface: "desktop", component: "AssistantMessage", props: { text: ${JSON.stringify(chatSample())}, isFirstOfReply: true } });
     console.log("PREVIEW chat " + JSON.stringify(await chat.find({})));
 });
 `;
@@ -140,7 +140,7 @@ function page(trees)
 {
     const sections = [["pane", "Pannello"], ["band", "Sopra il prompt"], ["chat", "Chat"]].filter(([key]) => trees[key])
         .map(([key, title]) => `<section class="${key}"><h2>${title}</h2><div class="surface">${element(trees[key], false)}</div></section>`);
-    return `<!doctype html><meta charset="utf-8"><title>colleagues-mod preview</title>
+    return `<!doctype html><meta charset="utf-8"><title>crew-mod preview</title>
 <style>
 :root{color-scheme:dark}
 body{margin:0;padding:16px;background:#141413;color:#ececec;font:13px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start}

@@ -1,25 +1,25 @@
 {
-  "name": "colleagues",
+  "name": "claude-crew",
   "owner": {
     "name": "Stefano Caronia",
     "url": "https://github.com/stefanocaronia"
   },
   "metadata": {
-    "description": "A standing team of expert colleagues for your projects: hire them, run review rounds, talk with them one-to-one or in meetings."
+    "description": "Crew: a standing team of expert colleagues for your projects: hire them, run review rounds, talk with them one-to-one or in meetings."
   },
   "plugins": [
     {
-      "name": "colleagues",
-      "source": "./plugins/colleagues",
+      "name": "crew",
+      "source": "./plugins/crew",
       "description": "Skill and hook: set up a team of expert colleagues, hire, fire and portray them, run review rounds, talk with them one-to-one or in meetings.",
-      "version": "0.2.3",
+      "version": "0.3.0",
       "category": "skill"
     },
     {
-      "name": "colleagues-mod",
-      "source": "./plugins/colleagues-mod",
-      "description": "Mod: a panel of the colleagues with portraits, who is at work and the steps they report, the week's budget; meetings drawn as a group chat, with controls to invite, let go and close.",
-      "version": "0.2.3",
+      "name": "crew-mod",
+      "source": "./plugins/crew-mod",
+      "description": "Mod: the Crew panel, the colleagues with portraits, who is at work and the steps they report, the week's budget; meetings drawn as a group chat, with controls to invite, let go and close.",
+      "version": "0.3.0",
       "category": "mod"
     }
   ]

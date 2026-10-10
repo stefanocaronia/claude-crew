@@ -14,4 +14,4 @@ Sensible ones, from what the colleague does:
 - **Testing**: who must run, reproduce or look at things working: code review, tests, the page in a browser, a build.
 - **Web**: who checks sources outside the project: rules and licences, references, what other products do.
 
-When the user asks to set them for the team, or for one colleague, set them from this list and their profile, write a `## <date>: permissions` line in each changed memory, and show the user a short table (who, permissions, why in a few words); they change any of them in the card.
+When the user asks to set them for the team, or for one colleague, set them from this list and their profile, write a `## <date>: permissions` line in each changed memory, and show the user a short table (who, permissions, why in a few words); they change any of them in the card. Keep the profile's `description` in step: a colleague without Write is read-only and returns opinions; one with Write also takes tasks in their field, and the description says so, since Claude reads it when choosing whom to call.

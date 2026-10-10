@@ -418,7 +418,7 @@ export const register: Register = (on, options) => {
                             {face(selected, 72, Boolean(presence(selected)))}
                             <Box flexDirection="column" flexShrink={1}>
                                 {name("card-name", selected, cardNameSize)}
-                                <Text dimColor>{roleOf(selected)}</Text>
+                                <Text>{roleOf(selected)}</Text>
                                 <Box flexDirection="row" flexWrap="wrap" alignItems="center">
                                     <Text dimColor>{[presence(selected), say.toDo(selected.openTasks), selected.model ? modelName(selected.model) : ""].filter(Boolean).join(" · ")}</Text>
                                 </Box>
@@ -493,8 +493,8 @@ export const register: Register = (on, options) => {
                             writeMark(colleague),
                             opener(isRunning ? `open-${colleague.id}` : `open-run-${run.agentId}`, colleague),
                         ])}
-                        <Text key={`role-${run.agentId}`} dimColor wrap="truncate-end">{roleOf(colleague)}</Text>
-                        <Text key={`task-${run.agentId}`} wrap="truncate-end">{[taskOf(run.task, colleague), steps, run.status === "failed" ? say.failed : ""].filter(Boolean).join(" · ")}</Text>
+                        <Text key={`role-${run.agentId}`} wrap="truncate-end">{roleOf(colleague)}</Text>
+                        <Text key={`task-${run.agentId}`} dimColor wrap="truncate-end">{[taskOf(run.task, colleague), steps, run.status === "failed" ? say.failed : ""].filter(Boolean).join(" · ")}</Text>
                         <Box key={`model-${run.agentId}`} flexDirection="row" flexWrap="nowrap" alignItems="center" minWidth={0} overflow="hidden">
                             <Box flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
                                 <Text dimColor wrap="truncate-end">{[modelName(run.model), run.effort ? say.effort(run.effort) : "", stats].filter(Boolean).join(" · ")}</Text>
@@ -510,7 +510,7 @@ export const register: Register = (on, options) => {
                 face(colleague, 40, true),
                 <Box key={`lines-${colleague.id}`} flexDirection="column" flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
                     {nameRow(`open-${colleague.id}`, colleague, [writeMark(colleague), opener(`open-${colleague.id}`, colleague)])}
-                    <Text key={`role-${colleague.id}`} dimColor wrap="truncate-end">{roleOf(colleague)}</Text>
+                    <Text key={`role-${colleague.id}`} wrap="truncate-end">{roleOf(colleague)}</Text>
                     <Box key={`about-${colleague.id}`} flexDirection="row" flexWrap="nowrap" alignItems="center" minWidth={0} overflow="hidden">
                         <Box flexShrink={1} minWidth={0} overflow="hidden">
                             <Text dimColor wrap="truncate-end">{`${about(colleague)} · `}</Text>

@@ -30,6 +30,7 @@ A colleague is an agent of `.claude/agents/` with a `todo.md` in its memory fold
 | to hire a colleague | [references/hire.md](references/hire.md) |
 | to fire one | [references/fire.md](references/fire.md) |
 | to change one: field, tools, character, name | [references/edit.md](references/edit.md) |
+| to set the permissions, of the team or of one, sensibly | [references/edit.md](references/edit.md), "Permissions" |
 | a portrait, for one colleague or the whole team | [references/portrait.md](references/portrait.md) |
 | a review round, or a milestone is reached | [references/round.md](references/round.md) |
 | a task for a colleague, or Claude finds one useful: a check, research, a test, a change in their field | [references/task.md](references/task.md) |

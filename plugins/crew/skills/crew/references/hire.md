@@ -3,15 +3,14 @@
 0. **Ask what the request leaves open**, when it does not say who is wanted (as the panel's button, which sends only "hire a colleague"): an interview in the chat, one question at a time, each with two to four answers drawn from the project and the team, plus the user's own. Use the host's question tool when it has one (`AskUserQuestion` in Claude Code), else a short numbered list. Skip what the request already says.
    1. The field: what the team lacks now. Propose fields from the work in progress and from what no colleague covers in the team table, each with one line on why.
    2. Experience and character: a veteran who demands a lot or someone younger and curious; blunt or diplomatic when they disagree.
-   3. What they may do: only read and give their opinion, also run and try things, check sources on the web, write the files of their field.
-   4. The portrait style ([portrait.md](portrait.md)), only when the team has no style line yet.
+   3. The portrait style ([portrait.md](portrait.md)), only when the team has no style line yet.
 
    Then step 1, from the answers.
 1. **Agree on who they are**, in one message the user can amend, and write nothing until they say yes:
    - the field, and why the team needs it now; what they review and what they leave to whom (the borders with the others);
    - first and last name, plausible in the project's language and culture, the first name unique in the team; age, city and a career that makes them credible;
    - character: standards, what they cannot stand, how they disagree;
-   - tools: read-only by default (`Read, Grep, Glob`), `Bash` when they must run or reproduce things, `WebSearch, WebFetch` when they must check sources, `Edit, Write` only when they own files of their field; their memory and todo they always write. The panel shows these as four permissions the user can switch in the colleague's card: Read (`Grep, Glob`; `Read` is always listed, for their memory), Write (`Edit, Write`), Testing (`Bash`) and Web (`WebSearch, WebFetch`); without Read or Write the panel refuses their reading or writing outside their memory folder; and, when the crew-mod is installed, `mcp__crew-mod__step`, with which they report their steps to the panel;
+   - their permissions, chosen by Claude from their field as [edit.md](edit.md) says ("Permissions") and written as `tools:`, one line in the proposal with why; their memory and todo they always write. Without Read or Write the panel refuses their reading or writing outside their memory folder. With the crew-mod installed, `mcp__crew-mod__step` is among their tools too, to report their steps to the panel;
    - a color among `red, blue, green, yellow, purple, orange, pink, cyan` that no colleague has;
    - `model` and `effort` only when the user asks: otherwise they inherit the session's.
 

@@ -55,16 +55,55 @@ export function colleagueOf(team: Colleague[], subagentType: string): Colleague 
 }
 
 /** The heading of the last section of a memory, without its marks: "9 ottobre (notte): mappa del mondo". */
-export function latestHeading(memory: string): string
+/** The profile with its effort set, or without the line, so the colleague works at the session's effort; a profile with no
+ * frontmatter is left as it is. */
+export function withEffort(profile: string, level: string | undefined): string
 {
-    const headings = [...memory.replace(/\r\n/g, "\n").matchAll(/^## (.+)$/gm)].map(match => match[1]?.trim() ?? "");
-    return headings.at(-1) ?? "";
+    const newline = profile.includes("\r\n") ? "\r\n" : "\n";
+    const lines = profile.replace(/\r\n/g, "\n").split("\n");
+    const end = lines[0]?.replace(/^\uFEFF/, "") === "---" ? lines.indexOf("---", 1) : -1;
+
+    if (end < 0) {
+        return profile;
+    }
+
+    const at = lines.findIndex((line, index) => index > 0 && index < end && /^effort\s*:/.test(line));
+
+    if (at >= 0 && level) {
+        lines[at] = `effort: ${level}`;
+    } else if (at >= 0) {
+        lines.splice(at, 1);
+    } else if (level) {
+        lines.splice(end, 0, `effort: ${level}`);
+    }
+
+    return lines.join(newline);
+}
+
+/** Up to `limit` open tasks, each colleague's next one in turn; a task ending in "(effort: high)" names the effort it needs. */
+export function backlogOf(tasks: { colleague: string; lines: string[] }[], limit: number): { colleague: string; text: string; effort?: string }[]
+{
+    const picked: { colleague: string; text: string; effort?: string }[] = [];
+
+    for (let round = 0; picked.length < limit && tasks.some(group => group.lines.length > round); round++) {
+        for (const group of tasks.filter(candidate => candidate.lines.length > round).slice(0, limit - picked.length)) {
+            picked.push(taskOf(group.colleague, group.lines[round] ?? ""));
+        }
+    }
+
+    return picked;
 }
 
 /** The open lines of a todo, without their box. */
 export function openTasks(todo: string): string[]
 {
     return [...todo.replace(/\r\n/g, "\n").matchAll(/^\s*- \[ \]\s*(.+)$/gm)].map(match => match[1]?.trim() ?? "");
+}
+
+function taskOf(colleague: string, line: string): { colleague: string; text: string; effort?: string }
+{
+    const match = /\s*\(effort:\s*(low|medium|high|xhigh|max)\)\s*$/i.exec(line);
+    return match ? { colleague, text: line.slice(0, match.index), effort: match[1]?.toLowerCase() } : { colleague, text: line };
 }
 
 function field(text: string, key: string): string | undefined

@@ -16,7 +16,7 @@ Everything lives in the project, under `.claude/`. The `<id>` is the first and l
 | `agents/<id>.md` | the profile: the subagent's frontmatter, then who they are and how they work (Claude Code looks for it here and uses it as their instructions) |
 | `agent-memory/<id>/MEMORY.md` | their memory: Claude Code hands it to them at the start of every round (`memory: project`) |
 | `agent-memory/<id>/todo.md` | their tasks, one per line: `- [ ] task`; done becomes `- [x]`, and ticked lines are removed in the next session |
-| `agent-memory/<id>/avatar.png` or `avatar.svg` | their portrait |
+| `agent-memory/<id>/avatar.jpg` and `avatar-small.jpg`, or `avatar.svg` | their portrait, at 128 px and 32 px |
 | `agent-memory/<id>/notes/` | longer notes (reviews, rounds, summaries), each linked from `MEMORY.md` |
 | `agent-memory/_former/<id>/` | a colleague who left: their profile and memory, kept |
 

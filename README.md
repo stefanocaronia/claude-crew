@@ -56,7 +56,7 @@ Everything stays in your project, under `.claude/`:
 .claude/agent-memory/matteo-conti/
     MEMORY.md                           their memory, handed to them at every round
     todo.md                             their tasks
-    avatar.png                          their portrait (or avatar.svg)
+    avatar.jpg, avatar-small.jpg        their portrait at 128 and 32 px (or avatar.svg)
     notes/                              longer notes, linked from MEMORY.md
 .claude/agent-memory/_former/           colleagues who left
 ```

@@ -66,7 +66,7 @@ function fixture()
             }
         }
 
-        for (const portrait of ["avatar.png", "avatar.svg"]) {
+        for (const portrait of ["avatar.jpg", "avatar.webp", "avatar.png", "avatar.svg"]) {
             if (existsSync(join(folder, portrait))) {
                 bytes[`/p/.claude/agent-memory/${id}/${portrait}`] = readFileSync(join(folder, portrait)).toString("base64");
             }

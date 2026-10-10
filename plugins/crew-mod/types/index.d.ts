@@ -33,12 +33,18 @@ export type Run = {
     stepDone?: number;
     stepTotal?: number;
     stepNote?: string;
+    /** When the colleague last took a step: the time of a run at work moves with it. */
+    steppedAt?: number;
+    /** Sent back to the team by the user: the run no longer shows among the finished ones. */
+    isBack?: boolean;
 };
 
 /** Who is in the conversation now, by colleague id, and who spoke last. */
 export type Meeting = {
     members: string[];
     last?: string;
+    /** What the band's controls just set, until the command's state file says the same. */
+    pending?: { members: string[]; at: number };
 };
 
 /** A rate-limit window as the status line has it: five_hour, seven_day. */
@@ -48,21 +54,13 @@ export type Budget = {
     resetsAt?: string;
 };
 
-/** The last section of a colleague's memory, and when their memory last changed. */
-export type News = {
-    colleague: string;
-    heading: string;
-    at: number;
-};
-
-/** The team's latest news and open tasks, read from their files at every turn. */
+/** The team's open tasks, read from their files at every turn. */
 export type Board = {
-    news: News[];
     tasks: { colleague: string; lines: string[] }[];
     /** Whether the crew plugin's commands are installed: without them nobody can talk with the team. */
     hasCommands: boolean;
-    /** The characters of all portraits, as data URIs. */
-    portraitWeight?: number;
+    /** The colleagues whose portrait is too heavy for the drawings, by id: they are drawn with initials. */
+    heavy?: string[];
     /** Why the last reading of the team failed, shown in the panel. */
     error?: string;
     checkedAt: number;
@@ -70,9 +68,17 @@ export type Board = {
 
 export type PanelView = {
     isFinishedCollapsed: boolean;
+    /** Whether the sections of the colleagues in the meeting, at work and on a coffee break are folded. */
+    isMeetingCollapsed?: boolean;
+    isWorkingCollapsed?: boolean;
+    isTeamCollapsed?: boolean;
     autoOpened: boolean;
-    /** The colleagues whose open tasks the panel shows, by id. */
-    expanded?: string[];
+    /** Whether the backlog shows its tasks; closed until the user opens it. */
+    isBacklogOpen?: boolean;
+    /** The style new portraits are asked in. */
+    style?: string;
+    /** The colleagues picked on their cards for a meeting, by id. */
+    picked?: string[];
     /** The colleague whose card the panel shows, by id. */
     selected?: string;
 };

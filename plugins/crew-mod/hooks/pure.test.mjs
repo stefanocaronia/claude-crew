@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { isNarration, segmentsOf, speakersOf } from "./meeting.ts";
-import { cardFrom, colleagueFrom, colleagueOf, latestHeading, openTasks } from "./team.ts";
-import { formatAgo, formatUntil, languageOf, listNames, modelName, words } from "./text.ts";
+import { backlogOf, cardFrom, colleagueFrom, colleagueOf, openTasks, withEffort } from "./team.ts";
+import { formatUntil, languageOf, listNames, modelName } from "./text.ts";
 
 const profile = "---\r\nname: matteo-conti\r\ndescription: \"Matteo Conti, architetto TypeScript. Usalo per le revisioni.\"\r\ntools: Read\r\nmemory: project\r\neffort: high\r\ncolor: red\r\n---\r\n\r\n# Matteo Conti, architetto TypeScript\r\n\r\nChi sei.";
 const matteo = colleagueFrom("matteo-conti", profile, "# todo\n- [ ] uno\n- [x] fatto\n- [ ] due\n", 7);
@@ -21,9 +21,29 @@ describe("colleagues from their files", () => {
         assert.equal(colleagueOf([matteo, giulia], "general-purpose"), undefined);
     });
 
-    it("finds the heading of a memory's last section, and a todo's open lines", () => {
-        assert.equal(latestHeading("# Matteo\r\n\r\n## 1 ottobre\r\nvecchio\r\n\r\n## 9 ottobre (notte): mappa\r\n- nuovo\r\n"), "9 ottobre (notte): mappa");
-        assert.equal(latestHeading("# Matteo\n\nniente"), "");
+    it("lists the backlog: each colleague's next task in turn, with the effort a task names", () => {
+        const tasks = [{ colleague: "matteo", lines: ["m1 (effort: high)", "m2", "m3"] }, { colleague: "giulia", lines: ["g1"] }, { colleague: "sara", lines: ["s1", "s2 (Effort: LOW)"] }];
+        assert.deepEqual(backlogOf(tasks, 4), [
+            { colleague: "matteo", text: "m1", effort: "high" },
+            { colleague: "giulia", text: "g1" },
+            { colleague: "sara", text: "s1" },
+            { colleague: "matteo", text: "m2" },
+        ]);
+        assert.deepEqual(backlogOf(tasks, 10).map(task => task.text), ["m1", "g1", "s1", "m2", "s2", "m3"]);
+        assert.equal(backlogOf(tasks, 10)[4]?.effort, "low");
+        assert.deepEqual(backlogOf([], 10), []);
+    });
+
+    it("sets a colleague's effort in the profile, adds it, or takes it out", () => {
+        const profile = "\uFEFF---\r\nname: matteo-conti\r\neffort: high\r\n---\r\n\r\n# Matteo\r\n";
+        assert.equal(withEffort(profile, "low"), "\uFEFF---\r\nname: matteo-conti\r\neffort: low\r\n---\r\n\r\n# Matteo\r\n");
+        assert.equal(withEffort(profile, undefined), "\uFEFF---\r\nname: matteo-conti\r\n---\r\n\r\n# Matteo\r\n");
+        assert.equal(withEffort("---\nname: sara\n---\n# Sara\n", "max"), "---\nname: sara\neffort: max\n---\n# Sara\n");
+        assert.equal(withEffort("# Sara, no frontmatter\n", "max"), "# Sara, no frontmatter\n");
+        assert.equal(withEffort("---\nname: sara\n---\neffort: in the body\n", undefined), "---\nname: sara\n---\neffort: in the body\n");
+    });
+
+    it("finds a todo's open lines", () => {
         assert.deepEqual(openTasks("- [ ] uno\r\n- [x] fatto\r\n  - [ ] due"), ["uno", "due"]);
     });
 
@@ -70,9 +90,7 @@ describe("words", () => {
         assert.equal(languageOf(undefined, undefined, undefined), "en");
     });
 
-    it("says how long ago, and lists names", () => {
-        const now = Date.UTC(2026, 9, 10, 12, 0);
-        assert.deepEqual([0, 5, 60, 180, 1500, 4400].map(minutes => formatAgo(now - minutes * 60000, now, words.it)), ["adesso", "5 min fa", "un'ora fa", "3 ore fa", "ieri", "3 giorni fa"]);
+    it("lists names", () => {
         assert.equal(listNames(["Matteo", "Giulia", "Sara"], "e"), "Matteo, Giulia e Sara");
         assert.equal(listNames(["Matteo"], "and"), "Matteo");
     });

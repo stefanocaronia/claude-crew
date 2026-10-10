@@ -43,6 +43,8 @@ const backlogPortraitBudget = 40_000;
 // Material's outline and hover state layer, in grays that read on light and dark themes.
 // The sections' icons, drawn as text (U+FE0E) so they stay monochrome like the buttons' symbols.
 const sectionIcons = { meeting: "☰", working: "⚒\uFE0E", finished: "✓", resting: "☕\uFE0E" };
+// The error color, readable on both themes: the firing buttons.
+const errorColor = "#D0453F";
 const outline = "#8080803d";
 const stateLayer = "#80808014";
 // The name 2 px larger than the panel's text (13 px), and larger still in a colleague's own card.
@@ -368,7 +370,8 @@ export const register: Register = (on, options) => {
             // Firing goes to Claude at once, who asks for a yes in the chat before anything.
             const fireButtons = (key: string, members: Colleague[]) => {
                 const names = listNames(members.map(member => member.name), say.and);
-                return <Button key={key} label={`✕ ${say.fire(names)}`} onPress={() => send(say.firePrompt(names))} />;
+                // In the error color: a firing is the one action that takes someone away.
+                return <Button key={key} onPress={() => send(say.firePrompt(names))}><Text color={errorColor}>{`✕ ${say.fire(names)}`}</Text></Button>;
             };
             const meet = async (members: Colleague[]) => {
                 await update($, view, current => ({ ...current, picked: [] }));
@@ -594,7 +597,7 @@ export const register: Register = (on, options) => {
                                             <Text dimColor wrap="truncate-end">{tile.label}</Text>
                                         </Box>
                                         <Text bold wrap="truncate-end">{tile.value}{tile.note ? <Text dimColor>{` · ${tile.note}`}</Text> : null}</Text>
-                                        {tile.share === undefined ? null : bar(ui, e.surface, tile.share, tile.share > 0.85 ? "#D0453F" : tile.share > 0.6 ? "#D9932B" : "#3B9C5F")}
+                                        {tile.share === undefined ? null : bar(ui, e.surface, tile.share, tile.share > 0.85 ? errorColor : tile.share > 0.6 ? "#D9932B" : "#3B9C5F")}
                                     </Box>
                                 ))}
                             </Box>

@@ -210,6 +210,7 @@ test("under the team: the backlog, each task with who holds it and its effort; a
         expect(await ui.find({ key: "act-hire" })).toBeUndefined();
         await ui.press({ key: "act-round" });
         expect(filled.at(-1)).toBe("run a review round with Sara and Matteo on ");
+        expect(await ui.find({ type: "Text", text: "✕ Fire Sara and Matteo" })).toBeDefined();
         await ui.press({ key: "act-fire" });
         expect(submitted.at(-1)).toBe("fire Sara and Matteo");
         await ui.press({ key: "act-portraits-style" });

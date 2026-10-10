@@ -1,17 +1,17 @@
-// The colleagues' panel and their meetings: a card for each colleague, their runs with the steps they report, the week's budget,
-// a meeting drawn as a group chat with its controls above the prompt. The meeting itself is the colleagues plugin's hook: the
-// controls send it the phrases it understands, and its state file says who is in the conversation.
+// The colleagues' panel and their meetings: the team with their portraits, who is at work and the steps they report, a colleague's
+// card, and a meeting drawn as a group chat with its controls above the prompt. The meeting itself is the colleagues plugin's
+// hook: the controls send it the phrases it understands, and its state file says who is in the conversation.
 import { atom, read, update } from "claude-code";
 import type { EngineInterface, Register } from "claude-code";
 
 import type { Colleague, Run } from "../types";
 
-import { headerHeight, headerSvg, idleHeight, idleSvg, meetingHeight, meetingSvg, runHeight, runSvg, speakerHeight, speakerSvg, contextShare, progressOf } from "./draw.ts";
-import type { Words } from "./draw.ts";
+import { avatarSvg, barSvg } from "./draw.ts";
 import { isEnding, isNarration, segmentsOf, speakersOf } from "./meeting.ts";
-import { cardFrom, colleagueFrom, colleagueOf } from "./team.ts";
-import { contextWindowOf, formatTime, formatTokens, formatUntil, languageOf, modelName, words } from "./text.ts";
-import type { Language } from "./text.ts";
+import { contextShare, progressOf, totalTime } from "./progress.ts";
+import { cardFrom, colleagueFrom, colleagueOf, latestHeading, openTasks } from "./team.ts";
+import { contextWindowOf, formatAgo, formatTime, formatTokens, formatUntil, languageOf, listNames, modelName, words } from "./text.ts";
+import type { Language, Words } from "./text.ts";
 
 const pane = "colleagues";
 const stepTool = "mcp__colleagues-mod__step";
@@ -21,12 +21,18 @@ const meeting = atom({ plugin: "colleagues-mod", key: "meeting" } as const, { me
 const budget = atom({ plugin: "colleagues-mod", key: "budget" } as const, []);
 const view = atom({ plugin: "colleagues-mod", key: "view" } as const, { isFinishedCollapsed: false, autoOpened: false });
 const card = atom({ plugin: "colleagues-mod", key: "card" } as const, null);
+const gallery = atom({ plugin: "colleagues-mod", key: "gallery" } as const, 0);
+const board = atom({ plugin: "colleagues-mod", key: "board" } as const, { news: [], tasks: [], checkedAt: 0 });
 const now = atom({ plugin: "colleagues-mod", key: "now" } as const, 0);
 
-// Module scope, set again by session.start at every load: the portraits as data URIs, and the panel's language.
+// Module scope, set again at every load: the portraits as data URIs (too large for the state, whose `gallery` says when they
+// changed), and the panel's language.
 let portraits = new Map<string, string>();
+let portraitsRead = "";
 let language: Language = "en";
 const say = (): Words => words[language];
+
+type Table = ReturnType<EngineInterface["ui"]["resolve"]>;
 
 export const register: Register = (on, options) => {
     on("session.start", async ($, e, next) => {
@@ -48,7 +54,7 @@ export const register: Register = (on, options) => {
             },
             isDeferred: false,
         });
-        await $.command.register({ name: "colleagues-panel", description: "Show or hide the colleagues panel: the team, who is at work, the meeting, the week's budget" });
+        await $.command.register({ name: "colleagues-panel", description: "Show or hide the colleagues panel: the team with their cards, who is at work, the steps they report" });
         await refresh($);
 
         // The team is there to be seen from the start: the panel opens once, where the surface docks it beside the chat.
@@ -201,115 +207,189 @@ export const register: Register = (on, options) => {
         return next(e);
     });
 
+    // The panel: the team, each with portrait, name (which opens their card), role and open tasks; who is at work above them.
     on("ui.render", { component: "Pane", requestId: pane }, async ($, e) => {
         const ui = $.ui.resolve(e);
         const { Box, Text, Button, Markdown } = ui;
-        const words = say();
+        const say = words[language];
         const colleagues = await read($, team);
         const list = await read($, runs);
         const talk = await read($, meeting);
         const windows = await read($, budget);
         const panel = await read($, view);
+        const stamp = await read($, gallery);
+        const latest = await read($, board);
         const at = Math.max(await read($, now), ...list.map(run => run.startedAt), 0);
-        const width = Math.max(240, Math.min(900, (e.props.bodyColumns || 40) * 8 - 8));
         const byId = new Map(colleagues.map(colleague => [colleague.id, colleague]));
         const running = list.filter(run => run.status === "running").reverse();
         const finished = list.filter(run => run.status !== "running").reverse();
         const busy = new Set(running.map(run => run.colleague));
         const idle = colleagues.filter(colleague => !busy.has(colleague.id));
         const selected = panel.selected ? byId.get(panel.selected) : undefined;
-        // The meeting itself lives in the main chat and above the prompt: here it is only a ring on who is in it.
-        const presence = (colleague: Colleague) => (talk.last === colleague.id ? "speaking" : talk.members.includes(colleague.id) ? "member" : undefined);
-        const isDesktop = e.surface === "desktop" && "Svg" in ui;
-
-        if (!colleagues.length) {
-            return <Text dimColor>{words.empty}</Text>;
-        }
-
-        if (selected) {
-            const details = await read($, card);
-            return (
-                <Box flexDirection="column" gap={1}>
-                    <Button key="back" label={`← ${words.team}`} plain onPress={() => update($, view, current => ({ ...current, selected: undefined }))} />
-                    {isDesktop && "Svg" in ui
-                        ? <ui.Svg source={idleSvg(width, selected, portraits, words)} alt={`${selected.fullName}, ${selected.role}`} width={width} height={idleHeight} />
-                        : <Text bold color={selected.color}>{selected.fullName} <Text dimColor>· {selected.role}</Text></Text>}
-                    {details?.id === selected.id && details.description ? <Text dimColor>{details.description}</Text> : null}
-                    {details?.id === selected.id ? <Markdown key="todo" text={details.openTasks.length ? details.openTasks.map(task => `- ${task}`).join("\n") : `*${words.toDo(0)}*`} /> : null}
-                    {details?.id === selected.id && details.memory ? <Markdown key="memory" text={clip(details.memory, 1600)} dimColor /> : null}
-                    <Button key="talk" label={`${words.talk} ${selected.name}`} onPress={() => void $.prompt.fill({ text: words.talkPrompt(selected.name), mode: "replace" })} />
-                </Box>
-            );
-        }
-
+        // The meeting itself is in the main chat and above the prompt: here only a ring says who is in it.
+        const presence = (colleague: Colleague) => (talk.last === colleague.id ? say.speaking : talk.members.includes(colleague.id) ? say.inMeeting : "");
+        const face = (colleague: Colleague, size: number, isRinged = false, isWorking = false) => faceOf(ui, e.surface, colleague, size, stamp, isRinged, isWorking);
         const open = (colleague: Colleague) => async () => {
             await update($, view, current => ({ ...current, selected: colleague.id }));
             await readCard($, colleague.id);
         };
-        const chips = (
-            <Box key="chips" flexDirection="row" flexWrap="wrap" gap={1}>
-                {colleagues.map(colleague => <Button key={`open-${colleague.id}`} label={colleague.name} plain onPress={open(colleague)} />)}
+        const name = (colleague: Colleague) => <Button key={`open-${colleague.id}`} label={colleague.fullName} plain onPress={open(colleague)} />;
+        const heading = (colleague: Colleague) => (
+            <Box key={`name-${colleague.id}`} flexDirection="row" flexWrap="wrap" columnGap={1} alignItems="center">
+                {name(colleague)}
+                <Text color={colleague.color}>{colleague.role}</Text>
+            </Box>
+        );
+
+        if (!colleagues.length) {
+            return <Text dimColor>{say.empty}</Text>;
+        }
+
+        if (selected) {
+            const details = (await read($, card))?.id === selected.id ? await read($, card) : null;
+            return (
+                <Box flexDirection="column" gap={1}>
+                    <Button key="back" label={`← ${say.team}`} plain onPress={() => update($, view, current => ({ ...current, selected: undefined }))} />
+                    <Box key="who" flexDirection="row" flexWrap="nowrap" gap={2} alignItems="center">
+                        {face(selected, 72, Boolean(presence(selected)))}
+                        <Box flexDirection="column" flexShrink={1}>
+                            <Text bold color={selected.color}>{selected.fullName}</Text>
+                            <Text>{selected.role}</Text>
+                            <Text dimColor>{[presence(selected), say.toDo(selected.openTasks), selected.model ? modelName(selected.model) : "", selected.effort ?? ""].filter(Boolean).join(" · ")}</Text>
+                        </Box>
+                    </Box>
+                    {details?.description ? <Text key="description" dimColor>{details.description}</Text> : null}
+                    <Text key="h-tasks" bold>{say.tasks}</Text>
+                    {details ? <Markdown key="tasks" text={details.openTasks.length ? details.openTasks.map(task => `- ${task}`).join("\n") : `*${say.toDo(0)}*`} /> : null}
+                    {details?.memory ? <Text key="h-memory" bold>{say.memory}</Text> : null}
+                    {details?.memory ? <Markdown key="memory" text={clip(details.memory, 1600)} dimColor /> : null}
+                    <Button key="talk" label={`${say.talk} ${selected.name}`} onPress={() => void $.prompt.fill({ text: say.talkPrompt(selected.name), mode: "replace" })} />
+                </Box>
+            );
+        }
+
+        const runRow = (run: Run) => {
+            const colleague = byId.get(run.colleague);
+
+            if (!colleague) {
+                return null;
+            }
+
+            const progress = progressOf(run);
+            const steps = run.stepTotal ? `${run.stepDone ?? 0}/${run.stepTotal}${run.stepNote ? ` · ${run.stepNote}` : ""}` : "";
+            const stats = `ctx ${Math.round(contextShare(run) * 100)}% · ${formatTokens(run.tokens)} · ${formatTime((run.endedAt ?? at) - run.startedAt)}`;
+            const mark = run.status === "running" ? "●" : run.status === "done" ? "✓" : "✗";
+            return (
+                <Box key={run.agentId} flexDirection="row" flexWrap="nowrap" gap={1} alignItems="center">
+                    {face(colleague, 44, true, run.status === "running")}
+                    <Box flexDirection="column" flexGrow={1} flexShrink={1}>
+                        {heading(colleague)}
+                        <Text dimColor wrap="truncate-end">{[run.task, `${modelName(run.model)}${run.effort ? ` · ${run.effort}` : ""}`, run.status === "failed" ? say.failed : ""].filter(Boolean).join(" · ")}</Text>
+                        <Box flexDirection="row" flexWrap="wrap" columnGap={1} alignItems="center">
+                            {bar(ui, e.surface, progress ?? contextShare(run), progress === undefined ? undefined : colleague.color)}
+                            {steps ? <Text>{steps}</Text> : null}
+                            <Text dimColor>{stats}</Text>
+                        </Box>
+                    </Box>
+                    <Text color={run.status === "failed" ? "#D0453F" : run.status === "done" ? "#3B9C5F" : colleague.color}>{mark}</Text>
+                </Box>
+            );
+        };
+        const idleRow = (colleague: Colleague) => (
+            <Box key={`idle-${colleague.id}`} flexDirection="row" flexWrap="nowrap" gap={1} alignItems="center">
+                {face(colleague, 40, Boolean(presence(colleague)))}
+                <Box flexDirection="column" flexGrow={1} flexShrink={1}>
+                    {heading(colleague)}
+                    <Text dimColor wrap="truncate-end">{[presence(colleague), say.toDo(colleague.openTasks), colleague.model ? modelName(colleague.model) : "", colleague.effort ?? ""].filter(Boolean).join(" · ")}</Text>
+                </Box>
             </Box>
         );
         const toggleFinished = (
             <Button
                 key="finished"
-                label={`${panel.isFinishedCollapsed ? "▸" : "▾"} ${words.finished} · ${finished.length}`}
+                label={`${panel.isFinishedCollapsed ? "▸" : "▾"} ${say.finished} · ${finished.length}`}
                 plain
                 onPress={() => update($, view, current => ({ ...current, isFinishedCollapsed: !current.isFinishedCollapsed }))}
             />
         );
-
-        if (isDesktop && "Svg" in ui) {
-            const { Svg } = ui;
-            const runCard = (run: Run) => {
-                const colleague = byId.get(run.colleague);
-                return colleague ? <Svg key={run.agentId} source={runSvg(width, run, colleague, portraits, at, words)} alt={`${colleague.fullName}: ${run.task}`} width={width} height={runHeight} /> : null;
-            };
-            return (
-                <Box flexDirection="column">
-                    <Svg key="header" source={headerSvg(width, windows, list, at, words)} alt={words.week} width={width} height={headerHeight} />
-                    {running.length ? <Text key="h-working" dimColor>{words.working} · {running.length}</Text> : null}
-                    {running.map(runCard)}
-                    {finished.length ? toggleFinished : null}
-                    {panel.isFinishedCollapsed ? null : finished.map(runCard)}
-                    <Text key="h-team" dimColor>{words.team} · {idle.length}</Text>
-                    {idle.map(colleague => <Svg key={`idle-${colleague.id}-${colleague.avatarStamp}`} source={idleSvg(width, colleague, portraits, words, presence(colleague))} alt={`${colleague.fullName}, ${colleague.role}`} width={width} height={idleHeight} />)}
-                    <Text key="h-cards" dimColor>{words.cards}</Text>
-                    {chips}
-                </Box>
-            );
-        }
-
-        // The terminal: the same in rows of text.
-        const columns = Math.max(24, e.props.bodyColumns || 40);
-        const barWidth = Math.max(6, Math.min(20, columns - 34));
-        const row = (run: Run) => {
-            const colleague = byId.get(run.colleague);
-            const share = progressOf(run) ?? contextShare(run);
-            const steps = run.stepTotal ? `${run.stepDone ?? 0}/${run.stepTotal}${run.stepNote ? ` ${run.stepNote}` : ""} · ` : "";
+        // Only what the engine knows: the plan's windows when it has a reading, the colleagues' work once there is some.
+        const tiles = [
+            ...windows.filter(window => window.kind === "seven_day" || window.kind === "five_hour").map(window => ({
+                label: window.kind === "seven_day" ? say.week : say.hours,
+                value: `${Math.round(window.percentUsed)}%`,
+                note: window.resetsAt ? `↻ ${formatUntil(window.resetsAt, at)}` : "",
+            })),
+            ...(list.length ? [{ label: `${say.tokens} · ${say.time}`, value: `${formatTokens(list.reduce((sum, run) => sum + run.tokens, 0))} · ${formatTime(totalTime(list, at))}`, note: "" }] : []),
+        ];
+        // Under the team: the latest line of each memory, every open task by colleague, and a few phrases to start from.
+        const newsRows = latest.news.slice(0, 5).flatMap(item => {
+            const colleague = byId.get(item.colleague);
             return colleague
-                ? (
-                    <Box key={run.agentId} flexDirection="column" marginBottom={1}>
-                        <Text wrap="truncate-end"><Text color={colleague.color} bold>● {colleague.fullName}</Text> <Text dimColor>{run.task}</Text></Text>
-                        <Text dimColor wrap="truncate-end">  {modelName(run.model)}{run.effort ? ` · ${run.effort}` : ""}</Text>
-                        <Text wrap="truncate-end">  <Text color={colleague.color}>{bar(share, barWidth)}</Text><Text dimColor> {steps}{formatTokens(run.tokens)} · {formatTime((run.endedAt ?? at) - run.startedAt)}</Text></Text>
+                ? [(
+                    <Box key={`news-${colleague.id}`} flexDirection="row" flexWrap="nowrap" gap={1} alignItems="flex-start">
+                        {face(colleague, 24)}
+                        <Box flexDirection="column" flexGrow={1} flexShrink={1}>
+                            <Box flexDirection="row" flexWrap="wrap" columnGap={1} alignItems="center">
+                                <Button key={`news-open-${colleague.id}`} label={colleague.name} plain onPress={open(colleague)} />
+                                <Text dimColor>{formatAgo(item.at, latest.checkedAt, say)}</Text>
+                            </Box>
+                            <Text wrap="truncate-end">{item.heading}</Text>
+                        </Box>
                     </Box>
-                )
-                : null;
-        };
-        const week = windows.find(window => window.kind === "seven_day");
+                )]
+                : [];
+        });
+        const expanded = panel.expanded ?? [];
+        const taskGroups = latest.tasks.flatMap(group => {
+            const colleague = byId.get(group.colleague);
+            const isOpen = colleague ? expanded.includes(colleague.id) : false;
+            return colleague
+                ? [(
+                    <Box key={`tasks-${colleague.id}`} flexDirection="column">
+                        <Button
+                            key={`toggle-${colleague.id}`}
+                            label={`${isOpen ? "▾" : "▸"} ${colleague.name} · ${group.lines.length}`}
+                            plain
+                            onPress={() => update($, view, current => ({ ...current, expanded: isOpen ? (current.expanded ?? []).filter(id => id !== colleague.id) : [...(current.expanded ?? []), colleague.id] }))}
+                        />
+                        {isOpen ? <Markdown key={`list-${colleague.id}`} text={group.lines.map(line => `- ${clip(line, 240)}`).join("\n")} /> : null}
+                    </Box>
+                )]
+                : [];
+        });
+        const openCount = latest.tasks.reduce((sum, group) => sum + group.lines.length, 0);
+        const actions = (
+            <Box key="actions" flexDirection="row" flexWrap="wrap" gap={1}>
+                <Button key="act-round" label={say.startRound} onPress={() => void $.prompt.fill({ text: say.roundPrompt, mode: "replace" })} />
+                <Button key="act-meeting" label={say.meetAll} onPress={() => void $.prompt.fill({ text: say.talkPrompt(listNames(colleagues.map(colleague => colleague.name), say.and)), mode: "replace" })} />
+                <Button key="act-hire" label={say.hire} onPress={() => void $.prompt.fill({ text: say.hirePrompt, mode: "replace" })} />
+            </Box>
+        );
         return (
-            <Box flexDirection="column">
-                {week ? <Text dimColor>{words.week} {Math.round(week.percentUsed)}%{week.resetsAt ? ` · ↻ ${formatUntil(week.resetsAt, at)}` : ""}</Text> : null}
-                {running.length ? <Text dimColor>{words.working} · {running.length}</Text> : null}
-                {running.map(row)}
+            <Box flexDirection="column" gap={1}>
+                {tiles.length
+                    ? (
+                        <Box key="tiles" flexDirection="row" flexWrap="wrap" columnGap={3}>
+                            {tiles.map(tile => (
+                                <Box key={`tile-${tile.label}`} flexDirection="column">
+                                    <Text dimColor>{tile.label}</Text>
+                                    <Text bold>{tile.value}{tile.note ? <Text dimColor> {tile.note}</Text> : null}</Text>
+                                </Box>
+                            ))}
+                        </Box>
+                    )
+                    : null}
+                {running.length ? <Text key="h-working" dimColor>{say.working} · {running.length}</Text> : null}
+                {running.map(runRow)}
                 {finished.length ? toggleFinished : null}
-                {panel.isFinishedCollapsed ? null : finished.map(row)}
-                <Text dimColor>{words.team} · {idle.length}</Text>
-                {idle.map(colleague => <Text key={`idle-${colleague.id}`} wrap="truncate-end"><Text color={colleague.color}>{presence(colleague) ? "◉ " : "● "}</Text>{colleague.fullName} <Text dimColor>· {colleague.role} · {words.toDo(colleague.openTasks)}{presence(colleague) ? ` · ${presence(colleague) === "speaking" ? words.speaking : words.inMeeting}` : ""}</Text></Text>)}
-                <Text dimColor>{words.cards}</Text>
-                {chips}
+                {panel.isFinishedCollapsed ? null : finished.map(runRow)}
+                <Text key="h-team" dimColor>{say.team} · {idle.length}</Text>
+                {idle.map(idleRow)}
+                {newsRows.length ? <Text key="h-news" dimColor>{say.news}</Text> : null}
+                {newsRows}
+                {taskGroups.length ? <Text key="h-tasks" dimColor>{say.openTasks} · {openCount}</Text> : null}
+                {taskGroups}
+                {actions}
             </Box>
         );
     });
@@ -327,26 +407,18 @@ export const register: Register = (on, options) => {
 
         const ui = $.ui.resolve(e);
         const { Box, Text } = ui;
-        const words = say();
-
-        if (e.surface !== "terminal" && "Svg" in ui) {
-            const width = Math.max(240, Math.min(900, (e.props.bodyColumns || 100) * 8 - 96));
-            return (
-                <Box flexDirection="column">
-                    <ui.Svg source={meetingSvg(width, members, byId.get(talk.last ?? ""), portraits, words)} alt={`${words.meeting}: ${members.map(member => member.name).join(", ")}`} width={width} height={meetingHeight} />
-                    {meetingControls($, ui, members, colleagues, words)}
-                </Box>
-            );
-        }
-
+        const say = words[language];
+        const stamp = await read($, gallery);
+        const last = talk.last ? byId.get(talk.last) : undefined;
         return (
             <Box flexDirection="column">
-                <Text>
-                    <Text bold>{words.meeting}: </Text>
-                    {members.map((member, index) => <Text key={member.id} color={member.color} bold={member.id === talk.last}>{index ? ", " : ""}{member.name}</Text>)}
-                    {talk.last ? <Text dimColor> · {words.speaking}: {byId.get(talk.last)?.name}</Text> : null}
-                </Text>
-                {meetingControls($, ui, members, colleagues, words)}
+                <Box key="who" flexDirection="row" flexWrap="wrap" columnGap={1} alignItems="center">
+                    <Text bold>{say.meeting}</Text>
+                    {members.map(member => faceOf(ui, e.surface, member, 26, stamp, member === last))}
+                    <Text key="members">{members.map((member, index) => <Text key={`member-${member.id}`} color={member.color} bold={member === last}>{index ? `, ${member.name}` : member.name}</Text>)}</Text>
+                    {last ? <Text key="speaking" dimColor>· {say.speaking}: {last.name}</Text> : null}
+                </Box>
+                {meetingControls($, ui, members, colleagues)}
             </Box>
         );
     });
@@ -365,9 +437,7 @@ export const register: Register = (on, options) => {
 
         const ui = $.ui.resolve(e);
         const { Box, Text, Markdown } = ui;
-        const width = Math.max(240, Math.min(560, (e.viewport?.columns ?? 70) * 8 - 32));
-        // Every surface hands out the whole table, an element it lacks drawing nothing: the terminal draws no Svg.
-        const drawsSvg = e.surface !== "terminal";
+        const stamp = await read($, gallery);
         return (
             <Box flexDirection="column" gap={1}>
                 {segments.map((segment, index) => {
@@ -377,14 +447,18 @@ export const register: Register = (on, options) => {
                         return <Markdown key={`n${index}`} text={segment.text} dimColor />;
                     }
 
-                    const head = segment.isContinued ? null
-                        : drawsSvg && "Svg" in ui
-                        ? <ui.Svg source={speakerSvg(width, speaker, portraits)} alt={`${speaker.fullName}, ${speaker.role}`} width={width} height={speakerHeight} />
-                        : <Text><Text color={speaker.color} bold>● {speaker.fullName}</Text> <Text dimColor>{speaker.role}</Text></Text>;
                     return (
                         <Box key={`s${index}`} flexDirection="column">
-                            {head}
-                            <Box paddingLeft={drawsSvg ? 4 : 2}><Markdown text={segment.text} /></Box>
+                            {segment.isContinued
+                                ? null
+                                : (
+                                    <Box flexDirection="row" flexWrap="nowrap" gap={1} alignItems="center">
+                                        {faceOf(ui, e.surface, speaker, 28, stamp)}
+                                        <Text bold color={speaker.color}>{speaker.fullName}</Text>
+                                        <Text dimColor>{speaker.role}</Text>
+                                    </Box>
+                                )}
+                            <Box paddingLeft={e.surface === "terminal" ? 2 : 4}><Markdown text={segment.text} /></Box>
                         </Box>
                     );
                 })}
@@ -393,9 +467,33 @@ export const register: Register = (on, options) => {
     });
 };
 
+// A colleague's portrait at a fixed size; the terminal draws no pictures, so a dot in their color stands for it there.
+function faceOf(ui: Table, surface: string, colleague: Colleague, size: number, stamp: number, isRinged = false, isWorking = false)
+{
+    const { Text } = ui;
+
+    if (surface === "terminal" || !("Svg" in ui)) {
+        return <Text key={`face-${colleague.id}`} color={colleague.color}>{isWorking ? "◉" : isRinged ? "◎" : "●"}</Text>;
+    }
+
+    return <ui.Svg key={`face-${colleague.id}-${stamp}`} source={avatarSvg(colleague, portraits.get(colleague.id), size, isRinged, isWorking)} alt={colleague.fullName} width={size} height={size} />;
+}
+
+function bar(ui: Table, surface: string, share: number, color: string | undefined)
+{
+    const { Text } = ui;
+
+    if (surface === "terminal" || !("Svg" in ui)) {
+        const filled = Math.round(12 * Math.max(0, Math.min(1, share)));
+        return <Text key="bar" color={color} dimColor={!color}>{"█".repeat(filled) + "░".repeat(12 - filled)}</Text>;
+    }
+
+    return <ui.Svg key="bar" source={barSvg(share, color, 120)} alt={`${Math.round(share * 100)}%`} width={120} height={6} />;
+}
+
 // The meeting's controls: a ✕ to let each one go, a menu to invite the others, a button to close it. Each sends the phrase the
 // colleagues plugin's hook understands, as if the user typed it.
-function meetingControls($: EngineInterface, ui: ReturnType<EngineInterface["ui"]["resolve"]>, members: Colleague[], colleagues: Colleague[], words: Words)
+function meetingControls($: EngineInterface, ui: Table, members: Colleague[], colleagues: Colleague[])
 {
     const { Box, Button } = ui;
     const others = colleagues.filter(colleague => !members.includes(colleague));
@@ -425,13 +523,15 @@ function meetingControls($: EngineInterface, ui: ReturnType<EngineInterface["ui"
     );
 }
 
-// The team from their files, the budget's windows, and who is in the conversation.
+// The team from their files, their news and open tasks, the budget's windows, and who is in the conversation.
 async function refresh($: EngineInterface): Promise<void>
 {
     const root = await projectRoot($);
     const agents = `${root}/.claude/agents`;
     const loaded: Colleague[] = [];
     const found = new Map<string, string>();
+    const news: { colleague: string; heading: string; at: number }[] = [];
+    const tasks: { colleague: string; lines: string[] }[] = [];
 
     for (const entry of (await $.fs.exists(agents)) ? await $.fs.list(agents) : []) {
         const id = entry.name.endsWith(".md") ? entry.name.slice(0, -".md".length) : "";
@@ -442,15 +542,45 @@ async function refresh($: EngineInterface): Promise<void>
         }
 
         const portrait = await readPortrait($, folder);
+        const todo = await $.fs.read(`${folder}/todo.md`);
+        const lines = openTasks(todo);
 
         if (portrait) {
             found.set(id, portrait.uri);
         }
 
-        loaded.push(colleagueFrom(id, await $.fs.read(`${agents}/${entry.name}`), await $.fs.read(`${folder}/todo.md`), portrait?.stamp ?? 0));
+        if (await $.fs.exists(`${folder}/MEMORY.md`)) {
+            const heading = latestHeading(await $.fs.read(`${folder}/MEMORY.md`));
+
+            if (heading) {
+                news.push({ colleague: id, heading, at: (await $.fs.stat(`${folder}/MEMORY.md`)).mtimeMs });
+            }
+        }
+
+        if (lines.length) {
+            tasks.push({ colleague: id, lines });
+        }
+
+        loaded.push(colleagueFrom(id, await $.fs.read(`${agents}/${entry.name}`), todo, portrait?.stamp ?? 0));
     }
 
+    const checkedAt = await $.clock.now();
+    await update($, board, () => ({
+        news: news.sort((first, second) => second.at - first.at || first.colleague.localeCompare(second.colleague)),
+        tasks: tasks.sort((first, second) => second.lines.length - first.lines.length || first.colleague.localeCompare(second.colleague)),
+        checkedAt,
+    }));
+
+    // The drawings read the portraits from the module, which a reload empties: `gallery` tells them to draw again.
+    const signature = [...found].map(([id, uri]) => `${id}:${uri.length}`).join("|");
     portraits = found;
+
+    if (signature !== portraitsRead) {
+        portraitsRead = signature;
+        const at = await $.clock.now();
+        await update($, gallery, () => at);
+    }
+
     const sorted = loaded.sort((first, second) => first.name.localeCompare(second.name));
 
     // Every message in the chat draws from the team: it is written only when it changed.
@@ -543,7 +673,8 @@ async function openOnce($: EngineInterface): Promise<void>
     }
 
     await update($, view, current => ({ ...current, autoOpened: true }));
-    void $.ui.open({ id: pane, title: say().pane });
+    // A session with nowhere to draw (headless) has no pane to open.
+    void $.ui.open({ id: pane, title: say().pane }).catch(() => undefined);
 }
 
 async function settingsLanguage($: EngineInterface): Promise<string | undefined>
@@ -554,12 +685,6 @@ async function settingsLanguage($: EngineInterface): Promise<string | undefined>
     } catch {
         return undefined;
     }
-}
-
-function bar(share: number, width: number): string
-{
-    const filled = Math.round(width * Math.max(0, Math.min(1, share)));
-    return "█".repeat(filled) + "░".repeat(Math.max(0, width - filled));
 }
 
 function clip(text: string, length: number): string

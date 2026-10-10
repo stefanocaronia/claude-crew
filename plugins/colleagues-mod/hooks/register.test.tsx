@@ -100,7 +100,8 @@ test("a reply with colleagues speaking is drawn as a group chat, the narrator ap
 
     for (const surface of surfaces) {
         const ui = await $.ui.mount({ plugin, surface, component: "AssistantMessage", props: { text, isFirstOfReply: true } });
-        expect(surface === "desktop" ? await ui.find({ type: "Svg" }) : await ui.find({ type: "Text", text: /Matteo Conti/ })).toBeDefined();
+        expect(await ui.find({ type: "Text", text: "Matteo Conti" })).toBeDefined();
+        expect(Boolean(await ui.find({ type: "Svg" }))).toBe(surface === "desktop");
         expect((await ui.find({ type: "Markdown", text: /parser regge/ }))?.props.dimColor).toBeUndefined();
         expect((await ui.find({ type: "Markdown", text: /apre il file/ }))?.props.dimColor).toBe(true);
         expect(await ui.find({ type: "Markdown", text: /prova di ieri/ })).toBeDefined();
@@ -117,9 +118,32 @@ test("the panel marks who is in the meeting, whose controls stay above the promp
         expect(await ui.find({ key: "close" })).toBeUndefined();
 
         if (surface === "terminal") {
-            expect(await ui.find({ type: "Text", text: /Matteo Conti.*in the meeting/ })).toBeDefined();
+            expect(await ui.find({ type: "Text", text: /in the meeting · 1 to do/ })).toBeDefined();
         }
 
+        await ui.unmount();
+    }
+});
+
+test("under the team: the latest news, the open tasks by colleague, and phrases to start from", async ($, on) => {
+    world(on, []);
+    const filled: string[] = [];
+    on("prompt.fill", (_, e) => {
+        filled.push(e.text);
+        return { isFilled: true } as never;
+    });
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+
+    for (const surface of surfaces) {
+        const ui = await $.ui.mount({ plugin, surface, component: "Pane", requestId: "colleagues", props: { title: "Colleagues", isFocused: false, bodyColumns: 50, placement: "dock" } as never });
+        expect(await ui.find({ type: "Text", text: "9 October" })).toBeDefined();
+        expect(await ui.find({ type: "Text", text: "Open tasks · 2" })).toBeDefined();
+        expect(await ui.find({ type: "Markdown", text: /retest the parser/ })).toBeUndefined();
+        await ui.press({ key: "toggle-matteo-conti" });
+        expect(await ui.find({ type: "Markdown", text: /retest the parser/ })).toBeDefined();
+        await ui.press({ key: "toggle-matteo-conti" });
+        await ui.press({ key: "act-meeting" });
+        expect(filled.at(-1)).toBe("I want to talk to Giulia, Matteo and Sara ");
         await ui.unmount();
     }
 });
@@ -131,12 +155,12 @@ test("the panel shows who is at work and the team, and a colleague's card", asyn
 
     for (const surface of surfaces) {
         const ui = await $.ui.mount({ plugin, surface, component: "Pane", requestId: "colleagues", props: { title: "Colleagues", isFocused: false, bodyColumns: 50, placement: "dock" } as never });
-        const alts = (await ui.findAll({ type: "Svg" })).map(found => String(found.props.alt));
-        expect(surface === "desktop" ? alts.includes("Matteo Conti: review the parser") : Boolean(await ui.find({ type: "Text", text: /review the parser/ }))).toBe(true);
+        expect(await ui.find({ type: "Text", text: /review the parser/ })).toBeDefined();
+        expect(Boolean(await ui.find({ type: "Svg", props: { alt: "Matteo Conti" } } as never))).toBe(surface === "desktop");
         await ui.press({ key: "open-matteo-conti" });
         expect(await ui.find({ type: "Markdown", text: /retest the parser/ })).toBeDefined();
         await ui.press({ key: "back" });
-        expect((await ui.find({ key: "open-giulia-ferri" }))?.props.label).toBe("Giulia");
+        expect((await ui.find({ key: "open-giulia-ferri" }))?.props.label).toBe("Giulia Ferri");
         await ui.unmount();
     }
 });

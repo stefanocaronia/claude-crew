@@ -48,9 +48,25 @@ export type Budget = {
     resetsAt?: string;
 };
 
+/** The last section of a colleague's memory, and when their memory last changed. */
+export type News = {
+    colleague: string;
+    heading: string;
+    at: number;
+};
+
+/** The team's latest news and open tasks, read from their files at every turn. */
+export type Board = {
+    news: News[];
+    tasks: { colleague: string; lines: string[] }[];
+    checkedAt: number;
+};
+
 export type PanelView = {
     isFinishedCollapsed: boolean;
     autoOpened: boolean;
+    /** The colleagues whose open tasks the panel shows, by id. */
+    expanded?: string[];
     /** The colleague whose card the panel shows, by id. */
     selected?: string;
 };
@@ -72,6 +88,9 @@ declare module "claude-code" {
             budget: Budget[];
             view: PanelView;
             card: Card | null;
+            board: Board;
+            /** Changes when the portraits are read again, so the drawings that show them are redrawn. */
+            gallery: number;
             now: number;
         };
     }

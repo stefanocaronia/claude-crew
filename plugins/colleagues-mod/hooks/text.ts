@@ -1,5 +1,6 @@
 // The panel's words in English and Italian, and how numbers, times and models are written.
 export type Language = "en" | "it";
+export type Words = (typeof words)["en"];
 
 export const words = {
     en: {
@@ -14,7 +15,21 @@ export const words = {
         meeting: "Meeting",
         speaking: "speaking",
         inMeeting: "in the meeting",
-        cards: "Open a card:",
+        tasks: "To do",
+        news: "From the team",
+        openTasks: "Open tasks",
+        startRound: "Start a round",
+        roundPrompt: "run a review round with the colleagues on ",
+        meetAll: "Meeting with everyone",
+        hire: "Hire a colleague",
+        hirePrompt: "hire a colleague for ",
+        and: "and",
+        justNow: "just now",
+        minutesAgo: (count: number) => `${count} min ago`,
+        hoursAgo: (count: number) => (count === 1 ? "an hour ago" : `${count} hours ago`),
+        yesterday: "yesterday",
+        daysAgo: (count: number) => `${count} days ago`,
+        memory: "Latest in their memory",
         toDo: (count: number) => (count === 1 ? "1 to do" : `${count} to do`),
         talk: "Talk with",
         talkPrompt: (names: string) => `I want to talk to ${names} `,
@@ -37,7 +52,21 @@ export const words = {
         meeting: "Riunione",
         speaking: "parla",
         inMeeting: "in riunione",
-        cards: "Apri la scheda:",
+        tasks: "Da fare",
+        news: "Dalla squadra",
+        openTasks: "Compiti aperti",
+        startRound: "Avvia un giro",
+        roundPrompt: "fai un giro di revisione con i colleghi su ",
+        meetAll: "Riunione con tutti",
+        hire: "Assumi un collega",
+        hirePrompt: "assumi un collega esperto di ",
+        and: "e",
+        justNow: "adesso",
+        minutesAgo: (count: number) => `${count} min fa`,
+        hoursAgo: (count: number) => (count === 1 ? "un'ora fa" : `${count} ore fa`),
+        yesterday: "ieri",
+        daysAgo: (count: number) => `${count} giorni fa`,
+        memory: "Ultime righe della memoria",
         toDo: (count: number) => `${count} da fare`,
         talk: "Parla con",
         talkPrompt: (names: string) => `voglio parlare con ${names} `,
@@ -74,6 +103,21 @@ export function formatTime(milliseconds: number): string
     const minutes = Math.floor((seconds % 3600) / 60);
     const rest = String(seconds % 60).padStart(2, "0");
     return hours ? `${hours}:${String(minutes).padStart(2, "0")}:${rest}` : `${minutes}:${rest}`;
+}
+
+/** How long ago, in words: "adesso", "5 min fa", "2 ore fa", "ieri", "3 giorni fa". */
+export function formatAgo(at: number, now: number, say: Words): string
+{
+    const minutes = Math.max(0, Math.floor((now - at) / 60000));
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    return minutes < 1 ? say.justNow : hours < 1 ? say.minutesAgo(minutes) : days < 1 ? say.hoursAgo(hours) : days < 2 ? say.yesterday : say.daysAgo(days);
+}
+
+/** "Matteo, Giulia e Sara". */
+export function listNames(names: string[], and: string): string
+{
+    return names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} ${and} ${names.at(-1)}`;
 }
 
 /** How long until a window resets: "2d 5h", "3h 10m", "12m". */

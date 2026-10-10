@@ -54,7 +54,15 @@ export function colleagueOf(team: Colleague[], subagentType: string): Colleague 
     return team.find(colleague => colleague.id === bare);
 }
 
-function openTasks(todo: string): string[]
+/** The heading of the last section of a memory, without its marks: "9 ottobre (notte): mappa del mondo". */
+export function latestHeading(memory: string): string
+{
+    const headings = [...memory.replace(/\r\n/g, "\n").matchAll(/^## (.+)$/gm)].map(match => match[1]?.trim() ?? "");
+    return headings.at(-1) ?? "";
+}
+
+/** The open lines of a todo, without their box. */
+export function openTasks(todo: string): string[]
 {
     return [...todo.replace(/\r\n/g, "\n").matchAll(/^\s*- \[ \]\s*(.+)$/gm)].map(match => match[1]?.trim() ?? "");
 }

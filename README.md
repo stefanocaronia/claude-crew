@@ -12,7 +12,7 @@ A standing team of expert colleagues for your projects, in Claude Code. Each col
 Two plugins, each working without the other:
 
 - **colleagues**: the skill (hiring and firing, portraits, review rounds, conversations and meetings) and the hook that hands the chat over to the colleagues and back.
-- **colleagues-mod**: a panel and a group chat. The panel shows the team with their portraits, who is at work with the steps they report, their context, tokens and time, and the week's budget; a click on a name opens their card (profile, open tasks, latest memory). In a meeting, each colleague's turn is drawn under their portrait and name, and above the prompt sit the participants with buttons to let one go, invite another, or close the meeting.
+- **colleagues-mod**: a panel and a group chat. The panel shows the team with their portraits, roles and open tasks, and who is at work with the steps they report, their context, tokens and time; a click on a name opens their card (profile, open tasks, latest memory). In a meeting, each colleague's turn is drawn under their portrait and name, and above the prompt sit the participants with buttons to let one go, invite another, or close the meeting.
 
 ## Install
 
@@ -38,7 +38,7 @@ Ask Claude in your own words; the `colleagues` skill knows the operations:
 
 The hook recognises Italian and English phrases: *voglio / vorrei / fammi / posso parlare con*, *parliamo con*, *riunione con*, *I want to / I'd like to / let me talk to*, *let's talk with*, *meeting with*; *anche con* or *also with* adds someone; *Sara può andare* or *Sara can go* lets one leave; *torna Claude*, *riunione finita*, *back to Claude*, *meeting over* end it.
 
-`/colleagues-panel` shows or hides the panel; it also opens by itself when a colleague starts working.
+The panel opens by itself at the start of a session in a project with colleagues; `/colleagues-panel` shows or hides it.
 
 ## Files
 
@@ -62,9 +62,11 @@ claude plugin test plugins/colleagues-mod
 claude plugin validate .
 ```
 
+To see the mod as the desktop gets it, with a project's real colleagues, `node tools/preview.mjs <project> [--meeting matteo-conti,giulia-ferri] [--working elena-galli]` writes an HTML page (by default in the project's `tmp/`): the trees the mod hands over, in the app's dark colors.
+
 ## Credits
 
-The panel's way of drawing each row as one SVG, its text measuring and its light and dark colors come from [savvy-progress](https://github.com/johnnyvizz/claude-kit/tree/main/plugins/savvy-progress) by johnnyvizz (MIT).
+The step tool, the run tracking and the drawings' light and dark colors follow [savvy-progress](https://github.com/johnnyvizz/claude-kit/tree/main/plugins/savvy-progress) by johnnyvizz (MIT).
 
 ## License
 

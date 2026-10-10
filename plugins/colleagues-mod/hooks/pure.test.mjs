@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { isEnding, isNarration, segmentsOf, speakersOf } from "./meeting.ts";
-import { cardFrom, colleagueFrom, colleagueOf } from "./team.ts";
-import { formatUntil, languageOf, modelName } from "./text.ts";
+import { cardFrom, colleagueFrom, colleagueOf, latestHeading, openTasks } from "./team.ts";
+import { formatAgo, formatUntil, languageOf, listNames, modelName, words } from "./text.ts";
 
 const profile = "---\r\nname: matteo-conti\r\ndescription: \"Matteo Conti, architetto TypeScript. Usalo per le revisioni.\"\r\ntools: Read\r\nmemory: project\r\neffort: high\r\ncolor: red\r\n---\r\n\r\n# Matteo Conti, architetto TypeScript\r\n\r\nChi sei.";
 const matteo = colleagueFrom("matteo-conti", profile, "# todo\n- [ ] uno\n- [x] fatto\n- [ ] due\n", 7);
@@ -19,6 +19,12 @@ describe("colleagues from their files", () => {
         assert.equal(colleagueOf([matteo, giulia], "giulia-ferri"), giulia);
         assert.equal(colleagueOf([matteo, giulia], "team:matteo-conti"), matteo);
         assert.equal(colleagueOf([matteo, giulia], "general-purpose"), undefined);
+    });
+
+    it("finds the heading of a memory's last section, and a todo's open lines", () => {
+        assert.equal(latestHeading("# Matteo\r\n\r\n## 1 ottobre\r\nvecchio\r\n\r\n## 9 ottobre (notte): mappa\r\n- nuovo\r\n"), "9 ottobre (notte): mappa");
+        assert.equal(latestHeading("# Matteo\n\nniente"), "");
+        assert.deepEqual(openTasks("- [ ] uno\r\n- [x] fatto\r\n  - [ ] due"), ["uno", "due"]);
     });
 
     it("makes a card: description, open tasks, the last section of the memory", () => {
@@ -65,6 +71,13 @@ describe("words", () => {
         assert.equal(languageOf(undefined, undefined, "it_IT.UTF-8"), "it");
         assert.equal(languageOf("en", "italiano"), "en");
         assert.equal(languageOf(undefined, undefined, undefined), "en");
+    });
+
+    it("says how long ago, and lists names", () => {
+        const now = Date.UTC(2026, 9, 10, 12, 0);
+        assert.deepEqual([0, 5, 60, 180, 1500, 4400].map(minutes => formatAgo(now - minutes * 60000, now, words.it)), ["adesso", "5 min fa", "un'ora fa", "3 ore fa", "ieri", "3 giorni fa"]);
+        assert.equal(listNames(["Matteo", "Giulia", "Sara"], "e"), "Matteo, Giulia e Sara");
+        assert.equal(listNames(["Matteo"], "and"), "Matteo");
     });
 
     it("writes models and the time to a reset", () => {

@@ -19,6 +19,8 @@ const ends = [
     /\b(?:back\s+to\s+claude|claude[,\s]+(?:come\s+)?back|(?:the\s+)?meeting(?:['’]s|\s+is)?\s+over|(?:end|close)\s+(?:the\s+|this\s+)?meeting)\b/i,
 ];
 const nameJoiners = new Set(["e", "ed", "anche", "con", "and", "also", "with", "too", "&"]);
+// "Sara può andare avanti", "Sara can go ahead", "Sara leaves a note": the words that make a leave phrase mean something else.
+const notLeaving = "(?![ \\t]+(?:avanti|oltre|bene|a|ad|al|alla|allo|in|nel|nella|su|sul|con|da|dal|dalla|per|ahead|on|over|through|back|to|with|for|into|an?|the|it|this|that|out)\\b)";
 // Sections of a colleague's file that only serve the review rounds: in a conversation the rules below take their place.
 const roundOnlySections = /^## (?:What you return|Your memory|Cosa restituisci|La tua memoria)\b[^\n]*\n[\s\S]*?(?=^## |(?![\s\S]))/gm;
 const backToClaude = "Then Claude is back, with no prefix: two or three lines on what was decided and what remains. From here on the "
@@ -53,13 +55,23 @@ function onPrompt(input, colleagues)
     const prompt = input.prompt ?? input.prompt_text ?? "";
     const call = findCall(prompt, colleagues);
     const present = findPresent(prompt, colleagues);
+    const sent = findLeaving(prompt, colleagues).filter(id => active.includes(id));
 
-    if (call || (present.length && active.length)) {
+    if (call || (present.length && active.length) || sent.length) {
         const called = [...(call?.ids ?? []), ...present];
-        const next = [...new Set(call && !call.isAdding ? called : [...active, ...called])];
+        const next = [...new Set(call && !call.isAdding ? called : [...active, ...called])].filter(id => !sent.includes(id) || called.includes(id));
         const leaving = active.filter(id => !next.includes(id));
         const joining = next.filter(id => !active.includes(id));
         writeActive(input.session_id, next);
+
+        if (!next.length) {
+            return `${dismiss(people(active))} ${backToClaude}`;
+        }
+
+        if (!called.length) {
+            return `${dismiss(people(leaving))} ${remind(people(next))}`;
+        }
+
         // Calling again whoever is already here gives them their files again.
         return introduce(people(next), people(joining.length ? joining : next), leaving.length ? dismiss(people(leaving)) : "");
     }
@@ -142,6 +154,28 @@ function findPresent(prompt, colleagues)
         }
     }
 
+    return [...new Set(ids)];
+}
+
+// "Sara può andare", "congeda Sara", "Sara can go", "dismiss Sara": they leave the conversation, the others stay.
+function findLeaving(prompt, colleagues)
+{
+    if (!colleagues.length) {
+        return [];
+    }
+
+    const names = colleagues.map(colleague => escapeRegExp(colleague.name)).join("|");
+    const list = `((?:${names})(?:\\s*(?:,|&|\\be\\b|\\bed\\b|\\band\\b)\\s*(?:${names}))*)`;
+    const patterns = [
+        `\\b${list}\\s+(?:può|puoi|possono|potete)\\s+(?:andare|uscire)\\b${notLeaving}`,
+        `\\b${list}\\s+(?:esce|escono)\\b${notLeaving}`,
+        `\\b(?:congeda|congedo|saluta|lascia\\s+andare|fai\\s+uscire|esce|escono)\\s+${list}`,
+        `\\b${list}\\s+(?:can|may)\\s+(?:go|leave)\\b${notLeaving}`,
+        `\\b${list}\\s+leaves?\\b${notLeaving}`,
+        `\\b(?:dismiss|excuse)\\s+${list}`,
+        `\\blet\\s+${list}\\s+go\\b`,
+    ];
+    const ids = patterns.flatMap(pattern => [...prompt.matchAll(new RegExp(pattern, "gi"))].flatMap(match => namesIn(match[1], colleagues)));
     return [...new Set(ids)];
 }
 

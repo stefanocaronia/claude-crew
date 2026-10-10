@@ -9,11 +9,17 @@ A standing team of expert colleagues for your projects, in Claude Code. Each col
 > riunione finita
 ```
 
+Two plugins, each working without the other:
+
+- **colleagues**: the skill (hiring and firing, portraits, review rounds, conversations and meetings) and the hook that hands the chat over to the colleagues and back.
+- **colleagues-mod**: a panel and a group chat. The panel shows the team with their portraits, who is at work with the steps they report, their context, tokens and time, and the week's budget; a click on a name opens their card (profile, open tasks, latest memory). In a meeting, each colleague's turn is drawn under their portrait and name, and above the prompt sit the participants with buttons to let one go, invite another, or close the meeting.
+
 ## Install
 
 ```
 /plugin marketplace add stefanocaronia/colleagues
 /plugin install colleagues@colleagues
+/plugin install colleagues-mod@colleagues
 ```
 
 ## Use
@@ -30,7 +36,9 @@ Ask Claude in your own words; the `colleagues` skill knows the operations:
 | "run a review round" | the colleagues whose field the work touches review it in parallel; findings reach you as proposals, one at a time |
 | "voglio parlare con Matteo", "I want to talk to Matteo and Giulia" | they answer in the chat, each message starting with their name, until "torna Claude" / "back to Claude" |
 
-The hook that hands the chat over recognises Italian and English phrases: *voglio / vorrei / fammi / posso parlare con*, *parliamo con*, *riunione con*, *I want to / I'd like to / let me talk to*, *let's talk with*, *meeting with*; *anche con* or *also with* adds someone; *torna Claude*, *riunione finita*, *back to Claude*, *meeting over* end it.
+The hook recognises Italian and English phrases: *voglio / vorrei / fammi / posso parlare con*, *parliamo con*, *riunione con*, *I want to / I'd like to / let me talk to*, *let's talk with*, *meeting with*; *anche con* or *also with* adds someone; *Sara può andare* or *Sara can go* lets one leave; *torna Claude*, *riunione finita*, *back to Claude*, *meeting over* end it.
+
+`/colleagues-panel` shows or hides the panel; it also opens by itself when a colleague starts working.
 
 ## Files
 
@@ -49,9 +57,14 @@ Everything stays in your project, under `.claude/`:
 ## Development
 
 ```
-node --test plugins/colleagues/scripts/conversation.test.mjs
-claude plugin validate plugins/colleagues
+node --test plugins/colleagues/scripts/conversation.test.mjs plugins/colleagues-mod/hooks/pure.test.mjs
+claude plugin test plugins/colleagues-mod
+claude plugin validate .
 ```
+
+## Credits
+
+The panel's way of drawing each row as one SVG, its text measuring and its light and dark colors come from [savvy-progress](https://github.com/johnnyvizz/claude-kit/tree/main/plugins/savvy-progress) by johnnyvizz (MIT).
 
 ## License
 

@@ -1,6 +1,6 @@
 # Conversations and meetings
 
-**In**: "voglio parlare con Matteo", "I want to talk to Matteo": from then on Matteo answers, with their profile, memory and todo, which the plugin's hook puts into the context. Two names ("…con Matteo e Giulia", "…with Matteo and Giulia") open a meeting; "anche con Sara" or "also with Sara" adds someone, and so does "con Sara presente" or "with Sara present".
+**In**: "voglio parlare con Matteo", "I want to talk to Matteo": from then on Matteo answers, with their profile, memory and todo, which the plugin's hook puts into the context. Two names ("…con Matteo e Giulia", "…with Matteo and Giulia") open a meeting; "anche con Sara" or "also with Sara" adds someone, and so does "con Sara presente" or "with Sara present". "Sara può andare" or "Sara can go" lets one leave while the others stay. The colleagues-mod panel offers the same as buttons above the prompt: it sends these phrases.
 
 **How**:
 - Every message starts with the speaker's name, `[Matteo]`; in a meeting whoever has something to say speaks, disagreement included, and whoever the user addresses answers.

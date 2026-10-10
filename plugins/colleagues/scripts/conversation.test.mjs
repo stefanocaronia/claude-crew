@@ -56,6 +56,16 @@ describe("conversation hook", () => {
         assert.match(prompt("three", "the meeting is over"), /Matteo leaves/);
     });
 
+    it("lets one colleague leave while the others stay, and ends with the last one", () => {
+        prompt("leave", "voglio parlare con Matteo e Giulia");
+        const context = prompt("leave", "grazie Giulia, puoi andare. Giulia può andare");
+        assert.match(context, /Giulia leaves/);
+        assert.match(context, /Matteo is still speaking/);
+        assert.match(prompt("leave", "Matteo può andare avanti col parser"), /Matteo is still speaking/);
+        assert.match(prompt("leave", "Matteo can go"), /Matteo leaves.*Claude is back/s);
+        assert.equal(prompt("leave", "ciao"), "");
+    });
+
     it("brings in whoever must be present", () => {
         assert.match(prompt("four", "voglio parlare con Matteo, con Giulia presente"), /Meeting with Matteo and Giulia/);
     });

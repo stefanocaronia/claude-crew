@@ -41,13 +41,6 @@ export function speakersOf(text: string, team: Colleague[]): Colleague[]
     return speakers.filter((speaker, index) => speakers.indexOf(speaker) === index);
 }
 
-/** Whether a reply is only narrator lines, which keep a meeting going. */
-export function isNarration(text: string): boolean
-{
-    const paragraphs = text.trim().split(/\n\s*\n/).filter(Boolean);
-    return paragraphs.length > 0 && paragraphs.every(isItalic);
-}
-
 // A speaker's turn, with the narrator lines inside it split out.
 function turn(text: string, speaker: Colleague | undefined): Segment[]
 {

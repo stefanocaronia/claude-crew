@@ -52,7 +52,7 @@ function world(on: On, members: string[], hasCommands = true): string[] & { file
 {
     const sent: string[] = [];
     const files: Record<string, string> = { ...project, ...(members.length ? { "/tmp/claude-crew/s1.json": JSON.stringify({ active: members }) } : {}) };
-    mock.env(on, { OS: "Linux", TMPDIR: "/tmp" });
+    mock.env(on, { OS: "Linux", TMPDIR: "/tmp", LANG: "en_US.UTF-8" });
     mock.clock(on, { now: Date.UTC(2026, 9, 10, 9, 0) });
     on("session.start", () => ({ cwd: "/p" }) as never);
     on("settings.read", () => ({ value: {} }) as never);
@@ -150,8 +150,8 @@ test("a reply with colleagues speaking is drawn as a group chat, the narrator ap
 
     for (const surface of surfaces) {
         const ui = await $.ui.mount({ plugin, surface, component: "AssistantMessage", props: { text, isFirstOfReply: true } });
-        expect(surface === "desktop" ? (await ui.find({ type: "Svg", alt: "Matteo Conti" } as never)) : (await ui.find({ type: "Text", text: "Matteo Conti" }))).toBeDefined();
-        expect(await ui.find({ type: "Text", text: "Code review" })).toBeDefined();
+        expect(surface === "desktop" ? (await ui.find({ type: "Svg", props: { alt: "Matteo Conti" } } as never)) : (await ui.find({ type: "Text", text: "Matteo Conti" }))).toBeDefined();
+        expect(surface === "desktop" ? (await ui.find({ type: "Svg", props: { alt: "Code review" } } as never)) : (await ui.find({ type: "Text", text: "Code review" }))).toBeDefined();
         expect(Boolean(await ui.find({ type: "Svg" }))).toBe(surface === "desktop");
         expect((await ui.find({ type: "Markdown", text: /parser regge/ }))?.props.dimColor).toBeUndefined();
         expect((await ui.find({ type: "Markdown", text: /apre il file/ }))?.props.dimColor).toBe(true);

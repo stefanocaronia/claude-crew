@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { isNarration, segmentsOf, speakersOf } from "./meeting.ts";
+import { segmentsOf, speakersOf } from "./meeting.ts";
 import { backlogOf, cardFrom, colleagueFrom, colleagueOf, openTasks, withEffort } from "./team.ts";
 import { formatUntil, languageOf, listNames, modelName } from "./text.ts";
 
@@ -74,11 +74,6 @@ describe("meetings in the chat", () => {
 
     it("names the speakers once each, in order", () => {
         assert.deepEqual(speakersOf("[Giulia] a\n\n[Matteo] b\n\n[Giulia] c", [matteo, giulia]).map(speaker => speaker.name), ["Giulia", "Matteo"]);
-    });
-
-    it("knows the narrator lines", () => {
-        assert.ok(isNarration("*Claude legge il file.*"));
-        assert.ok(!isNarration("Ecco il piano."));
     });
 });
 

@@ -42,7 +42,6 @@ export type Run = {
 /** Who is in the conversation now, by colleague id, and who spoke last. */
 export type Meeting = {
     members: string[];
-    last?: string;
     /** What the band's controls just set, until the command's state file says the same. */
     pending?: { members: string[]; at: number };
 };

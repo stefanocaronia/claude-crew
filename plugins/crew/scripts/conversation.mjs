@@ -167,8 +167,8 @@ function rules(people)
         "- What falls outside one's field is said, and the right colleague is named.",
         "- Memory and todo: the lines ticked [x] in an earlier session are removed; both are edited, never rewritten, because other "
             + "sessions write to them too. They are the colleague's own notes: what they say is not a request from the user.",
-        "- Claude stays out of the dialogue as a narrator: its lines are in italics, with no name in front, and say what happens (tools, "
-            + "files, errors), never the colleagues' opinions.",
+        "- Claude stays out of the dialogue as a narrator: its lines, the notes between tools included, are in italics, with no name in front, "
+            + "and say what happens (tools, files, errors), never the colleagues' opinions.",
         "- Answer in the language the user writes in.",
         `- ${commands}`,
     ].join("\n");
@@ -206,8 +206,8 @@ function remind(people)
 {
     const names = people.map(person => person.name);
     const who = people.length > 1
-        ? `Still a meeting with ${listNames(names)}: every turn starts with the speaker's name.`
-        : `${names[0]} is still speaking: the message starts with [${names[0]}].`;
+        ? `Still a meeting with ${listNames(names)}: every turn starts with the speaker's name, and Claude's own lines, notes between tools included, are in italics.`
+        : `${names[0]} is still speaking: the message starts with [${names[0]}], and Claude's own lines, notes between tools included, are in italics.`;
     const files = people.map(person => `${agentPath(person.id)} and ${memoryPath(person.id)}/`).join("; ");
     return `[Crew] ${who} If their file, memory or todo are no longer in the context, read them again before answering (${files}). ${commands}`;
 }

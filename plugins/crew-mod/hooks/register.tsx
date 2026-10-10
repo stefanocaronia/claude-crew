@@ -6,8 +6,8 @@ import type { EngineInterface, Register } from "claude-code";
 
 import type { Colleague, Meeting, Run } from "../types";
 
-import { avatarSvg, barSvg, effortSvg, iconSvg, nameSvg, wideBarSvg } from "./draw.ts";
-import { isNarration, segmentsOf, speakersOf } from "./meeting.ts";
+import { avatarSvg, barSvg, blankSvg, captionSvg, effortSvg, iconSvg, nameSvg, wideBarSvg } from "./draw.ts";
+import { segmentsOf, speakersOf } from "./meeting.ts";
 import { contextShare, progressOf, totalTime } from "./progress.ts";
 import { backlogOf, cardFrom, colleagueFrom, colleagueOf, openTasks, withEffort } from "./team.ts";
 import { contextWindowOf, formatTime, formatTokens, formatUntil, languageOf, listNames, modelName, words } from "./text.ts";
@@ -48,6 +48,8 @@ const stateLayer = "#80808014";
 // The name 2 px larger than the panel's text (13 px), and larger still in a colleague's own card.
 const nameSize = 15;
 const cardNameSize = 18;
+// The portrait beside a colleague's turn in the chat.
+const chatFace = 32;
 // The efforts a colleague can work at; "inherit" takes the line out of the profile, and the session's effort holds.
 const effortLevels = ["inherit", "low", "medium", "high", "xhigh", "max"] as const;
 // The styles the portraits can be drawn again in.
@@ -74,7 +76,7 @@ export const register: Register = (on, options) => {
             await update($, runs, list => list.map(run => (run.status === "running" ? { ...run, status: "failed" as const, endedAt: run.steppedAt ?? run.startedAt } : run)));
         }
 
-        language = languageOf(options.language, await settingsLanguage($), await $.env.get("LANG"));
+        language = languageOf(options.language, await settingsLanguage($), await $.env.get("LANG"), systemLocale());
         await $.tool.register({
             name: "step",
             description: "For a colleague in a review round: report your progress to the Crew panel. Right after reading the brief, call it with "
@@ -259,9 +261,7 @@ export const register: Register = (on, options) => {
 
         if (speakers.length) {
             const current = await read($, meeting);
-            await setMeeting($, [...new Set([...current.members, ...speakers.map(speaker => speaker.id)])], speakers.at(-1)?.id, current.pending);
-        } else if (!isNarration(text) && (await read($, meeting)).last !== undefined) {
-            await update($, meeting, current => ({ ...current, last: undefined }));
+            await setMeeting($, [...new Set([...current.members, ...speakers.map(speaker => speaker.id)])], current.pending);
         }
 
         return stored;
@@ -295,7 +295,7 @@ export const register: Register = (on, options) => {
             const sendBack = (ids: string[]) => update($, runs, all => all.map(run => (ids.includes(run.colleague) && run.status !== "running" ? { ...run, isBack: true } : run)));
             const selected = panel.selected ? byId.get(panel.selected) : undefined;
             // The meeting itself is in the main chat and above the prompt: here only a ring says who is in it.
-            const presence = (colleague: Colleague) => (talk.last === colleague.id ? say.speaking : talk.members.includes(colleague.id) ? say.inMeeting : "");
+            const presence = (colleague: Colleague) => (talk.members.includes(colleague.id) ? say.inMeeting : "");
             const face = (colleague: Colleague, size: number, isRinged = false, isWorking = false) => faceOf(ui, e.surface, colleague, size, stamp, isRinged, isWorking);
             const open = (colleague: Colleague) => async () => {
                 await update($, view, current => ({ ...current, selected: colleague.id }));
@@ -380,7 +380,7 @@ export const register: Register = (on, options) => {
             };
             // The button that opens a colleague's card.
             const opener = (key: string, colleague: Colleague) => <Button key={key} label="❯" plain onPress={open(colleague)} />;
-            const about = (colleague: Colleague) => [talk.last === colleague.id ? say.speaking : "", say.toDo(colleague.openTasks)].filter(Boolean).join(" · ");
+            const about = (colleague: Colleague) => say.toDo(colleague.openTasks);
             // Each colleague in an outlined card, the portrait at its top left; the cards make a grid that takes a second column when the
             // pane is wide.
             const colleagueCard = (key: string, children: (JSX.Element | null)[]) => (
@@ -612,9 +612,8 @@ export const register: Register = (on, options) => {
 
             const ui = $.ui.resolve(e);
             const stamp = await read($, gallery);
-            const last = talk.last ? byId.get(talk.last) : undefined;
             const working = new Set((await read($, runs)).filter(run => run.status === "running").map(run => run.colleague));
-            return meetingBand($, ui, e.surface, members, colleagues.filter(colleague => !working.has(colleague.id)), last, stamp);
+            return meetingBand($, ui, e.surface, members, colleagues.filter(colleague => !working.has(colleague.id)), stamp);
         };
 
         try {
@@ -649,20 +648,15 @@ export const register: Register = (on, options) => {
                             return <Markdown key={`n${index}`} text={segment.text} dimColor />;
                         }
 
+                        // The portrait at the left; name, role and message in one column, so they start at the same place.
                         return (
-                            <Box key={`s${index}`} flexDirection="column">
-                                {segment.isContinued
-                                    ? null
-                                    : (
-                                        <Box flexDirection="row" flexWrap="nowrap" gap={1} alignItems="center">
-                                            {faceOf(ui, e.surface, speaker, 32, stamp)}
-                                            <Box flexDirection="column" minWidth={0}>
-                                                {nameOf(ui, e.surface, speaker, speaker.fullName)}
-                                                <Text key="role" dimColor wrap="truncate-end">{roleOf(speaker)}</Text>
-                                            </Box>
-                                        </Box>
-                                    )}
-                                <Box paddingLeft={e.surface === "terminal" ? 2 : 4}><Markdown text={segment.text} /></Box>
+                            <Box key={`s${index}`} flexDirection="row" flexWrap="nowrap" gap={1} alignItems="flex-start">
+                                {segment.isContinued ? spacer(ui, e.surface, speaker) : faceOf(ui, e.surface, speaker, chatFace, stamp)}
+                                <Box flexDirection="column" flexGrow={1} flexShrink={1} minWidth={0}>
+                                    {segment.isContinued ? null : nameOf(ui, e.surface, speaker, speaker.fullName)}
+                                    {segment.isContinued ? null : caption(ui, e.surface, roleOf(speaker))}
+                                    <Markdown text={segment.text} />
+                                </Box>
                             </Box>
                         );
                     })}
@@ -677,6 +671,27 @@ export const register: Register = (on, options) => {
         }
     });
 };
+
+// The role under a name in the chat: small and gray, with a little room before the message; on the terminal, dim text.
+function caption(ui: Table, surface: string, text: string)
+{
+    if (surface === "terminal" || !("Svg" in ui)) {
+        return <ui.Text key="role" dimColor wrap="truncate-end">{text}</ui.Text>;
+    }
+
+    const drawn = captionSvg(text, 12, 6);
+    return <ui.Svg key="role" source={drawn.source} alt={text} width={drawn.width} height={drawn.height} />;
+}
+
+// The room of a portrait, for a speaker going on after a narrator line.
+function spacer(ui: Table, surface: string, colleague: Colleague)
+{
+    if (surface === "terminal" || !("Svg" in ui)) {
+        return <ui.Text key={`face-${colleague.id}`}> </ui.Text>;
+    }
+
+    return <ui.Svg key={`face-${colleague.id}`} source={blankSvg(chatFace, 1)} alt={colleague.name} width={chatFace} height={1} />;
+}
 
 // A colleague's role as the panel and the chat write it, with a capital.
 function roleOf(colleague: Colleague): string
@@ -735,7 +750,7 @@ function bar(ui: Table, surface: string, share: number, color: string | undefine
 // The meeting above the prompt, on one line: its title, an outlined chip for each one in it (portrait, name, who speaks, a ✕ to let
 // them go), a menu to invite whoever is free, and at the right the button that closes it. Each control sends the crew plugin's
 // command, as the user would type it.
-function meetingBand($: EngineInterface, ui: Table, surface: string, members: Colleague[], free: Colleague[], last: Colleague | undefined, stamp: number)
+function meetingBand($: EngineInterface, ui: Table, surface: string, members: Colleague[], free: Colleague[], stamp: number)
 {
     const { Box, Text, Button } = ui;
     const say = words[language];
@@ -745,14 +760,13 @@ function meetingBand($: EngineInterface, ui: Table, surface: string, members: Co
     const send = (command: string, args: string, change: (ids: string[]) => string[]) => async () => {
         const current = await read($, meeting);
         const next = change(current.members);
-        await setMeeting($, next, current.last && next.includes(current.last) ? current.last : undefined, { members: next, at: await $.clock.now() });
+        await setMeeting($, next, { members: next, at: await $.clock.now() });
         await $.command.run({ command, args });
     };
     const chip = (member: Colleague) => (
         <Box key={`chip-${member.id}`} flexDirection="row" flexWrap="nowrap" alignItems="center" columnGap={1} {...(isDesktop ? { borderStyle: "round" as const, borderColor: outline, paddingLeft: 1 } : {})}>
-            {faceOf(ui, surface, member, 22, stamp, member === last)}
+            {faceOf(ui, surface, member, 22, stamp, true)}
             {nameOf(ui, surface, member, member.name)}
-            {member === last ? <Text key={`speaking-${member.id}`} dimColor>{say.speaking}</Text> : null}
             <Button key={`leave-${member.id}`} label="✕" plain dimColor onPress={send("crew:leave", member.name, ids => ids.filter(id => id !== member.id))} />
         </Box>
     );
@@ -951,7 +965,7 @@ async function projectRoot($: EngineInterface): Promise<string>
 }
 
 // Who is in the meeting now. Whoever joins it starts something new, so those who had finished go back to the coffee break.
-async function setMeeting($: EngineInterface, members: string[], last?: string, pending?: Meeting["pending"]): Promise<void>
+async function setMeeting($: EngineInterface, members: string[], pending?: Meeting["pending"]): Promise<void>
 {
     const current = await read($, meeting);
 
@@ -959,7 +973,7 @@ async function setMeeting($: EngineInterface, members: string[], last?: string, 
         await update($, runs, list => list.map(run => (run.status !== "running" ? { ...run, isBack: true } : run)));
     }
 
-    await update($, meeting, () => ({ members, last, pending }));
+    await update($, meeting, () => ({ members, pending }));
 }
 
 // Why a colleague cannot take a task now, for Claude: who, busy with what, and how to free them.
@@ -1004,7 +1018,7 @@ async function refreshMeeting($: EngineInterface): Promise<void>
     }
 
     if (current.pending || !sameMembers(active, current.members)) {
-        await setMeeting($, active, current.last && active.includes(current.last) ? current.last : undefined);
+        await setMeeting($, active);
     }
 }
 
@@ -1039,11 +1053,24 @@ async function openOnce($: EngineInterface): Promise<void>
     void $.ui.open({ id: pane, title: say().pane }).catch(() => undefined);
 }
 
+// The language the settings ask for: the plugin's own option, as written there, then Claude Code's language.
 async function settingsLanguage($: EngineInterface): Promise<string | undefined>
 {
     try {
-        const settings = (await $.settings.read()) as Record<string, unknown>;
-        return typeof settings.language === "string" ? settings.language : undefined;
+        const settings = (await $.settings.read()) as { language?: unknown; pluginConfigs?: Record<string, { options?: { language?: unknown } }> };
+        const own = settings.pluginConfigs?.["crew-mod@claude-crew"]?.options?.language;
+        const usable = [own, settings.language].filter(hint => typeof hint === "string" && hint !== "auto");
+        return usable[0] as string | undefined;
+    } catch {
+        return undefined;
+    }
+}
+
+// The system's locale, where no LANG says it (Windows).
+function systemLocale(): string | undefined
+{
+    try {
+        return Intl.DateTimeFormat().resolvedOptions().locale;
     } catch {
         return undefined;
     }

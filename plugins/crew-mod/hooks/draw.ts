@@ -70,6 +70,22 @@ export function nameSvg(name: string, color: string, size: number): { source: st
     return { source: `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${style}${text}</svg>`, width, height };
 }
 
+/** A line of gray text drawn small, as the role under a name, with `below` pixels of room under it. */
+export function captionSvg(text: string, size: number, below = 0): { source: string; width: number; height: number }
+{
+    const width = Math.ceil(text.length * size * 0.56) + 4;
+    const height = Math.ceil(size * 1.35) + below;
+    const style = "<style>.c{fill:#6b6b67}@media (prefers-color-scheme: dark){.c{fill:#a3a39e}}</style>";
+    const line = `<text class="c" x="0" y="${Math.round(size * 1.02)}" font-family="${font}" font-size="${size}">${xml(text)}</text>`;
+    return { source: `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${style}${line}</svg>`, width, height };
+}
+
+/** Empty room of a given size, to keep a column where a portrait would be. */
+export function blankSvg(width: number, height: number): string
+{
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"></svg>`;
+}
+
 /** The effort a task needs as four gray bars, low to max; undefined for a level it does not know. */
 export function effortSvg(level: string): string | undefined
 {

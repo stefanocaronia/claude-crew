@@ -1,6 +1,6 @@
 {
   "name": "crew",
-  "version": "0.3.37",
+  "version": "0.3.38",
   "description": "A standing team of expert colleagues for a project: subagents with a profile, a memory and a todo, who review the work at milestones and talk with you one-to-one or in meetings.",
   "author": {
     "name": "Stefano Caronia",

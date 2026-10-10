@@ -252,7 +252,7 @@ test("the panel shows who is at work and the team, and a colleague's card with i
         expect(await ui.find({ type: "Markdown", text: /retest the parser/ })).toBeDefined();
         expect((await ui.find({ key: "card-effort" }))?.props.label).toBe("as the session");
 
-        for (const level of ["low", "medium", "high", "extra high", "max", "as the session"]) {
+        for (const level of ["low", "medium", "high", "extra", "max", "as the session"]) {
             await ui.press({ key: "card-effort" });
             expect((await ui.find({ key: "card-effort" }))?.props.label).toBe(level);
         }

@@ -2,6 +2,10 @@
 export type Language = "en" | "it";
 export type Words = (typeof words)["en"];
 
+// The efforts as Claude Code names them, low to max.
+const englishLevels: Record<string, string> = { low: "low", medium: "medium", high: "high", xhigh: "extra", max: "max" };
+const italianLevels: Record<string, string> = { low: "basso", medium: "medio", high: "alto", xhigh: "extra", max: "max" };
+
 export const words = {
     en: {
         pane: "👥 Crew",
@@ -19,7 +23,7 @@ export const words = {
         memoryUsed: (percent: number) => `memory ${percent}%`,
         tokens: (count: string) => `${count} tokens`,
         step: (done: number, total: number, note?: string) => `step ${done} of ${total}${note ? `: ${note}` : ""}`,
-        effort: (level: string) => `effort ${level}`,
+        effort: (level: string) => `effort ${englishLevels[level] ?? level}`,
         sessionEffort: "session's effort",
         settings: "Settings",
         effortTitle: "Effort",
@@ -28,7 +32,7 @@ export const words = {
         permissionNames: { read: "Read", write: "Write", test: "Testing", web: "Web" },
         canWrite: "can change the project's files",
         portrait: "Redo the portrait",
-        levels: { low: "low", medium: "medium", high: "high", xhigh: "extra high", max: "max" },
+        levels: englishLevels,
         units: { day: "d", hour: "h", thousand: "k", million: "M", decimal: "." },
         meeting: "Meeting",
         invite: "Invite",
@@ -82,7 +86,7 @@ export const words = {
         memoryUsed: (percent: number) => `memoria ${percent}%`,
         tokens: (count: string) => `${count} token`,
         step: (done: number, total: number, note?: string) => `passo ${done} di ${total}${note ? `: ${note}` : ""}`,
-        effort: (level: string) => `impegno ${({ low: "basso", medium: "medio", high: "alto", xhigh: "molto alto", max: "massimo" } as Record<string, string>)[level] ?? level}`,
+        effort: (level: string) => `impegno ${italianLevels[level] ?? level}`,
         sessionEffort: "impegno della sessione",
         settings: "Impostazioni",
         effortTitle: "Impegno",
@@ -91,7 +95,7 @@ export const words = {
         permissionNames: { read: "Lettura", write: "Scrittura", test: "Testing", web: "Web" },
         canWrite: "può modificare i file del progetto",
         portrait: "Rifai il ritratto",
-        levels: { low: "basso", medium: "medio", high: "alto", xhigh: "molto alto", max: "massimo" },
+        levels: italianLevels,
         units: { day: "g", hour: "h", thousand: " mila", million: " milioni", decimal: "," },
         meeting: "Riunione",
         invite: "Invita",

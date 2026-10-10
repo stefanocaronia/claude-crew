@@ -1,0 +1,44 @@
+---
+name: colleagues
+description: A standing team of expert colleagues for a project, each a subagent with a profile, a memory and a todo, who review the work at milestones and talk with the user one-to-one or in meetings. Use it to set the team up in a project, hire, fire or change a colleague, draw their portraits, show the team, or run a review round. The plugin's hook hands the chat over on its own when the user asks to talk with a colleague ("voglio parlare con Matteo", "I want to talk to Matteo").
+---
+
+# Colleagues
+
+A colleague is an expert who reviews the work in their field and discusses it with the user: a Claude Code subagent with a profile, a memory that lasts across sessions and a todo. The user decides who joins the team, what becomes of their findings, and when to talk with them.
+
+## Files
+
+Everything lives in the project, under `.claude/`. The `<id>` is the first and last name, lowercase with hyphens (`matteo-conti`): Claude Code names the agent and its memory folder by it.
+
+| Path | Content |
+|---|---|
+| `agents/<id>.md` | the profile: the subagent's frontmatter, then who they are and how they work (Claude Code looks for it here and uses it as their instructions) |
+| `agent-memory/<id>/MEMORY.md` | their memory: Claude Code hands it to them at the start of every round (`memory: project`) |
+| `agent-memory/<id>/todo.md` | their tasks, one per line: `- [ ] task`; done becomes `- [x]`, and ticked lines are removed in the next session |
+| `agent-memory/<id>/avatar.png` or `avatar.svg` | their portrait |
+| `agent-memory/<id>/notes/` | longer notes (reviews, rounds, summaries), each linked from `MEMORY.md` |
+| `agent-memory/_former/<id>/` | a colleague who left: their profile and memory, kept |
+
+A colleague is an agent of `.claude/agents/` with a `todo.md` in its memory folder; other agents are just agents. The profile's heading is `# <First> <Last>, <role>`: the first name, unique in the team, is how the user calls them. The team table (who, field, id) sits in the project's instructions file (`AGENTS.md` or `CLAUDE.md`), in a "Colleagues" section, with one line on the portraits' style.
+
+## Operations
+
+| The user asks | Read first |
+|---|---|
+| to set the team up in a project | [references/adopt.md](references/adopt.md) |
+| to hire a colleague | [references/hire.md](references/hire.md) |
+| to fire one | [references/fire.md](references/fire.md) |
+| to change one: field, tools, character, name | [references/edit.md](references/edit.md) |
+| a portrait, for one colleague or the whole team | [references/portrait.md](references/portrait.md) |
+| a review round, or a milestone is reached | [references/round.md](references/round.md) |
+| to talk with one or more of them | [references/conversation.md](references/conversation.md) |
+| who is on the team | the team table and each `todo.md`: name, field, open tasks |
+
+## Always
+
+- Propose, the user decides: who is hired or fired, which findings become work.
+- Memory and todo are edited, never rewritten from scratch: other sessions write to them too.
+- When the user decides on a colleague's proposal, add the decision (date, what, why) to that colleague's `MEMORY.md` at once, and tick the todo lines it closes.
+- Name a colleague with their field the first time in a message ("Matteo, our code reviewer"), the name alone after.
+- Colleagues write in the project's language; the file names above stay as they are.

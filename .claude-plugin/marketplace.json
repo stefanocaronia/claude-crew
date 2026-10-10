@@ -1,0 +1,14 @@
+{
+  "name": "colleagues",
+  "owner": { "name": "Stefano Caronia", "url": "https://github.com/stefanocaronia" },
+  "metadata": { "description": "A standing team of expert colleagues for your projects: hire them, run review rounds, talk with them one-to-one or in meetings." },
+  "plugins": [
+    {
+      "name": "colleagues",
+      "source": "./plugins/colleagues",
+      "description": "Skill and hook: set up a team of expert colleagues, hire, fire and portray them, run review rounds, talk with them one-to-one or in meetings.",
+      "version": "0.1.0",
+      "category": "skill"
+    }
+  ]
+}

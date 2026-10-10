@@ -31,7 +31,7 @@ function listed(files: Record<string, string>, folder: string): never[]
 }
 
 // The world beneath the mod: the project's files, the session, the hook's state file naming who is in the conversation.
-function world(on: On, members: string[]): string[]
+function world(on: On, members: string[], hasCommands = true): string[]
 {
     const sent: string[] = [];
     const files: Record<string, string> = { ...project, ...(members.length ? { "/tmp/claude-colleagues/s1.json": JSON.stringify({ active: members }) } : {}) };
@@ -53,6 +53,7 @@ function world(on: On, members: string[]): string[]
         return <Text key="engine">engine</Text>;
     });
     on("ui.open", () => ({ value: {} }) as never);
+    on("command.list", () => ({ value: hasCommands ? [{ name: "colleagues:talk", description: "", source: "plugin", plugin: "colleagues", isFullscreen: false }] : [] }) as never);
     on("agent.spawn", () => ({ model: "claude-opus-5-5", agentId: "a1" }) as never);
     on("command.run", (_, e) => {
         sent.push(`/${e.command}${e.args ? ` ${e.args}` : ""}`);
@@ -80,6 +81,13 @@ test("the meeting's controls let one go, invite another and close it, through th
     await ui.press({ key: "close" });
     expect(sent.at(-1)).toBe("/colleagues:end");
     expect(await ui.find({ key: "close" })).toBeUndefined();
+});
+
+test("without the colleagues plugin's commands, the panel says how to install them", async ($, on) => {
+    world(on, [], false);
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+    const ui = await $.ui.mount({ plugin, surface: "terminal", component: "Pane", requestId: "colleagues", props: { title: "Colleagues", isFocused: false, bodyColumns: 50, placement: "dock" } as never });
+    expect(await ui.find({ type: "Text", text: /plugin install colleagues@colleagues/ })).toBeDefined();
 });
 
 test("no meeting, no band above the prompt", async ($, on) => {

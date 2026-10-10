@@ -22,7 +22,7 @@ const budget = atom({ plugin: "colleagues-mod", key: "budget" } as const, []);
 const view = atom({ plugin: "colleagues-mod", key: "view" } as const, { isFinishedCollapsed: false, autoOpened: false });
 const card = atom({ plugin: "colleagues-mod", key: "card" } as const, null);
 const gallery = atom({ plugin: "colleagues-mod", key: "gallery" } as const, 0);
-const board = atom({ plugin: "colleagues-mod", key: "board" } as const, { news: [], tasks: [], checkedAt: 0 });
+const board = atom({ plugin: "colleagues-mod", key: "board" } as const, { news: [], tasks: [], checkedAt: 0, hasCommands: true });
 const now = atom({ plugin: "colleagues-mod", key: "now" } as const, 0);
 
 // Module scope, set again at every load: the portraits as data URIs (too large for the state, whose `gallery` says when they
@@ -360,6 +360,7 @@ export const register: Register = (on, options) => {
         );
         return (
             <Box flexDirection="column" gap={1}>
+                {latest.hasCommands ? null : <Text key="install" dimColor>{say.installSkill}</Text>}
                 {tiles.length
                     ? (
                         <Box key="tiles" flexDirection="row" flexWrap="wrap" columnGap={3}>
@@ -556,7 +557,9 @@ async function refresh($: EngineInterface): Promise<void>
     }
 
     const checkedAt = await $.clock.now();
+    const hasCommands = (await $.command.list()).some(info => info.plugin === "colleagues" || info.name.startsWith("colleagues:"));
     await update($, board, () => ({
+        hasCommands,
         news: news.sort((first, second) => second.at - first.at || first.colleague.localeCompare(second.colleague)),
         tasks: tasks.sort((first, second) => second.lines.length - first.lines.length || first.colleague.localeCompare(second.colleague)),
         checkedAt,

@@ -42,3 +42,4 @@ A colleague is an agent of `.claude/agents/` with a `todo.md` in its memory fold
 - When the user decides on a colleague's proposal, add the decision (date, what, why) to that colleague's `MEMORY.md` at once, and tick the todo lines it closes.
 - Name a colleague with their field the first time in a message ("Matteo, our code reviewer"), the name alone after.
 - Colleagues write in the project's language; the file names above stay as they are.
+- The panel is the colleagues-mod plugin. When setting a team up or running a round without it (`claude plugin list`), offer it once, and install it (`claude plugin install colleagues-mod@colleagues`) only if the user says yes.

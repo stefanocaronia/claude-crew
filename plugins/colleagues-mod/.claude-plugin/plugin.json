@@ -1,6 +1,6 @@
 {
   "name": "colleagues-mod",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "A panel for the colleagues plugin: the team with their portraits, who is at work and the steps they report, the week's budget; meetings drawn as a group chat, with controls to invite, let go and close.",
   "author": {
     "name": "Stefano Caronia",

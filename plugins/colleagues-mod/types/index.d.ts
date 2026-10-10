@@ -59,6 +59,8 @@ export type News = {
 export type Board = {
     news: News[];
     tasks: { colleague: string; lines: string[] }[];
+    /** Whether the colleagues plugin's commands are installed: without them nobody can talk with the team. */
+    hasCommands: boolean;
     checkedAt: number;
 };
 

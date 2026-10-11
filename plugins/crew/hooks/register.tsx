@@ -6,8 +6,8 @@ import type { EngineInterface, Register } from "claude-code";
 
 import type { Colleague, Meeting, Permissions, Preferences, Run, Speaker, WeeklyCounts } from "../types";
 
-import { avatarSvg, barSvg, blankSvg, captionSvg, effortSvg, iconSvg, nameSvg, thumbnailSvg, wideBarSvg } from "./draw.ts";
-import { segmentsOf, speakersOf } from "./meeting.ts";
+import { avatarSvg, barSvg, blankSvg, captionSvg, claudeSvg, effortSvg, iconSvg, nameSvg, thumbnailSvg, wideBarSvg } from "./draw.ts";
+import { claudeId, segmentsOf, speakersOf } from "./meeting.ts";
 import { imagePathsIn, imageTypeOf, isInside, isOwnMemory, resolvedPath } from "./paths.ts";
 import { contextShare, progressOf, totalTime, withCount } from "./progress.ts";
 import { backlogOf, cardFrom, colleagueFrom, colleagueOf, openTasks, retestsOf, withEffort, withPermissions } from "./team.ts";
@@ -15,6 +15,8 @@ import { contextWindowOf, dateOf, formatTime, formatTokens, formatUntil, isoWeek
 import type { Language, Words } from "./text.ts";
 
 const pane = "crew";
+// Claude's name and face in a meeting's chat.
+const claudeOrange = "#D97757";
 const stepTool = "mcp__crew__step";
 const panelTool = "mcp__crew__panel";
 const team = atom({ plugin: "crew", key: "team" } as const, []);
@@ -799,7 +801,9 @@ export const register: Register = (on, options) => {
                 return next(e);
             }
 
-            const segments = segmentsOf(e.props.text, await read($, speakers));
+            // Claude speaks too, with [Claude], when it answers the user in a meeting.
+            const claude = { id: claudeId, name: "Claude", fullName: "Claude", role: words[language].claudeRole, color: claudeOrange };
+            const segments = segmentsOf(e.props.text, [...(await read($, speakers)), claude]);
 
             if (!segments) {
                 return next(e);
@@ -901,6 +905,10 @@ function faceOf(ui: Table, surface: string, colleague: Speaker, size: number, st
 
     if (surface === "terminal" || !("Svg" in ui)) {
         return <Text key={`face-${colleague.id}`} color={colleague.color}>{isWorking ? "◉" : isRinged ? "◎" : "●"}</Text>;
+    }
+
+    if (colleague.id === claudeId) {
+        return <ui.Svg key="face-claude" source={claudeSvg(size)} alt="Claude" width={size} height={size} />;
     }
 
     return <ui.Svg key={`face-${colleague.id}-${stamp}`} source={avatarSvg(colleague, picture === "initials" ? undefined : (picture === "small" ? smallPortraits : portraits).get(colleague.id), size, isRinged, isWorking)} alt={colleague.fullName} width={size} height={size} />;

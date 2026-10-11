@@ -105,6 +105,18 @@ describe("meetings in the chat", () => {
         ]);
     });
 
+    it("gives Claude's own words a turn of its own, [Claude] or plain text before the first name, the narration still apart", () => {
+        const claude = { id: "claude", name: "Claude", fullName: "Claude", role: "Your assistant", color: "#D97757" };
+        assert.deepEqual(segmentsOf("*Claude legge.*\n\nConfermo.\n\n[Matteo] Regge.", [matteo, claude])?.map(segment => [segment.speaker?.name, segment.text]), [
+            [undefined, "*Claude legge.*"],
+            ["Claude", "Confermo."],
+            ["Matteo", "Regge."],
+        ]);
+        assert.deepEqual(segmentsOf("[Claude] Fatto.", [matteo, claude])?.map(segment => [segment.speaker?.name, segment.text]), [["Claude", "Fatto."]]);
+        // Without Claude among the speakers, plain text before the first name stays narration, as before.
+        assert.equal(segmentsOf("Confermo.\n\n[Matteo] Regge.", [matteo])?.[0]?.speaker, undefined);
+    });
+
     it("leaves alone a reply with no colleague in it, or a bracket that is not a colleague", () => {
         assert.equal(segmentsOf("Ecco il piano.", [matteo]), undefined);
         assert.equal(segmentsOf("[Nota] niente", [matteo]), undefined);

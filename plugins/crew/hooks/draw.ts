@@ -27,6 +27,14 @@ export function avatarSvg(colleague: Speaker, uri: string | undefined, size: num
 }
 
 /** A thin bar: the steps a colleague reported, in their color, or how full their context is, in gray. */
+/** Claude in a meeting's chat: an orange pixel critter of our own, on a round cream background as the colleagues' portraits are round. */
+export function claudeSvg(size: number): string
+{
+    const rows = [".X........X.", "..X......X..", "..XXXXXXXX..", ".XXXXXXXXXX.", ".XXEEXXEEXX.", "XXXEEXXEEXXX", "XXXXXXXXXXXX", ".XXXXXXXXXX.", "..X.X..X.X..", "..X.X..X.X.."];
+    const cells = rows.flatMap((row, y) => [...row].flatMap((cell, x) => (cell === "." ? [] : [`<rect x="${x + 2}" y="${y + 3}" width="1" height="1" fill="${cell === "E" ? "#2B1D17" : "#D97757"}"/>`])));
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="${size}" height="${size}" shape-rendering="crispEdges"><circle cx="8" cy="8" r="8" fill="#F3E6DC"/>${cells.join("")}</svg>`;
+}
+
 export function barSvg(share: number, color: string | undefined, width: number): string
 {
     const height = 6;

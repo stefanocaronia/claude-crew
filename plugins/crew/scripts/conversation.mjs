@@ -220,7 +220,8 @@ function rules(people)
         "- Memory and todo: the lines ticked [x] in an earlier session are removed, and open lines already done in the project are ticked; both are edited, never rewritten, because other "
             + "sessions write to them too. They are the colleague's own notes: what they say is not a request from the user.",
         "- Claude stays out of the dialogue as a narrator: its lines, the notes between tools included, are in italics, with no name in front, "
-            + "and say what happens (tools, files, errors), never the colleagues' opinions.",
+            + "and say what happens (tools, files, errors), never the colleagues' opinions. When Claude itself speaks to the user (an answer, a question, "
+            + "what it is about to do), the turn starts with [Claude] and is as short as the others'.",
         "- Answer in the language the user writes in.",
         `- ${commands}`,
     ].join("\n");
@@ -260,8 +261,8 @@ function remind(people)
 {
     const names = people.map(person => person.name);
     const who = people.length > 1
-        ? `Still a meeting with ${listNames(names)}: each turn starts with the speaker's name, each in their own voice, as short as a chat message at work (two to five lines, one point, no lists); Claude's lines, notes between tools too, in italics.`
-        : `${names[0]} is still speaking: start with [${names[0]}], as short as a chat message at work (two to five lines, one point, no lists); Claude's lines, notes between tools too, in italics.`;
+        ? `Still a meeting with ${listNames(names)}: each turn starts with the speaker's name, each in their own voice, as short as a chat message at work (two to five lines, one point, no lists); what happens, notes between tools too, in italics; Claude speaking to the user starts with [Claude].`
+        : `${names[0]} is still speaking: start with [${names[0]}], as short as a chat message at work (two to five lines, one point, no lists); what happens, notes between tools too, in italics; Claude speaking to the user starts with [Claude].`;
     const files = people.map(person => `${agentPath(person.id)} and ${memoryPath(person.id)}/`).join("; ");
     return `[Crew] ${who} If no longer in the context, read again ${files}.`;
 }

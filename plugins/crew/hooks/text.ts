@@ -89,6 +89,7 @@ const en = {
     language: "Language",
     automatic: (name: string) => `Automatic (${name})`,
     autoOpen: "Open the panel when a session starts",
+    claudeRole: "Your assistant",
 };
 
 export const words: Record<Language, Words> = {
@@ -163,6 +164,7 @@ export const words: Record<Language, Words> = {
         language: "Lingua",
         automatic: (name: string) => `Automatica (${name})`,
         autoOpen: "Apri il pannello a inizio sessione",
+        claudeRole: "Il tuo assistente",
     },
     es: {
         pane: "👥 Crew",
@@ -234,6 +236,7 @@ export const words: Record<Language, Words> = {
         language: "Idioma",
         automatic: (name: string) => `Automático (${name})`,
         autoOpen: "Abrir el panel al iniciar una sesión",
+        claudeRole: "Tu asistente",
     },
     fr: {
         pane: "👥 Crew",
@@ -305,6 +308,7 @@ export const words: Record<Language, Words> = {
         language: "Langue",
         automatic: (name: string) => `Automatique (${name})`,
         autoOpen: "Ouvrir le panneau au début d'une session",
+        claudeRole: "Votre assistant",
     },
     de: {
         pane: "👥 Crew",
@@ -376,6 +380,7 @@ export const words: Record<Language, Words> = {
         language: "Sprache",
         automatic: (name: string) => `Automatisch (${name})`,
         autoOpen: "Panel beim Start einer Sitzung öffnen",
+        claudeRole: "Dein Assistent",
     },
     pt: {
         pane: "👥 Crew",
@@ -447,6 +452,7 @@ export const words: Record<Language, Words> = {
         language: "Idioma",
         automatic: (name: string) => `Automático (${name})`,
         autoOpen: "Abrir o painel ao iniciar uma sessão",
+        claudeRole: "Seu assistente",
     },
     ja: {
         pane: "👥 Crew",
@@ -518,6 +524,7 @@ export const words: Record<Language, Words> = {
         language: "言語",
         automatic: (name: string) => `自動 (${name})`,
         autoOpen: "セッション開始時にパネルを開く",
+        claudeRole: "あなたのアシスタント",
     },
     zh: {
         pane: "👥 Crew",
@@ -589,6 +596,7 @@ export const words: Record<Language, Words> = {
         language: "语言",
         automatic: (name: string) => `自动 (${name})`,
         autoOpen: "会话开始时打开面板",
+        claudeRole: "你的助手",
     },
     ko: {
         pane: "👥 Crew",
@@ -660,6 +668,7 @@ export const words: Record<Language, Words> = {
         language: "언어",
         automatic: (name: string) => `자동 (${name})`,
         autoOpen: "세션이 시작될 때 패널 열기",
+        claudeRole: "당신의 어시스턴트",
     },
     ar: {
         pane: "👥 Crew",
@@ -731,6 +740,7 @@ export const words: Record<Language, Words> = {
         language: "اللغة",
         automatic: (name: string) => `تلقائي (${name})`,
         autoOpen: "افتح اللوحة عند بدء الجلسة",
+        claudeRole: "مساعدك",
     },
     ru: {
         pane: "👥 Crew",
@@ -802,6 +812,7 @@ export const words: Record<Language, Words> = {
         language: "Язык",
         automatic: (name: string) => `Автоматически (${name})`,
         autoOpen: "Открывать панель в начале сессии",
+        claudeRole: "Ваш ассистент",
     },
 };
 

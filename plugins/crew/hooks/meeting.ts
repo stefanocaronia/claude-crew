@@ -1,6 +1,9 @@
 // A conversation with the colleagues as the chat shows it: each turn starts with "[Matteo]", Claude's narrator lines are in italics.
 import type { Speaker } from "../types";
 
+/** The id of Claude among the speakers, when it speaks in its own voice in a meeting. */
+export const claudeId = "claude";
+
 /** One piece of a reply: a colleague's turn, or a narrator line when `speaker` is absent. */
 export type Segment = {
     speaker?: Speaker;
@@ -23,7 +26,7 @@ export function segmentsOf(text: string, team: Speaker[]): Segment[] | undefined
         return undefined;
     }
 
-    const segments: Segment[] = narration(text.slice(0, markers[0]?.index ?? 0));
+    const segments: Segment[] = outside(text.slice(0, markers[0]?.index ?? 0), team.find(member => member.id === claudeId));
 
     markers.forEach((marker, index) => {
         const end = markers[index + 1]?.index ?? text.length;
@@ -71,6 +74,29 @@ function turn(text: string, speaker: Speaker | undefined): Segment[]
 function narration(text: string): Segment[]
 {
     return text.trim() ? [{ text: text.trim() }] : [];
+}
+
+// What stands before the first name: narration in italics and, when Claude is among the speakers, its own words, which are not.
+function outside(text: string, claude: Speaker | undefined): Segment[]
+{
+    if (!claude) {
+        return narration(text);
+    }
+
+    const segments: Segment[] = [];
+
+    for (const paragraph of text.trim().split(/\n\s*\n/).map(part => part.trim()).filter(Boolean)) {
+        const speaker = isItalic(paragraph) ? undefined : claude;
+        const last = segments.at(-1);
+
+        if (last && last.speaker === speaker) {
+            last.text = `${last.text}\n\n${paragraph}`;
+        } else {
+            segments.push(speaker ? { speaker, text: paragraph } : { text: paragraph });
+        }
+    }
+
+    return segments;
 }
 
 function isItalic(paragraph: string): boolean

@@ -399,11 +399,6 @@ export const register: Register = (on, options) => {
 
             const pickedTeam = picked.flatMap(id => byId.get(id) ?? []);
             const pickedNames = pickedTeam.length ? listNames(pickedTeam.map(colleague => colleague.name), say.and) : "";
-            // A review needs its subject, so it is written in the prompt for the user to finish; hiring, firing and new portraits go to
-            // Claude at once, who asks in the chat what it needs.
-            const ask = (text: string) => {
-                void $.prompt.fill({ text, mode: "replace" });
-            };
             const send = (text: string) => {
                 void $.prompt.submit({ text, asUser: true });
             };
@@ -438,10 +433,13 @@ export const register: Register = (on, options) => {
                 // In the error color: a firing is the one action that takes someone away.
                 return <Button key={key} onPress={() => send(say.firePrompt(names))}><Text color={errorColor}>{`✕ ${say.fire(names)}`}</Text></Button>;
             };
+            // A review, a meeting, hiring, firing and new portraits all go to Claude, who asks in the chat what the request leaves open:
+            // what to review, the meeting's topic, the new colleague's field. A talk with one colleague from their card starts at once.
             const meet = async (members: Colleague[]) => {
                 await update($, view, current => ({ ...current, picked: [] }));
-                await $.command.run({ command: "crew:talk", args: members.map(member => member.name).join(" ") });
+                send(say.meetPrompt(listNames(members.map(member => member.name), say.and)));
             };
+            const talkWith = (colleague: Colleague) => $.command.run({ command: "crew:talk", args: colleague.name });
             // The name opens the colleague's card. A button, not a link: on the desktop most clicks on a Markdown link never reach the panel.
             // The name drawn in the colleague's color, larger than the text around it; on the terminal, bold text.
             const name = (key: string, colleague: Colleague, size = nameSize) => {
@@ -510,8 +508,8 @@ export const register: Register = (on, options) => {
                             </Box>
                         </Box>
                         <Box key="card-actions" flexDirection="row" flexWrap="wrap" gap={1}>
-                            {isBusy ? null : <Button key="talk" variant="primary" label={`☰ ${say.talk} ${selected.name}`} onPress={() => meet([selected])} />}
-                            {isBusy ? null : <Button key="card-round" label={`↻ ${say.roundWith(selected.name)}`} onPress={() => ask(say.roundPromptWith(selected.name))} />}
+                            {isBusy ? null : <Button key="talk" variant="primary" label={`☰ ${say.talk} ${selected.name}`} onPress={() => talkWith(selected)} />}
+                            {isBusy ? null : <Button key="card-round" label={`↻ ${say.roundWith(selected.name)}`} onPress={() => send(say.roundPromptWith(selected.name))} />}
                             {retests ? <Button key="card-retest" label={`↻ ${say.retest(retests)}`} onPress={() => send(say.retestPrompt(selected.name))} /> : null}
                             {stuck.length ? <Button key="card-free" label={say.markFree} plain onPress={markFree} /> : null}
                             {portraitButtons("card-portrait", say.portrait, selected.name)}
@@ -697,7 +695,7 @@ export const register: Register = (on, options) => {
                     {fold("finished-section", sectionIcons.finished, say.finished, finished.map(runRow), panel.isFinishedCollapsed, current => ({ ...current, isFinishedCollapsed: !current.isFinishedCollapsed }), <Button key="all-back" label={`↩ ${say.allBack}`} plain dimColor onPress={() => sendBack(finished.map(run => run.colleague))} />)}
                     {fold("team", sectionIcons.resting, say.resting, idle.map(colleague => teamRow(colleague)), Boolean(panel.isTeamCollapsed), current => ({ ...current, isTeamCollapsed: !current.isTeamCollapsed }))}
                     <Box key="actions" flexDirection="row" flexWrap="wrap" gap={1}>
-                        <Button key="act-round" variant="primary" label={`↻ ${pickedNames ? say.roundWith(pickedNames) : say.startRound}`} onPress={() => ask(pickedNames ? say.roundPromptWith(pickedNames) : say.roundPrompt)} />
+                        <Button key="act-round" variant="primary" label={`↻ ${pickedNames ? say.roundWith(pickedNames) : say.startRound}`} onPress={() => send(pickedNames ? say.roundPromptWith(pickedNames) : say.roundPrompt)} />
                         <Button key="act-meeting" label={`☰ ${pickedNames ? say.meetWith(pickedNames) : say.meetAll}`} onPress={() => meet(pickedTeam.length ? pickedTeam : colleagues.filter(colleague => !busy.has(colleague.id)))} />
                         {pickedNames ? null : <Button key="act-hire" label={`+ ${say.hire}`} onPress={() => send(say.hirePrompt)} />}
                         {pickedNames ? fireButtons("act-fire", pickedTeam) : null}

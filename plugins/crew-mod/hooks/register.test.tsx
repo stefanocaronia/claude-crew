@@ -199,11 +199,6 @@ test("under the team: the backlog, each task with who holds it and its effort; a
         submitted.push(e.text);
         return { drop: "kept by the test" } as never;
     });
-    const filled: string[] = [];
-    on("prompt.fill", (_, e) => {
-        filled.push(e.text);
-        return { isFilled: true } as never;
-    });
     await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
 
     for (const surface of surfaces) {
@@ -221,7 +216,7 @@ test("under the team: the backlog, each task with who holds it and its effort; a
         expect((await ui.find({ key: "act-meeting" }))?.props.label).toBe("☰ Meeting with Sara and Matteo");
         expect(await ui.find({ key: "act-hire" })).toBeUndefined();
         await ui.press({ key: "act-round" });
-        expect(filled.at(-1)).toBe("run a review round with Sara and Matteo on ");
+        expect(submitted.at(-1)).toBe("run a review round with Sara and Matteo");
         expect(await ui.find({ type: "Text", text: "✕ Fire Sara and Matteo" })).toBeDefined();
         await ui.press({ key: "act-fire" });
         expect(submitted.at(-1)).toBe("fire Sara and Matteo");
@@ -229,10 +224,10 @@ test("under the team: the backlog, each task with who holds it and its effort; a
         await ui.press({ key: "act-portraits" });
         expect(submitted.at(-1)).toBe("draw the portraits of Sara and Matteo again, in 80s-90s anime style");
         await ui.press({ key: "act-meeting" });
-        expect(sent.at(-1)).toBe("/crew:talk Sara Matteo");
+        expect(submitted.at(-1)).toBe("meeting with Sara and Matteo: ask me the topic");
         expect((await ui.find({ key: "pick-sara-lombardi" }))?.props.label).toBe("☐");
         await ui.press({ key: "act-meeting" });
-        expect(sent.at(-1)).toBe("/crew:talk Giulia Matteo Sara");
+        expect(submitted.at(-1)).toBe("meeting with Giulia, Matteo and Sara: ask me the topic");
         expect(await ui.find({ key: "act-fire" })).toBeUndefined();
         await ui.press({ key: "act-portraits-style" });
         await ui.press({ key: "act-portraits-style" });
@@ -697,4 +692,21 @@ test("a project without colleagues: the panel offers to set the team up, with th
         expect(sent.at(-1)).toBe("/crew:init");
         await ui.unmount();
     }
+});
+
+test("from a colleague's card, a review asks Claude what to review, and a talk starts at once", async ($, on) => {
+    const sent = world(on, []);
+    const submitted: string[] = [];
+    on("prompt.submit", (_, e) => {
+        submitted.push(e.text);
+        return { drop: "kept by the test" } as never;
+    });
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+    const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: { title: "Crew", isFocused: false, bodyColumns: 50, placement: "dock" } as never });
+    await ui.press({ key: "open-giulia-ferri" });
+    await ui.press({ key: "card-round" });
+    expect(submitted.at(-1)).toBe("run a review round with Giulia");
+    await ui.press({ key: "talk" });
+    expect(sent.at(-1)).toBe("/crew:talk Giulia");
+    await ui.unmount();
 });

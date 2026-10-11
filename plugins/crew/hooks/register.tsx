@@ -466,7 +466,9 @@ export const register: Register = (on, options) => {
             );
 
             const chosen = await read($, preferences);
-            const settingsButton = <Button key="open-settings" label={`⚙\uFE0E ${say.panelSettings}`} plain dimColor onPress={() => update($, view, current => ({ ...current, isSettingsOpen: true }))} />;
+            // The panel's settings: a gear beside the team's actions, its name written out in the empty panel.
+            const openSettings = () => update($, view, current => ({ ...current, isSettingsOpen: true }));
+            const settingsButton = <Button key="open-settings" label={`⚙\uFE0E ${say.panelSettings}`} plain dimColor onPress={openSettings} />;
 
             if (panel.isSettingsOpen) {
                 const codes = Object.keys(languageNames) as Language[];
@@ -711,7 +713,6 @@ export const register: Register = (on, options) => {
             const heavy = (latest.heavy ?? []).map(id => byId.get(id)?.name ?? id);
             return (
                 <Box flexDirection="column" gap={1}>
-                    <Box key="top" flexDirection="row" justifyContent="flex-end">{settingsButton}</Box>
                     {latest.error ? <Text key="error" dimColor>{say.readError(latest.error)}</Text> : null}
                     {heavy.length ? <Text key="heavy" dimColor>{say.heavyPortraits(listNames(heavy, say.and, say.comma))}</Text> : null}
                     {latest.hasCommands ? null : <Text key="install" dimColor>{say.installSkill}</Text>}
@@ -741,6 +742,7 @@ export const register: Register = (on, options) => {
                         {pickedNames ? null : <Button key="act-hire" label={`+ ${say.hire}`} onPress={() => runCommand("crew:hire", [])} />}
                         {pickedNames ? fireButton("act-fire", pickedTeam) : null}
                         {portraitButton("act-portraits", say.portraits, pickedTeam)}
+                        <Button key="open-settings" label={"⚙︎"} onPress={openSettings} />
                     </Box>
                     {backlogRows.length
                         ? (

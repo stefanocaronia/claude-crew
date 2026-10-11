@@ -52,6 +52,10 @@ const nameSize = 15;
 const cardNameSize = 18;
 // The portrait beside a colleague's turn in the chat.
 const chatFace = 32;
+// How often a colleague at work redraws the panel with their latest figures, and what is waiting to be shown, by run.
+const stepRedrawEvery = 15_000;
+const unshown = new Map<string, { model: string; effort?: string; contextTokens: number; tokens: number; at: number }>();
+const shownAt = new Map<string, number>();
 // The permissions, in the order the card shows them.
 const permissionKinds = ["read", "write", "test", "web"] as const;
 // The efforts a colleague can work at; "inherit" takes the line out of the profile, and the session's effort holds.
@@ -218,17 +222,21 @@ export const register: Register = (on, options) => {
         }
 
         const spent = (usage.input_tokens || 0) + (usage.cache_read_input_tokens || 0) + (usage.cache_creation_input_tokens || 0) + (usage.output_tokens || 0);
-        // The time moves with the steps: a timer would redraw the panel every second, and a click on a replaced drawing is lost.
         const at = await $.clock.now();
-        await update($, runs, list => list.map(run => (run.agentId !== e.agentId ? run : {
-            ...run,
+        const kept = unshown.get(e.agentId);
+        unshown.set(e.agentId, {
             model: usage.model || e.model,
-            effort: typeof e.effort === "string" ? e.effort : run.effort,
+            effort: typeof e.effort === "string" ? e.effort : kept?.effort,
             contextTokens: spent,
-            contextMax: contextWindowOf(usage.model || e.model),
-            tokens: run.tokens + spent,
-            steppedAt: at,
-        })));
+            tokens: (kept?.tokens ?? 0) + spent,
+            at,
+        });
+
+        // The figures move with the steps, but redraw the panel at most every so often: a click on a replaced drawing is lost.
+        if (at - (shownAt.get(e.agentId) ?? 0) >= stepRedrawEvery) {
+            await showSteps($, e.agentId);
+        }
+
         return result;
     });
 
@@ -243,6 +251,7 @@ export const register: Register = (on, options) => {
         const at = await $.clock.now();
 
         if (e.agentId) {
+            await showSteps($, e.agentId);
             await update($, runs, list => list.map(run => (run.agentId !== e.agentId ? run : { ...run, status: e.reason === "answer" ? "done" : "failed", endedAt: at })));
             await update($, now, () => at);
         } else {
@@ -1031,6 +1040,28 @@ async function meetingRefusal($: EngineInterface, command: string): Promise<stri
     return busy.length
         ? `${busy.join(", ")}: a colleague at work on a task joins no meeting until it ends. Ask the user whether to wait, or to meet without them.`
         : undefined;
+}
+
+// The steps of a run not yet on screen: their tokens added up, the latest context and model.
+async function showSteps($: EngineInterface, agentId: string): Promise<void>
+{
+    const steps = unshown.get(agentId);
+
+    if (!steps) {
+        return;
+    }
+
+    unshown.delete(agentId);
+    shownAt.set(agentId, steps.at);
+    await update($, runs, list => list.map(run => (run.agentId !== agentId ? run : {
+        ...run,
+        model: steps.model,
+        effort: steps.effort ?? run.effort,
+        contextTokens: steps.contextTokens,
+        contextMax: contextWindowOf(steps.model),
+        tokens: run.tokens + steps.tokens,
+        steppedAt: steps.at,
+    })));
 }
 
 async function setEffort($: EngineInterface, id: string, level: string | undefined): Promise<void>

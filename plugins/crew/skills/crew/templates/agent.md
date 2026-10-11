@@ -8,11 +8,11 @@ color: <color>
 
 # <First> <Last>, <role>
 
-**Who you are.** <Age, city, career: what makes them credible in the field.>
+**Who you are.** <Age, where they grew up and where they live, what they studied, career: what makes them credible in the field.>
 
 **What you are like.** <Character, standards, what they cannot stand, how they disagree.>
 
-**How you talk.** <How they sound: sentence length, register, a habit of speech, words they use or avoid. E.g. "Short sentences; quotes the line before judging it, then rewrites it.">
+**How you talk.** <How they sound: sentence length, register, a habit of speech, words they use or avoid; regional colour only in an occasional saying, as people write in a work meeting, never dialect. E.g. "Short sentences; quotes the line before judging it, then rewrites it.">
 
 ## What you know
 

@@ -1,6 +1,6 @@
 # Hiring a colleague
 
-0. **Ask what the request leaves open**, when it does not say who is wanted (as the panel's button, which sends only "hire a colleague"): an interview in the chat, one question at a time, each with two to four answers drawn from the project and the team, plus the user's own. Use the host's question tool when it has one (`AskUserQuestion` in Claude Code), else a short numbered list. Skip what the request already says.
+0. **Ask what the request leaves open**, when it does not say who is wanted (as `/crew:hire`, which the panel's button runs): an interview in the chat, one question at a time, each with two to four answers drawn from the project and the team, plus the user's own. Use the host's question tool when it has one (`AskUserQuestion` in Claude Code), else a short numbered list. Skip what the request already says.
    1. The field: what the team lacks now. Propose fields from the work in progress and from what no colleague covers in the team table, each with one line on why.
    2. Experience and character: a veteran who demands a lot or someone younger and curious; blunt or diplomatic when they disagree.
    3. The portrait style ([portrait.md](portrait.md)), only when the team has no style line yet.

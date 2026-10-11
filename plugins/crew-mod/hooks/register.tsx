@@ -24,6 +24,7 @@ const meeting = atom({ plugin: "crew-mod", key: "meeting" } as const, { members:
 const budget = atom({ plugin: "crew-mod", key: "budget" } as const, []);
 const view = atom({ plugin: "crew-mod", key: "view" } as const, { isFinishedCollapsed: false, autoOpened: false });
 const card = atom({ plugin: "crew-mod", key: "card" } as const, null);
+const report = atom({ plugin: "crew-mod", key: "report" } as const, null);
 const gallery = atom({ plugin: "crew-mod", key: "gallery" } as const, 0);
 const board = atom({ plugin: "crew-mod", key: "board" } as const, { tasks: [], checkedAt: 0, hasCommands: true });
 
@@ -65,9 +66,8 @@ const shownAt = new Map<string, number>();
 const permissionKinds = ["read", "write", "test", "web"] as const;
 // The efforts a colleague can work at; "inherit" takes the line out of the profile, and the session's effort holds.
 const effortLevels = ["inherit", "low", "medium", "high", "xhigh", "max"] as const;
-// The styles the portraits can be drawn again in.
-const portraitStyles = ["realistic", "anime", "pixel", "vector"] as const;
-type PortraitStyle = typeof portraitStyles[number];
+// The longest report the panel draws, in characters: what is left of a drawing's 100,000 after the portraits.
+const reportLimit = 40_000;
 // How many open tasks the backlog shows; its effort column and a colleague's card at its narrowest, in cells.
 const backlogSize = 20;
 const effortWidth = 4;
@@ -306,13 +306,10 @@ export const register: Register = (on, options) => {
         const at = await $.clock.now();
         const steps = takeSteps(agentId);
         releaseFiles([agentId]);
-        // One write, so the panel is redrawn once: the steps not yet shown, and the end.
-        await update($, runs, list => list.map(run => (run.agentId !== agentId ? run : { ...withSteps(run, steps), status: e.reason === "answer" ? "done" : "failed", endedAt: at })));
-        const run = (await read($, runs)).find(other => other.agentId === agentId);
-
-        if (run && e.reason === "answer" && e.answer.trim()) {
-            await saveReport($, run, e.answer, at).catch(() => undefined);
-        }
+        const ended = (await read($, runs)).find(other => other.agentId === agentId);
+        const file = ended && e.reason === "answer" && e.answer.trim() ? await saveReport($, ended, e.answer, at).catch(() => undefined) : undefined;
+        // One write, so the panel is redrawn once: the steps not yet shown, the end, the report's file.
+        await update($, runs, list => list.map(run => (run.agentId !== agentId ? run : { ...withSteps(run, steps), status: e.reason === "answer" ? "done" : "failed", endedAt: at, ...(file ? { report: file } : {}) })));
 
         return next(e);
     });
@@ -373,7 +370,7 @@ export const register: Register = (on, options) => {
             const presence = (colleague: Colleague) => (talk.members.includes(colleague.id) ? say.inMeeting : "");
             const face = (colleague: Colleague, size: number, isRinged = false, isWorking = false) => faceOf(ui, e.surface, colleague, size, stamp, isRinged, isWorking);
             const open = (colleague: Colleague) => async () => {
-                await update($, view, current => ({ ...current, selected: colleague.id }));
+                await update($, view, current => ({ ...current, selected: colleague.id, reading: undefined }));
                 await readCard($, colleague.id);
             };
             const isDesktop = e.surface !== "terminal" && "Svg" in ui;
@@ -399,6 +396,9 @@ export const register: Register = (on, options) => {
 
             const pickedTeam = picked.flatMap(id => byId.get(id) ?? []);
             const pickedNames = pickedTeam.length ? listNames(pickedTeam.map(colleague => colleague.name), say.and) : "";
+            // A meeting with everyone takes whoever is free; while a meeting goes on, the band above the prompt invites.
+            const free = colleagues.filter(colleague => !busy.has(colleague.id) && !inMeeting.has(colleague.id));
+            const canMeet = !talk.members.length && (pickedTeam.length > 0 || free.length > 0);
             const send = (text: string) => {
                 void $.prompt.submit({ text, asUser: true });
             };
@@ -406,18 +406,13 @@ export const register: Register = (on, options) => {
             const effortButton = (key: string, colleague: Colleague) => {
                 return <Button key={key} label={colleague.effort ? say.effort(colleague.effort) : say.sessionEffort} plain dimColor onPress={() => setEffort($, colleague.id, nextEffort(colleague.effort))} />;
             };
-            // New portraits: a click on the style moves to the next one, the button sends the request to Claude.
-            const style = (portraitStyles as readonly string[]).includes(panel.style ?? "") ? panel.style as PortraitStyle : portraitStyles[0];
-            const portraitButtons = (key: string, label: string, names: string) => [
-                <Button key={key} label={`◐ ${label}`} onPress={() => send(say.portraitsPrompt(names, say.styles[style]))} />,
-                <Button
-                    key={`${key}-style`}
-                    label={`${say.styleLabel}: ${say.styles[style]}`}
-                    plain
-                    dimColor
-                    onPress={() => update($, view, current => ({ ...current, style: portraitStyles[(portraitStyles.indexOf(style) + 1) % portraitStyles.length] }))}
-                />,
-            ];
+            // The panel's actions are the crew plugin's commands, which ask in the chat what the request leaves open: what to review, the
+            // meeting's topic, the new colleague's field, the portraits' style, a yes before a firing. The picks are used up.
+            const runCommand = async (command: string, members: Colleague[]) => {
+                await update($, view, current => ({ ...current, picked: [] }));
+                await $.command.run({ command, args: members.map(member => member.name).join(" ") });
+            };
+            const portraitButton = (key: string, label: string, members: Colleague[]) => <Button key={key} label={`◐ ${label}`} onPress={() => runCommand("crew:portraits", members)} />;
             // A colleague's name, and at its right what belongs to the whole card: a mark of their work, the box that picks them.
             const nameRow = (key: string, colleague: Colleague, extras: (JSX.Element | null)[]) => (
                 <Box key={`row-${key}`} flexDirection="row" flexWrap="nowrap" alignItems="center" columnGap={1} minWidth={0}>
@@ -427,18 +422,11 @@ export const register: Register = (on, options) => {
                     {extras}
                 </Box>
             );
-            // Firing goes to Claude at once, who asks for a yes in the chat before anything.
-            const fireButtons = (key: string, members: Colleague[]) => {
-                const names = listNames(members.map(member => member.name), say.and);
-                // In the error color: a firing is the one action that takes someone away.
-                return <Button key={key} onPress={() => send(say.firePrompt(names))}><Text color={errorColor}>{`✕ ${say.fire(names)}`}</Text></Button>;
-            };
-            // A review, a meeting, hiring, firing and new portraits all go to Claude, who asks in the chat what the request leaves open:
-            // what to review, the meeting's topic, the new colleague's field. A talk with one colleague from their card starts at once.
-            const meet = async (members: Colleague[]) => {
-                await update($, view, current => ({ ...current, picked: [] }));
-                send(say.meetPrompt(listNames(members.map(member => member.name), say.and)));
-            };
+            // In the error color: a firing is the one action that takes someone away. The command asks for a yes first.
+            const fireButton = (key: string, members: Colleague[]) => (
+                <Button key={key} onPress={() => runCommand("crew:fire", members)}><Text color={errorColor}>{`✕ ${say.fire(listNames(members.map(member => member.name), say.and))}`}</Text></Button>
+            );
+            // A talk with one colleague from their card starts at once, with no topic asked.
             const talkWith = (colleague: Colleague) => $.command.run({ command: "crew:talk", args: colleague.name });
             // The name opens the colleague's card. A button, not a link: on the desktop most clicks on a Markdown link never reach the panel.
             // The name drawn in the colleague's color, larger than the text around it; on the terminal, bold text.
@@ -451,7 +439,7 @@ export const register: Register = (on, options) => {
                 return <ui.Svg key={key} source={drawn.source} alt={colleague.fullName} width={drawn.width} height={drawn.height} />;
             };
             // The button that opens a colleague's card.
-            const opener = (key: string, colleague: Colleague) => <Button key={key} label="❯" plain onPress={open(colleague)} />;
+            const opener = (key: string, colleague: Colleague, onPress = open(colleague)) => <Button key={key} label="❯" plain onPress={onPress} />;
             // A pencil left of the opener, only for a colleague who may change the project's files.
             const writeMark = (colleague: Colleague) => {
                 if (!colleague.permissions.write) {
@@ -475,7 +463,25 @@ export const register: Register = (on, options) => {
                 return (
                     <Box flexDirection="column" gap={1} alignItems="flex-start">
                         <Text key="empty" dimColor>{say.empty}</Text>
-                        <Button key="act-init" label={`+ ${say.setUp}`} onPress={() => void $.command.run({ command: "crew:init", args: "" })} />
+                        {latest.hasCommands
+                            ? <Button key="act-init" label={`+ ${say.setUp}`} onPress={() => $.command.run({ command: "crew:init", args: "" })} />
+                            : <Text key="install" dimColor>{say.installSkill}</Text>}
+                    </Box>
+                );
+            }
+
+            const reading = panel.reading ? byId.get(panel.reading.colleague) : undefined;
+
+            if (panel.reading && reading) {
+                const shown = await read($, report);
+                const text = shown?.colleague === reading.id && shown.file === panel.reading.file ? shown : null;
+                return (
+                    <Box flexDirection="column" gap={1}>
+                        <Button key="report-back" label={`← ${say.back}`} plain onPress={() => update($, view, current => ({ ...current, reading: undefined }))} />
+                        {nameRow(`report-${reading.id}`, reading, [opener(`report-open-${reading.id}`, reading)])}
+                        <Text key="report-file" dimColor wrap="truncate-end">{`notes/${panel.reading.file}`}</Text>
+                        {text?.text ? <Markdown key="report-text" text={text.text} /> : <Text key="report-missing" dimColor>{say.reportMissing}</Text>}
+                        {text?.isCut ? <Text key="report-cut" dimColor>{say.reportCut(panel.reading.file)}</Text> : null}
                     </Box>
                 );
             }
@@ -504,16 +510,16 @@ export const register: Register = (on, options) => {
                                     <Text dimColor>{[presence(selected), say.toDo(selected.openTasks), selected.model ? modelName(selected.model) : ""].filter(Boolean).join(" · ")}</Text>
                                 </Box>
                                 {week ? <Text key="week" dimColor>{say.thisWeek(week.tasks, week.refusals)}</Text> : null}
-                                {details?.latestReport ? <Text key="report" dimColor>{say.latestReport(details.latestReport)}</Text> : null}
+                                {details?.latestReport ? <Button key="card-report" label={`${say.latestReport(details.latestReport)} ❯`} plain dimColor onPress={() => openReport($, selected.id, details.latestReport ?? "")} /> : null}
                             </Box>
                         </Box>
                         <Box key="card-actions" flexDirection="row" flexWrap="wrap" gap={1}>
                             {isBusy ? null : <Button key="talk" variant="primary" label={`☰ ${say.talk} ${selected.name}`} onPress={() => talkWith(selected)} />}
-                            {isBusy ? null : <Button key="card-round" label={`↻ ${say.roundWith(selected.name)}`} onPress={() => send(say.roundPromptWith(selected.name))} />}
+                            {isBusy ? null : <Button key="card-round" label={`↻ ${say.roundWith(selected.name)}`} onPress={() => runCommand("crew:review", [selected])} />}
                             {retests ? <Button key="card-retest" label={`↻ ${say.retest(retests)}`} onPress={() => send(say.retestPrompt(selected.name))} /> : null}
                             {stuck.length ? <Button key="card-free" label={say.markFree} plain onPress={markFree} /> : null}
-                            {portraitButtons("card-portrait", say.portrait, selected.name)}
-                            {fireButtons("card-fire", [selected])}
+                            {portraitButton("card-portrait", say.portrait, [selected])}
+                            {fireButton("card-fire", [selected])}
                         </Box>
                         <Box key="card-settings" flexDirection="column">
                             <Text bold>{say.settings}</Text>
@@ -579,7 +585,8 @@ export const register: Register = (on, options) => {
                                 ? <Text key={`mark-${run.agentId}`} color={colleague.color}>{mark}</Text>
                                 : <Button key={`back-${run.agentId}`} label={mark} plain onPress={() => sendBack([colleague.id])} />,
                             writeMark(colleague),
-                            opener(isRunning ? `open-${colleague.id}` : `open-run-${run.agentId}`, colleague),
+                            // Once finished, the opener shows what they answered.
+                            isRunning || !run.report ? opener(isRunning ? `open-${colleague.id}` : `open-run-${run.agentId}`, colleague) : opener(`open-run-${run.agentId}`, colleague, () => openReport($, colleague.id, run.report ?? "")),
                         ])}
                         <Text key={`role-${run.agentId}`} wrap="truncate-end">{roleOf(colleague)}</Text>
                         <Text key={`task-${run.agentId}`} dimColor wrap="truncate-end">{[taskOf(run.task, colleague), steps].filter(Boolean).join(" · ")}</Text>
@@ -695,11 +702,11 @@ export const register: Register = (on, options) => {
                     {fold("finished-section", sectionIcons.finished, say.finished, finished.map(runRow), panel.isFinishedCollapsed, current => ({ ...current, isFinishedCollapsed: !current.isFinishedCollapsed }), <Button key="all-back" label={`↩ ${say.allBack}`} plain dimColor onPress={() => sendBack(finished.map(run => run.colleague))} />)}
                     {fold("team", sectionIcons.resting, say.resting, idle.map(colleague => teamRow(colleague)), Boolean(panel.isTeamCollapsed), current => ({ ...current, isTeamCollapsed: !current.isTeamCollapsed }))}
                     <Box key="actions" flexDirection="row" flexWrap="wrap" gap={1}>
-                        <Button key="act-round" variant="primary" label={`↻ ${pickedNames ? say.roundWith(pickedNames) : say.startRound}`} onPress={() => send(pickedNames ? say.roundPromptWith(pickedNames) : say.roundPrompt)} />
-                        <Button key="act-meeting" label={`☰ ${pickedNames ? say.meetWith(pickedNames) : say.meetAll}`} onPress={() => meet(pickedTeam.length ? pickedTeam : colleagues.filter(colleague => !busy.has(colleague.id)))} />
-                        {pickedNames ? null : <Button key="act-hire" label={`+ ${say.hire}`} onPress={() => send(say.hirePrompt)} />}
-                        {pickedNames ? fireButtons("act-fire", pickedTeam) : null}
-                        {portraitButtons("act-portraits", say.portraits, pickedNames)}
+                        <Button key="act-round" variant="primary" label={`↻ ${pickedNames ? say.roundWith(pickedNames) : say.startRound}`} onPress={() => runCommand("crew:review", pickedTeam)} />
+                        {canMeet ? <Button key="act-meeting" label={`☰ ${pickedNames ? say.meetWith(pickedNames) : say.meetAll}`} onPress={() => runCommand("crew:meeting", pickedTeam.length ? pickedTeam : free)} /> : null}
+                        {pickedNames ? null : <Button key="act-hire" label={`+ ${say.hire}`} onPress={() => runCommand("crew:hire", [])} />}
+                        {pickedNames ? fireButton("act-fire", pickedTeam) : null}
+                        {portraitButton("act-portraits", say.portraits, pickedTeam)}
                     </Box>
                     {backlogRows.length
                         ? (
@@ -1273,12 +1280,12 @@ async function recordRun($: EngineInterface, colleague: Colleague, task: string,
 }
 
 // A colleague's answer kept in their notes, so the round's report outlives the session: notes/<date>-<task>.md, never over another.
-async function saveReport($: EngineInterface, run: Run, answer: string, at: number): Promise<void>
+async function saveReport($: EngineInterface, run: Run, answer: string, at: number): Promise<string | undefined>
 {
     const colleague = (await read($, team)).find(member => member.id === run.colleague);
 
     if (!colleague) {
-        return;
+        return undefined;
     }
 
     const task = taskOf(run.task, colleague);
@@ -1296,6 +1303,19 @@ async function saveReport($: EngineInterface, run: Run, answer: string, at: numb
     if ((await read($, card))?.id === colleague.id) {
         await readCard($, colleague.id);
     }
+
+    return file;
+}
+
+// A report of a colleague's notes shown in the panel, over the team or the card until the user goes back. A drawing carries at most
+// 100,000 characters: a long report is cut, the rest left to the file.
+async function openReport($: EngineInterface, colleague: string, file: string): Promise<void>
+{
+    const path = `${await projectRoot($)}/.claude/agent-memory/${colleague}/notes/${file}`;
+    const text = (await $.fs.exists(path)) ? await $.fs.read(path) : "";
+    const isCut = text.length > reportLimit;
+    await update($, report, () => ({ colleague, file, text: isCut ? text.slice(0, reportLimit) : text, ...(isCut ? { isCut } : {}) }));
+    await update($, view, current => ({ ...current, reading: { colleague, file } }));
 }
 
 // The counts of the weeks kept, from the plugin's store; nothing when it cannot be read.

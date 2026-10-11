@@ -36,6 +36,10 @@ function listed(files: Record<string, string>, folder: string): never[]
 // The crew plugin's script: talk, invite, leave and end change who is in the conversation, in its state file.
 function keepMeeting(files: Record<string, string>, command: string, args: string): void
 {
+    if (!["crew:talk", "crew:invite", "crew:leave", "crew:end"].includes(command)) {
+        return;
+    }
+
     const state = "/tmp/claude-crew/s1.json";
     const active = files[state] ? (JSON.parse(files[state]) as { active: string[] }).active : [];
     const ids = args.split(" ").filter(Boolean).flatMap(first => Object.keys(project).filter(path => path.startsWith(`/p/.claude/agents/${first.toLowerCase()}-`)).map(path => path.slice("/p/.claude/agents/".length, -".md".length)));
@@ -192,13 +196,8 @@ test("the panel marks who is in the meeting, whose controls stay above the promp
     }
 });
 
-test("under the team: the backlog, each task with who holds it and its effort; a meeting with the colleagues picked, or with everyone", async ($, on) => {
+test("under the team: the backlog, each task with who holds it and its effort; the actions are commands, with the colleagues picked or for everyone", async ($, on) => {
     const sent = world(on, []);
-    const submitted: string[] = [];
-    on("prompt.submit", (_, e) => {
-        submitted.push(e.text);
-        return { drop: "kept by the test" } as never;
-    });
     await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
 
     for (const surface of surfaces) {
@@ -215,38 +214,31 @@ test("under the team: the backlog, each task with who holds it and its effort; a
         await ui.press({ key: "pick-matteo-conti" });
         expect((await ui.find({ key: "act-meeting" }))?.props.label).toBe("☰ Meeting with Sara and Matteo");
         expect(await ui.find({ key: "act-hire" })).toBeUndefined();
-        await ui.press({ key: "act-round" });
-        expect(submitted.at(-1)).toBe("run a review round with Sara and Matteo: ask me what to review");
         expect(await ui.find({ type: "Text", text: "✕ Fire Sara and Matteo" })).toBeDefined();
-        await ui.press({ key: "act-fire" });
-        expect(submitted.at(-1)).toBe("fire Sara and Matteo");
-        await ui.press({ key: "act-portraits-style" });
-        await ui.press({ key: "act-portraits" });
-        expect(submitted.at(-1)).toBe("draw the portraits of Sara and Matteo again, in 80s-90s anime style");
-        await ui.press({ key: "act-meeting" });
-        expect(submitted.at(-1)).toBe("meeting with Sara and Matteo: ask me the topic");
-        expect((await ui.find({ key: "pick-sara-lombardi" }))?.props.label).toBe("☐");
-        await ui.press({ key: "act-meeting" });
-        expect(submitted.at(-1)).toBe("meeting with Giulia, Matteo and Sara: ask me the topic");
+        // Each action is a command, which asks in the chat what it needs; the picks are used up.
+        for (const [key, command] of [["act-round", "/crew:review Sara Matteo"], ["act-fire", "/crew:fire Sara Matteo"], ["act-portraits", "/crew:portraits Sara Matteo"], ["act-meeting", "/crew:meeting Sara Matteo"]] as const) {
+            await ui.press({ key });
+            expect(sent.at(-1)).toBe(command);
+            expect((await ui.find({ key: "pick-sara-lombardi" }))?.props.label).toBe("☐");
+            await ui.press({ key: "pick-sara-lombardi" });
+            await ui.press({ key: "pick-matteo-conti" });
+        }
+
+        await ui.press({ key: "pick-sara-lombardi" });
+        await ui.press({ key: "pick-matteo-conti" });
         expect(await ui.find({ key: "act-fire" })).toBeUndefined();
-        await ui.press({ key: "act-portraits-style" });
-        await ui.press({ key: "act-portraits-style" });
-        await ui.press({ key: "act-portraits" });
-        expect(submitted.at(-1)).toBe("draw the portraits of the whole team again, in vector cartoon style");
-        await ui.press({ key: "act-portraits-style" });
-        await ui.press({ key: "act-hire" });
-        expect(submitted.at(-1)).toBe("hire a colleague");
+
+        for (const [key, command] of [["act-round", "/crew:review"], ["act-portraits", "/crew:portraits"], ["act-hire", "/crew:hire"], ["act-meeting", "/crew:meeting Giulia Matteo Sara"]] as const) {
+            await ui.press({ key });
+            expect(sent.at(-1)).toBe(command);
+        }
+
         await ui.unmount();
     }
 });
 
 test("the panel shows who is at work and the team, and a colleague's card with its actions", async ($, on) => {
-    world(on, []);
-    const submitted: string[] = [];
-    on("prompt.submit", (_, e) => {
-        submitted.push(e.text);
-        return { drop: "kept by the test" } as never;
-    });
+    const sent = world(on, []);
     await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
     await $.agent.spawn({ prompt: "Review the parser.", description: "Matteo: review the parser", subagentType: "matteo-conti" } as never);
 
@@ -283,12 +275,10 @@ test("the panel shows who is at work and the team, and a colleague's card with i
         await ui.press({ key: "permission-write" });
         expect(await labels()).toEqual(["☑︎ Read", "☐ Write", "☐ Testing"]);
         await ui.press({ key: "permission-read" });
-        await ui.press({ key: "card-portrait-style" });
         await ui.press({ key: "card-portrait" });
-        expect(submitted.at(-1)).toBe("draw the portraits of Matteo again, in 80s-90s anime style");
-        await ui.press({ key: "card-portrait-style" });
-        await ui.press({ key: "card-portrait-style" });
-        await ui.press({ key: "card-portrait-style" });
+        expect(sent.at(-1)).toBe("/crew:portraits Matteo");
+        await ui.press({ key: "card-fire" });
+        expect(sent.at(-1)).toBe("/crew:fire Matteo");
         await ui.press({ key: "back" });
         expect((await ui.find({ key: "open-giulia-ferri" }))?.props.label).toBe("❯");
         await ui.unmount();
@@ -495,8 +485,24 @@ test("a colleague's answer is kept in their notes, never over another, and their
     expect(files["/p/.claude/agent-memory/matteo-conti/notes/2026-10-10-review-the-parser.md"]).toBe("# Review the parser! (2026-10-10)\n\nThe parser holds (a1).\n");
     expect(files["/p/.claude/agent-memory/matteo-conti/notes/2026-10-10-review-the-parser-2.md"]).toMatch(/holds \(a2\)/);
     const ui = await $.ui.mount({ plugin, surface: "terminal", component: "Pane", requestId: "crew", props: pane });
+    // The finished row's opener shows what they answered, and the name's opener their card.
     await ui.press({ key: "open-run-a2" });
-    expect(await ui.find({ type: "Text", text: "Latest report: notes/2026-10-10-review-the-parser-2.md" })).toBeDefined();
+    expect((await ui.find({ key: "report-text" }))?.text).toMatch(/Review the parser! \(2026-10-10\)[\s\S]*The parser holds \(a2\)/);
+    expect(await ui.find({ type: "Text", text: "notes/2026-10-10-review-the-parser-2.md" })).toBeDefined();
+    await ui.press({ key: "report-back" });
+    expect(await ui.find({ key: "report-text" })).toBeUndefined();
+    await ui.press({ key: "open-run-a2" });
+    await ui.press({ key: "report-open-matteo-conti" });
+    expect((await ui.find({ key: "card-report" }))?.props.label).toBe("Latest report: notes/2026-10-10-review-the-parser-2.md ❯");
+    // From the card, back from the report leads to the card again.
+    await ui.press({ key: "card-report" });
+    expect((await ui.find({ key: "report-text" }))?.text).toMatch(/holds \(a2\)/);
+    await ui.press({ key: "report-back" });
+    expect(await ui.find({ key: "card-report" })).toBeDefined();
+    // A report gone from the notes says so.
+    delete files["/p/.claude/agent-memory/matteo-conti/notes/2026-10-10-review-the-parser-2.md"];
+    await ui.press({ key: "card-report" });
+    expect(await ui.find({ type: "Text", text: "The report is no longer in their notes." })).toBeDefined();
 });
 
 test("open retests in a colleague's todo give their card a button that hands them over", async ($, on) => {
@@ -705,8 +711,45 @@ test("from a colleague's card, a review asks Claude what to review, and a talk s
     const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: { title: "Crew", isFocused: false, bodyColumns: 50, placement: "dock" } as never });
     await ui.press({ key: "open-giulia-ferri" });
     await ui.press({ key: "card-round" });
-    expect(submitted.at(-1)).toBe("run a review round with Giulia: ask me what to review");
+    expect(sent.at(-1)).toBe("/crew:review Giulia");
     await ui.press({ key: "talk" });
     expect(sent.at(-1)).toBe("/crew:talk Giulia");
+    await ui.unmount();
+});
+
+test("a meeting takes whoever is free, and none starts from the panel while one goes on", async ($, on) => {
+    const sent = world(on, []);
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+
+    for (const colleague of ["matteo-conti", "giulia-ferri", "sara-lombardi"]) {
+        await $.agent.spawn({ prompt: "Review.", description: "review", subagentType: colleague } as never);
+    }
+
+    const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: { title: "Crew", isFocused: false, bodyColumns: 50, placement: "dock" } as never });
+    expect(await ui.find({ key: "act-meeting" })).toBeUndefined();
+    await ui.unmount();
+    expect(sent.filter(line => line.startsWith("/crew:meeting"))).toEqual([]);
+});
+
+test("while a meeting goes on, the panel's meeting button gives way to the band's invite", async ($, on) => {
+    world(on, ["giulia-ferri"]);
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+    const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: { title: "Crew", isFocused: false, bodyColumns: 50, placement: "dock" } as never });
+    expect(await ui.find({ key: "act-meeting" })).toBeUndefined();
+    expect(await ui.find({ key: "act-round" })).toBeDefined();
+    await ui.unmount();
+});
+
+test("without the crew plugin's commands, the empty panel says to install it instead of offering to set the team up", async ($, on) => {
+    const sent = world(on, [], false);
+
+    for (const path of Object.keys(sent.files).filter(path => path.startsWith("/p/.claude/"))) {
+        delete sent.files[path];
+    }
+
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+    const ui = await $.ui.mount({ plugin, surface: "terminal", component: "Pane", requestId: "crew", props: { title: "Crew", isFocused: false, bodyColumns: 50, placement: "dock" } as never });
+    expect(await ui.find({ key: "act-init" })).toBeUndefined();
+    expect(await ui.find({ type: "Text", text: /need the crew plugin/ })).toBeDefined();
     await ui.unmount();
 });

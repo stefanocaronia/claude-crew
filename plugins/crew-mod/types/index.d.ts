@@ -50,6 +50,8 @@ export type Run = {
     steppedAt?: number;
     /** Sent back to the team by the user: the run no longer shows among the finished ones. */
     isBack?: boolean;
+    /** The file of the colleague's notes their answer was kept in, by name. */
+    report?: string;
 };
 
 /** Who is in the conversation now, by colleague id, and who spoke last. */
@@ -87,12 +89,12 @@ export type PanelView = {
     autoOpened: boolean;
     /** Whether the backlog shows its tasks; closed until the user opens it. */
     isBacklogOpen?: boolean;
-    /** The style new portraits are asked in. */
-    style?: string;
     /** The colleagues picked on their cards for a meeting, by id. */
     picked?: string[];
     /** The colleague whose card the panel shows, by id. */
     selected?: string;
+    /** The report the panel shows instead of the team or the card: whose, and its file in their notes. */
+    reading?: { colleague: string; file: string };
 };
 
 /** A colleague's card: what their profile says of them, their open tasks and the latest lines of their memory. */
@@ -103,6 +105,14 @@ export type Card = {
     memory: string;
     /** The newest round report in their notes folder, by name: "2026-10-11-review-the-parser.md". */
     latestReport?: string;
+};
+
+/** A report read from a colleague's notes for the panel, cut when it is longer than a drawing can carry. */
+export type Report = {
+    colleague: string;
+    file: string;
+    text: string;
+    isCut?: boolean;
 };
 
 /** What the colleagues did in each ISO week, kept across sessions in the plugin's store: by week ("2026-W41"), then by id. */
@@ -118,6 +128,7 @@ declare module "claude-code" {
             budget: Budget[];
             view: PanelView;
             card: Card | null;
+            report: Report | null;
             board: Board;
             /** Changes when the portraits are read again, so the drawings that show them are redrawn. */
             gallery: number;

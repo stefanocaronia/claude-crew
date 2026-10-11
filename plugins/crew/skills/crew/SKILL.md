@@ -1,6 +1,6 @@
 ---
 name: crew
-description: A standing team of expert colleagues for a project, each a subagent with a profile, a memory and a todo. Use it when a step of the work is done (a feature, a fix, a playtest), to run a review round with the colleagues it touches; before handing a colleague a task in their field (a check, research, a test, a change, within their permissions); and when the user asks to set the team up, hire, fire, change or portray a colleague, or see the team. The command init sets the team up; conversations and meetings go through the plugin's commands talk, invite, leave and end, which Claude invokes when the user asks in any words.
+description: A standing team of expert colleagues for a project, each a subagent with a profile, a memory and a todo. Use it when a step of the work is done (a feature, a fix, a playtest), to run a review round with the colleagues it touches; before handing a colleague a task in their field (a check, research, a test, a change, within their permissions); and when the user asks to set the team up, hire, fire, change or portray a colleague, or see the team. The command init sets the team up; conversations go through the plugin's commands talk, invite, leave and end, which Claude invokes when the user asks in any words. The commands review, meeting, hire, fire and portraits, run by the panel's buttons or typed by the user, ask first in the chat what the request leaves open.
 ---
 
 # Crew
@@ -27,14 +27,14 @@ A colleague is an agent of `.claude/agents/` with a `todo.md` in its memory fold
 | The user asks | Read first |
 |---|---|
 | to set the team up in a project (`/crew:init`, or the empty panel's button) | [references/adopt.md](references/adopt.md) |
-| to hire a colleague | [references/hire.md](references/hire.md) |
-| to fire one | [references/fire.md](references/fire.md) |
+| to hire a colleague (`/crew:hire` starts with the interview) | [references/hire.md](references/hire.md) |
+| to fire one (`/crew:fire` asks the yes first) | [references/fire.md](references/fire.md) |
 | to change one: field, tools, character, name | [references/edit.md](references/edit.md) |
 | to set the permissions, of the team or of one, sensibly | [references/edit.md](references/edit.md), "Permissions" |
-| a portrait, for one colleague or the whole team | [references/portrait.md](references/portrait.md) |
-| a review round, or a milestone is reached; when the request asks what to review (the panel's buttons do), ask that first with the choice form, as round.md says | [references/round.md](references/round.md) |
+| a portrait, for one colleague or the whole team (`/crew:portraits` asks the style first) | [references/portrait.md](references/portrait.md) |
+| a review round, or a milestone is reached (`/crew:review` asks first what to review) | [references/round.md](references/round.md) |
 | a task for a colleague, or Claude finds one useful: a check, research, a test, a change in their field | [references/task.md](references/task.md) |
-| to talk with one or more of them; when the request asks for the topic (the panel's meeting button does), ask that first with the choice form, as conversation.md says | [references/conversation.md](references/conversation.md) |
+| to talk with one or more of them (`/crew:meeting` asks the topic first) | [references/conversation.md](references/conversation.md) |
 | who is on the team | the team table and each `todo.md`: name, field, open tasks |
 
 ## Always

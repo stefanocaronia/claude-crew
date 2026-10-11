@@ -59,6 +59,9 @@ describe("the commands", () => {
         assert.match(text, /How you work/);
         assert.doesNotMatch(text, /REPORT FORMAT|MEMORY RULES/);
         assert.match(text, /\/crew:invite, \/crew:leave or \/crew:end/);
+        // They act too, within the permissions their tools give them, and the narrator names who acts.
+        assert.match(text, /Their permissions, binding: Matteo reads the project\. What one may not do, they propose/);
+        assert.match(text, /Each line names who acts/);
     });
 
     it("invite adds a colleague, introducing only the newcomer", () => {

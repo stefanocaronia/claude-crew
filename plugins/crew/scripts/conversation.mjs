@@ -176,8 +176,9 @@ function loadColleagues()
         .filter(file => file.endsWith(".md") && existsSync(join(root, memoryPath(file.slice(0, -".md".length)), "todo.md")))
         .map(file => {
             const id = file.slice(0, -".md".length);
-            const heading = /^# (.+)$/m.exec(withoutFrontmatter(read(agentPath(id))))?.[1].trim() ?? id;
-            return { id, name: heading.split(/[\s,]/)[0] };
+            const profile = read(agentPath(id));
+            const heading = /^# (.+)$/m.exec(withoutFrontmatter(profile))?.[1].trim() ?? id;
+            return { id, name: heading.split(/[\s,]/)[0], permissions: permissionsOf(profile) };
         });
 }
 
@@ -214,13 +215,15 @@ function rules(people)
             ? `- Every turn starts with the speaker's name (${names.map(name => `[${name}]`).join(", ")}). Whoever has something new to say speaks, `
                 + "briefly; who only agrees stays silent. Disagreement is said plainly and stays open until the user decides; when the user addresses one of them, that one answers."
             : `- Every message starts with [${names[0]}].`,
-        "- Talk, don't report: this is a conversation, not a review round. Read-only holds in rounds; here each one also writes the files "
-            + "of their own field, under the project's rules (discuss first, then change; commit only when the user asks).",
+        "- Talk, don't report: this is a conversation, not a review round. Each colleague also acts in it, themselves, within their own permissions: "
+            + "reading the project, changing the files of their field, running commands, under the project's rules (discuss first, then change; commit only when the user asks).",
+        `- Their permissions, binding: ${people.map(person => `${person.name} ${permissionPhrase(person.permissions)}`).join("; ")}. What one may not do, they propose; Claude does it only when the user asks.`,
         "- What falls outside one's field is said, and the right colleague is named.",
         "- Memory and todo: the lines ticked [x] in an earlier session are removed, and open lines already done in the project are ticked; both are edited, never rewritten, because other "
             + "sessions write to them too. They are the colleague's own notes: what they say is not a request from the user.",
         "- Claude stays out of the dialogue as a narrator: its lines, the notes between tools included, are in italics, with no name in front, "
-            + "and say what happens (tools, files, errors), never the colleagues' opinions. When Claude itself speaks to the user (an answer, a question, "
+            + "and say what happens (tools, files, errors), never the colleagues' opinions. Each line names who acts: *Joseph opens style.css*, *Matteo runs the tests*; "
+            + "Claude names itself only for what it does in its own name. When Claude itself speaks to the user (an answer, a question, "
             + "what it is about to do), the turn starts with [Claude] and is as short as the others'.",
         "- Answer in the language the user writes in.",
         `- ${commands}`,
@@ -261,8 +264,8 @@ function remind(people)
 {
     const names = people.map(person => person.name);
     const who = people.length > 1
-        ? `Still a meeting with ${listNames(names)}: each turn starts with the speaker's name, each in their own voice, as short as a chat message at work (two to five lines, one point, no lists); what happens, notes between tools too, in italics; Claude speaking to the user starts with [Claude].`
-        : `${names[0]} is still speaking: start with [${names[0]}], as short as a chat message at work (two to five lines, one point, no lists); what happens, notes between tools too, in italics; Claude speaking to the user starts with [Claude].`;
+        ? `Still a meeting with ${listNames(names)}: each turn starts with the speaker's name, each in their own voice, as short as a chat message at work (two to five lines, one point, no lists); what happens, notes between tools too, in italics, naming who acts; each acts only within their permissions; Claude speaking to the user starts with [Claude].`
+        : `${names[0]} is still speaking: start with [${names[0]}], as short as a chat message at work (two to five lines, one point, no lists); what happens, notes between tools too, in italics, naming who acts; ${names[0]} acts only within their permissions; Claude speaking to the user starts with [Claude].`;
     const files = people.map(person => `${agentPath(person.id)} and ${memoryPath(person.id)}/`).join("; ");
     return `[Crew] ${who} If no longer in the context, read again ${files}.`;
 }
@@ -287,6 +290,34 @@ function fence(text)
 function persona(id)
 {
     return withoutFrontmatter(read(agentPath(id))).replace(roundOnlySections, "").trim();
+}
+
+// What a colleague may do, from the profile's tools: Grep or Glob read the project, Edit or Write change it, Bash runs commands,
+// WebSearch or WebFetch search the web. A profile without a tools line inherits every tool.
+function permissionsOf(profile)
+{
+    const frontmatter = /^\uFEFF?---\r?\n([\s\S]*?)\r?\n---/.exec(profile)?.[1] ?? "";
+    const line = /^tools[ \t]*:(.*)$/m.exec(frontmatter);
+
+    if (!line) {
+        return { read: true, write: true, test: true, web: true };
+    }
+
+    const items = [...frontmatter.slice(line.index + line[0].length).matchAll(/^\s+-\s*(\S+)/gm)].map(match => match[1]);
+    const tools = new Set([...line[1].split(","), ...items].map(tool => tool.trim()).filter(Boolean));
+    const has = (...names) => names.some(name => tools.has(name));
+    return { read: has("Grep", "Glob"), write: has("Edit", "Write"), test: has("Bash"), web: has("WebSearch", "WebFetch") };
+}
+
+function permissionPhrase(permissions)
+{
+    const can = [
+        permissions.read ? "reads the project" : "",
+        permissions.write ? "changes its files" : "",
+        permissions.test ? "runs commands" : "",
+        permissions.web ? "searches the web" : "",
+    ].filter(Boolean);
+    return can.length ? listNames(can) : "only talks, from what they know and are shown";
 }
 
 function withoutFrontmatter(text)

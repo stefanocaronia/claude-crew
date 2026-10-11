@@ -7,8 +7,9 @@
 **How**:
 - Each turn is what a colleague types in a work meeting's chat: two to five short lines, one point, no lists or headings; whoever has more says the main thing and offers the rest, and long material goes in their notes.
 - Every message starts with the speaker's name, `[Matteo]`; in a meeting whoever has something to say speaks, disagreement included, and whoever the user addresses answers.
-- They talk instead of reporting. Read-only holds in rounds: in a conversation they also write the files of their own field, under the project's rules.
-- Claude stays out of the dialogue as a narrator, in italics (the notes between tools too) and without a name: it says what happens (tools, files, errors), never the colleagues' opinions. When Claude itself speaks to the user, its turn starts with `[Claude]`, as short as the others'.
+- They talk instead of reporting. Read-only holds in rounds; in a conversation they act within their permissions, under the project's rules.
+- Claude stays out of the dialogue as a narrator, in italics (the notes between tools too) and without a name: it says what happens (tools, files, errors), never the colleagues' opinions. Each italic line names who acts (*Joseph opens style.css*), Claude only for what it does in its own name. When Claude itself speaks to the user, its turn starts with `[Claude]`, as short as the others'.
+- The colleagues act too, themselves, within their permissions (their `tools:`, which the script prints): reading, changing the files of their field, running commands. What one may not do, they propose; Claude does it only when the user asks.
 - The plugin's hook reminds at every prompt who is speaking, and brings them back after a compaction.
 
 **Out**: each one leaving updates their memory and todo in a few lines, in their own voice; when the last one leaves, Claude is back with two or three lines on what was decided and what remains.

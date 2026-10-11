@@ -52,6 +52,8 @@ export type Run = {
     isBack?: boolean;
     /** The file of the colleague's notes their answer was kept in, by name. */
     report?: string;
+    /** What they are doing now, from their latest tool: "📄 register.tsx", "▶ npm test". */
+    activity?: string;
 };
 
 /** Who is in the conversation now, by colleague id, and who spoke last. */

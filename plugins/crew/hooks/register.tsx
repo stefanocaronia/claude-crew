@@ -66,6 +66,8 @@ const chatFace = 32;
 const stepRedrawEvery = 15_000;
 type Steps = { model: string; effort?: string; contextTokens: number; tokens: number; at: number };
 const unshown = new Map<string, Steps>();
+// What each colleague at work did last, shown with their next steps.
+const activities = new Map<string, string>();
 const shownAt = new Map<string, number>();
 // The permissions, in the order the card shows them.
 const permissionKinds = ["read", "write", "test", "web"] as const;
@@ -202,7 +204,8 @@ export const register: Register = (on, options) => {
 
             const total = Math.max(0, Math.round(input.total ?? run.stepTotal ?? 0));
             const done = Math.max(0, Math.round(input.done ?? run.stepDone ?? 0));
-            return { ...run, stepTotal: total || undefined, stepDone: total ? Math.min(total, done) : done, stepNote: input.note?.trim() || undefined };
+            const activity = activities.get(run.agentId);
+            return { ...run, stepTotal: total || undefined, stepDone: total ? Math.min(total, done) : done, stepNote: input.note?.trim() || undefined, ...(activity ? { activity } : {}) };
         }));
         return { result: say().stepDone };
     });
@@ -218,6 +221,12 @@ export const register: Register = (on, options) => {
 
         if (reason) {
             return { deny: reason };
+        }
+
+        const activity = e.agentId ? activityOf(e.tool, args) : undefined;
+
+        if (e.agentId && activity) {
+            activities.set(e.agentId, activity);
         }
 
         const result = await next(e);
@@ -313,6 +322,7 @@ export const register: Register = (on, options) => {
         const agentId = e.agentId;
         const at = await $.clock.now();
         const steps = takeSteps(agentId);
+        activities.delete(agentId);
         releaseFiles([agentId]);
         const ended = (await read($, runs)).find(other => other.agentId === agentId);
         const file = ended && e.reason === "answer" && e.answer.trim() ? await saveReport($, ended, e.answer, at).catch(() => undefined) : undefined;
@@ -382,6 +392,17 @@ export const register: Register = (on, options) => {
                 await readCard($, colleague.id);
             };
             const isDesktop = e.surface !== "terminal" && "Svg" in ui;
+            // A hint under the pointer, for the controls that are only a sign: the desktop shows it on hover, the terminal draws none.
+            const tip = (key: string, hint: string, control: JSX.Element) => (isDesktop
+                ? (
+                    <Box key={`tip-${key}`} flexShrink={0}>
+                        {control}
+                        <Box position="absolute" top={1} right={0} display="none" hover={{ display: "flex" }} backgroundColor={tooltipBackground} borderStyle="round" borderColor={outline} paddingX={1}>
+                            <Text color={tooltipText} wrap="truncate-end">{hint}</Text>
+                        </Box>
+                    </Box>
+                )
+                : control);
             const border = isDesktop ? { borderColor: outline } : { borderDimColor: true };
             // Material's outlined card, with the state layer under the pointer.
             const outlined = (key: string, children: (JSX.Element | null)[]) => (
@@ -393,14 +414,14 @@ export const register: Register = (on, options) => {
             // Only who is free can be picked: a colleague at work or in the meeting takes no other task.
             const picked = (panel.picked ?? []).filter(id => byId.has(id) && !busy.has(id) && !inMeeting.has(id));
             // A small square box in the text's color: an outline, checked when picked; a background only under the pointer.
-            const pick = (colleague: Colleague) => (
+            const pick = (colleague: Colleague) => tip(`pick-${colleague.id}`, say.pickTip, (
                 <Button
                     key={`pick-${colleague.id}`}
                     label={picked.includes(colleague.id) ? "☑\uFE0E" : "☐"}
                     plain
                     onPress={() => update($, view, current => ({ ...current, picked: (current.picked ?? []).includes(colleague.id) ? (current.picked ?? []).filter(id => id !== colleague.id) : [...(current.picked ?? []), colleague.id] }))}
                 />
-            );
+            ));
 
             const pickedTeam = picked.flatMap(id => byId.get(id) ?? []);
             const pickedNames = pickedTeam.length ? listNames(pickedTeam.map(colleague => colleague.name), say.and, say.comma) : "";
@@ -447,7 +468,7 @@ export const register: Register = (on, options) => {
                 return <ui.Svg key={key} source={drawn.source} alt={colleague.fullName} width={drawn.width} height={drawn.height} />;
             };
             // The button that opens a colleague's card.
-            const opener = (key: string, colleague: Colleague, onPress = open(colleague)) => <Button key={key} label="❯" plain onPress={onPress} />;
+            const opener = (key: string, colleague: Colleague, onPress = open(colleague), hint = say.openCard) => tip(key, hint, <Button key={key} label="❯" plain onPress={onPress} />);
             // A pencil left of the opener, only for a colleague who may change the project's files.
             const writeMark = (colleague: Colleague) => {
                 if (!colleague.permissions.write) {
@@ -528,6 +549,7 @@ export const register: Register = (on, options) => {
                 // A run left at work by an event that never came keeps the colleague busy: the user can free them.
                 const stuck = list.filter(run => run.colleague === selected.id && run.status === "running").map(run => run.agentId);
                 const isBusy = busy.has(selected.id) || talk.members.includes(selected.id);
+                const current = list.find(run => run.colleague === selected.id && run.status === "running");
                 const retests = details ? retestsOf(details.openTasks).length : 0;
                 const week = (await weeklyCounts($))[isoWeek(at)]?.[selected.id];
                 const markFree = async () => {
@@ -550,6 +572,18 @@ export const register: Register = (on, options) => {
                                 {details?.latestReport ? <Button key="card-report" label={`${say.latestReport(details.latestReport)} ❯`} plain dimColor onPress={() => openReport($, selected.id, details.latestReport ?? "")} /> : null}
                             </Box>
                         </Box>
+                        {current
+                            ? (
+                                <Box key="card-work" flexDirection="column">
+                                    <Text bold>{say.working}</Text>
+                                    {outlined("card-work-box", [
+                                        <Text key="work-task" wrap="truncate-end">{[taskOf(current.task, selected), current.stepTotal ? say.step(current.stepDone ?? 0, current.stepTotal, current.stepNote) : ""].filter(Boolean).join(" · ")}</Text>,
+                                        current.activity ? <Text key="work-activity" dimColor italic wrap="truncate-end">{current.activity}</Text> : null,
+                                        <Box key="work-bar" marginTop={1}>{wideBar(ui, e.surface, progressOf(current) ?? contextShare(current), progressOf(current) === undefined ? undefined : selected.color)}</Box>,
+                                    ])}
+                                </Box>
+                            )
+                            : null}
                         <Box key="card-actions" flexDirection="row" flexWrap="wrap" gap={1}>
                             {isBusy ? null : <Button key="talk" variant="primary" label={`☰ ${say.talk(selected.name)}`} onPress={() => talkWith(selected)} />}
                             {isBusy ? null : <Button key="card-round" label={`↻ ${say.roundWith(selected.name)}`} onPress={() => runCommand("crew:review", [selected])} />}
@@ -620,13 +654,15 @@ export const register: Register = (on, options) => {
                         {nameRow(isRunning ? `open-${colleague.id}` : `open-run-${run.agentId}`, colleague, [
                             isRunning
                                 ? <Text key={`mark-${run.agentId}`} color={colleague.color}>{mark}</Text>
-                                : <Button key={`back-${run.agentId}`} label={mark} plain onPress={() => sendBack([colleague.id])} />,
+                                : tip(`back-${run.agentId}`, say.sendBack, <Button key={`back-${run.agentId}`} label={mark} plain onPress={() => sendBack([colleague.id])} />),
                             writeMark(colleague),
                             // Once finished, the opener shows what they answered.
-                            isRunning || !run.report ? opener(isRunning ? `open-${colleague.id}` : `open-run-${run.agentId}`, colleague) : opener(`open-run-${run.agentId}`, colleague, () => openReport($, colleague.id, run.report ?? "")),
+                            isRunning || !run.report ? opener(isRunning ? `open-${colleague.id}` : `open-run-${run.agentId}`, colleague) : opener(`open-run-${run.agentId}`, colleague, () => openReport($, colleague.id, run.report ?? ""), say.readReport),
                         ])}
                         <Text key={`role-${run.agentId}`} wrap="truncate-end">{roleOf(colleague)}</Text>
                         <Text key={`task-${run.agentId}`} dimColor wrap="truncate-end">{[taskOf(run.task, colleague), steps].filter(Boolean).join(" · ")}</Text>
+                        {isRunning && run.activity ? <Text key={`activity-${run.agentId}`} dimColor italic wrap="truncate-end">{run.activity}</Text> : null}
+                        {!isRunning && run.report ? <Button key={`report-${run.agentId}`} label={`${say.report} ❯`} plain dimColor onPress={() => openReport($, colleague.id, run.report ?? "")} /> : null}
                         <Box key={`model-${run.agentId}`} flexDirection="row" flexWrap="nowrap" alignItems="center" minWidth={0} overflow="hidden">
                             <Box flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
                                 <Text dimColor wrap="truncate-end">{[modelName(run.model), run.effort ? say.effort(run.effort) : "", stats].filter(Boolean).join(" · ")}</Text>
@@ -744,7 +780,7 @@ export const register: Register = (on, options) => {
                         {pickedNames ? null : <Button key="act-hire" label={`+ ${say.hire}`} onPress={() => runCommand("crew:hire", [])} />}
                         {pickedNames ? fireButton("act-fire", pickedTeam) : null}
                         {portraitButton("act-portraits", say.portraits, pickedTeam)}
-                        <Button key="open-settings" label={"⚙︎"} onPress={openSettings} />
+                        {tip("open-settings", say.panelSettings, <Button key="open-settings" label={"⚙︎"} onPress={openSettings} />)}
                     </Box>
                     {backlogRows.length
                         ? (
@@ -1444,10 +1480,37 @@ async function dataUri($: EngineInterface, path: string, type: string): Promise<
 async function showSteps($: EngineInterface, agentId: string): Promise<void>
 {
     const steps = takeSteps(agentId);
+    const activity = activities.get(agentId);
 
-    if (steps) {
-        await update($, runs, list => list.map(run => (run.agentId !== agentId ? run : withSteps(run, steps))));
+    if (steps || activity) {
+        await update($, runs, list => list.map(run => (run.agentId !== agentId ? run : { ...withSteps(run, steps), ...(activity ? { activity } : {}) })));
     }
+}
+
+// What a colleague is doing, from the tool they call: a sign and its object, in no language.
+function activityOf(tool: string, args: Record<string, unknown>): string | undefined
+{
+    const text = (key: string) => (typeof args[key] === "string" ? args[key] as string : "");
+    const file = (key: string) => text(key).replace(/\\/g, "/").split("/").pop() ?? "";
+    const short = (value: string) => clip(value.replace(/\s+/g, " ").trim(), 60);
+
+    if (tool === stepTool) {
+        return undefined;
+    }
+
+    const signs: Record<string, () => string> = {
+        Read: () => `📄 ${file("file_path")}`,
+        Edit: () => `✎ ${file("file_path")}`,
+        Write: () => `✎ ${file("file_path")}`,
+        NotebookEdit: () => `✎ ${file("notebook_path")}`,
+        Grep: () => `🔎 ${short(text("pattern"))}`,
+        Glob: () => `🔎 ${short(text("pattern"))}`,
+        Bash: () => `▶ ${short(text("command"))}`,
+        PowerShell: () => `▶ ${short(text("command"))}`,
+        WebSearch: () => `🌐 ${short(text("query"))}`,
+        WebFetch: () => `🌐 ${short(text("url").replace(/^https?:\/\//, ""))}`,
+    };
+    return signs[tool]?.() ?? `⚙ ${tool.replace(/^mcp__[^_]+__/, "")}`;
 }
 
 // The steps of a run not yet on screen, taken to be shown.

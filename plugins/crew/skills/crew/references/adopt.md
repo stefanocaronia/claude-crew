@@ -8,4 +8,4 @@
    - «- **Rounds**: when a step of the plan is done, a feature finished or a playtest played, Claude runs a review round with the colleagues the work touches (the crew skill), before calling the step done.»
    - «- **Tasks**: when a question or a check falls in a colleague's field and needs more than a glance, Claude gives it to them as a subagent, within the permissions of their `tools`.»
 
-   Then and the project's own rules if any (what they must never touch). The method itself is this skill: don't copy it there.
+   Then the project's own rules, if any (what they must never touch). The method itself is this skill: don't copy it there.

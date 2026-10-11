@@ -474,7 +474,12 @@ export const register: Register = (on, options) => {
             );
 
             if (!colleagues.length) {
-                return <Text dimColor>{say.empty}</Text>;
+                return (
+                    <Box flexDirection="column" gap={1} alignItems="flex-start">
+                        <Text key="empty" dimColor>{say.empty}</Text>
+                        <Button key="act-init" label={`+ ${say.setUp}`} onPress={() => void $.command.run({ command: "crew:init", args: "" })} />
+                    </Box>
+                );
             }
 
             if (selected) {

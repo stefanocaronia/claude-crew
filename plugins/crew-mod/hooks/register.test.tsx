@@ -680,3 +680,21 @@ test("the backlog's small portraits take only the weight the team's portraits le
     expect(small).toHaveLength(14);
     expect(small.some(element => (element.props as { source: string }).source.includes("<image"))).toBe(false);
 });
+
+test("a project without colleagues: the panel offers to set the team up, with the crew's init command", async ($, on) => {
+    const sent = world(on, []);
+
+    for (const path of Object.keys(sent.files).filter(path => path.startsWith("/p/.claude/"))) {
+        delete sent.files[path];
+    }
+
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+
+    for (const surface of surfaces) {
+        const ui = await $.ui.mount({ plugin, surface, component: "Pane", requestId: "crew", props: { title: "Crew", isFocused: false, bodyColumns: 50, placement: "dock" } as never });
+        expect(await ui.find({ type: "Text", text: "No colleagues in this project yet." })).toBeDefined();
+        await ui.press({ key: "act-init" });
+        expect(sent.at(-1)).toBe("/crew:init");
+        await ui.unmount();
+    }
+});

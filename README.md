@@ -34,7 +34,7 @@ Two plugins: the skill works on its own, and the panel installs the skill with i
 1. Open a terminal in your project's folder and type `claude`.
 2. Paste the three install lines above. The panel brings the skill with it, so the last line alone is enough.
 3. Open a new chat (or restart the app): plugins load when a chat starts.
-4. Ask: "set up a team of colleagues for this project". Claude reads the project, proposes a few roles, and you pick.
+4. Type `/crew:init`, or ask "set up a team of colleagues for this project". Claude reads the project, proposes a few roles, and you pick.
 
 ## Use
 
@@ -42,7 +42,7 @@ Ask Claude in your own words; the `crew` skill knows the operations:
 
 | Ask | What happens |
 |---|---|
-| "set up a team of colleagues for this project" | Claude reads the project, proposes three to eight roles, you pick, they are hired |
+| `/crew:init`, or "set up a team of colleagues for this project" | Claude reads the project, proposes three to eight roles, you pick, they are hired |
 | "hire a colleague for security" / "assumi un collega per la sicurezza" | a profile, a memory folder, a todo and a portrait |
 | "fire Sara" / "licenzia Sara" | their open tasks are reassigned or closed, profile and memory archived |
 | "change Matteo's tools" | the profile changes, the memory notes why |

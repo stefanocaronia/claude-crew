@@ -9,7 +9,7 @@ A standing team of expert colleagues for your projects, in Claude Code. Each col
 > riunione finita
 ```
 
-Two plugins, each working without the other:
+Two plugins: the skill works on its own, and the panel installs the skill with it.
 
 - **crew**: the skill (hiring and firing, portraits, review rounds, conversations and meetings) and the hook that hands the chat over to the colleagues and back.
 - **crew-mod**: the Crew panel and a group chat. The panel shows each colleague in one of four sections: in the meeting, at work (with the steps they report, their context, tokens and time), finished, on a coffee break. Their card holds their open tasks, latest memory and settings: effort and permissions. Under the team, the buttons for a review, a meeting, hiring and new portraits, and the backlog of open tasks. In a meeting, each colleague's turn is drawn under their portrait, name and role, and a card above the prompt holds the participants, an invite menu and the button that closes it.

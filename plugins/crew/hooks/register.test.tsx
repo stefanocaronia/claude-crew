@@ -821,3 +821,18 @@ test("a colleague who had finished and is resumed by a message is at work again,
     expect(Object.keys(files).filter(path => path.includes("/matteo-conti/notes/")).length).toBe(2);
     await ui.unmount();
 });
+
+test("a colleague at work whom the panel never saw start is found among the session's agents and shown at work", async ($, on) => {
+    world(on, []);
+    on("tool.call", { tool: "Read" }, () => ({ result: "" }) as never);
+    on("agent.list", () => ({ value: [{ id: "x9", description: "review the setup", type: "matteo-conti", status: "running" }, { id: "x8", description: "explore", type: "Explore", status: "running" }] }) as never);
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+    const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: { title: "Crew", isFocused: false, bodyColumns: 50, placement: "dock" } as never });
+    expect(await ui.find({ key: "working-toggle" })).toBeUndefined();
+    await $.tool.call({ tool: "Read", file_path: "/p/README.md", agentId: "x8", tool_use_id: "r0" } as never);
+    expect(await ui.find({ key: "working-toggle" })).toBeUndefined();
+    await $.tool.call({ tool: "Read", file_path: "/p/.claude/agent-memory/matteo-conti/MEMORY.md", agentId: "x9", tool_use_id: "r1" } as never);
+    expect((await ui.find({ key: "working-toggle" }))?.props.label).toBe("▾ ⚒︎ Working · 1");
+    expect(await ui.find({ type: "Text", text: /Review the setup/ })).toBeDefined();
+    await ui.unmount();
+});

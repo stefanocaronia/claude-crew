@@ -68,6 +68,8 @@ type Steps = { model: string; effort?: string; contextTokens: number; tokens: nu
 const unshown = new Map<string, Steps>();
 // What each colleague at work did last, shown with their next steps.
 const activities = new Map<string, string>();
+// The agents at work that are no colleague of the team.
+const strangers = new Set<string>();
 const shownAt = new Map<string, number>();
 // The permissions, in the order the card shows them.
 const permissionKinds = ["read", "write", "test", "web"] as const;
@@ -1499,16 +1501,42 @@ async function showSteps($: EngineInterface, agentId: string): Promise<void>
 // and gives them no other task meanwhile.
 async function resume($: EngineInterface, agentId: string): Promise<void>
 {
+    if (strangers.has(agentId)) {
+        return;
+    }
+
     const run = (await read($, runs)).find(other => other.agentId === agentId);
 
-    if (!run || run.status === "running") {
+    if (run?.status === "running") {
         return;
     }
 
     const at = await $.clock.now();
+
+    if (!run) {
+        await adopt($, agentId, at);
+        return;
+    }
+
     await update($, runs, list => list.map(other => (other.agentId !== agentId
         ? other
         : { ...other, status: "running" as const, startedAt: at, steppedAt: at, endedAt: undefined, isBack: undefined, stepDone: undefined, stepTotal: undefined, stepNote: undefined, activity: undefined })));
+}
+
+// A colleague at work whom the panel never saw start: spawned before it loaded, or in a session whose runs a reload or the old
+// panel plugin kept elsewhere. The session's agents say who they are; an agent of no colleague is never looked up again.
+async function adopt($: EngineInterface, agentId: string, at: number): Promise<void>
+{
+    const agent = (await $.agent.list().catch(() => [])).find(other => other.id === agentId);
+    const colleague = agent ? colleagueOf(await read($, team), agent.type) : undefined;
+
+    if (!agent || !colleague) {
+        strangers.add(agentId);
+        return;
+    }
+
+    const run: Run = { agentId, colleague: colleague.id, task: agent.description, model: "", status: "running", startedAt: at, steppedAt: at, contextTokens: 0, contextMax: contextWindowOf(""), tokens: 0 };
+    await update($, runs, list => [...list, run].slice(-100));
 }
 
 // What a colleague is doing, from the tool they call: a sign and its object, in no language.

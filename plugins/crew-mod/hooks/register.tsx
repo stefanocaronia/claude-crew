@@ -4,14 +4,14 @@
 import { atom, read, update } from "claude-code";
 import type { EngineInterface, Register } from "claude-code";
 
-import type { Colleague, Meeting, Permissions, Run, Speaker, WeeklyCounts } from "../types";
+import type { Colleague, Meeting, Permissions, Preferences, Run, Speaker, WeeklyCounts } from "../types";
 
 import { avatarSvg, barSvg, blankSvg, captionSvg, effortSvg, iconSvg, nameSvg, thumbnailSvg, wideBarSvg } from "./draw.ts";
 import { segmentsOf, speakersOf } from "./meeting.ts";
 import { imagePathsIn, imageTypeOf, isInside, isOwnMemory, resolvedPath } from "./paths.ts";
 import { contextShare, progressOf, totalTime, withCount } from "./progress.ts";
 import { backlogOf, cardFrom, colleagueFrom, colleagueOf, openTasks, retestsOf, withEffort, withPermissions } from "./team.ts";
-import { contextWindowOf, dateOf, formatTime, formatTokens, formatUntil, isoWeek, languageOf, listNames, modelName, slugOf, words } from "./text.ts";
+import { contextWindowOf, dateOf, formatTime, formatTokens, formatUntil, isoWeek, languageNames, languageOf, listNames, modelName, slugOf, words } from "./text.ts";
 import type { Language, Words } from "./text.ts";
 
 const pane = "crew";
@@ -25,6 +25,7 @@ const budget = atom({ plugin: "crew-mod", key: "budget" } as const, []);
 const view = atom({ plugin: "crew-mod", key: "view" } as const, { isFinishedCollapsed: false, autoOpened: false });
 const card = atom({ plugin: "crew-mod", key: "card" } as const, null);
 const report = atom({ plugin: "crew-mod", key: "report" } as const, null);
+const preferences = atom({ plugin: "crew-mod", key: "preferences" } as const, { language: "auto", autoOpen: true });
 const gallery = atom({ plugin: "crew-mod", key: "gallery" } as const, 0);
 const board = atom({ plugin: "crew-mod", key: "board" } as const, { tasks: [], checkedAt: 0, hasCommands: true });
 
@@ -35,6 +36,8 @@ let portraits = new Map<string, string>();
 let smallPortraits = new Map<string, string>();
 let portraitsRead = "";
 let language: Language = "en";
+// The language the options, Claude Code and the system ask for: what "automatic" means in the panel's settings.
+let detectedLanguage: Language = "en";
 // The files the refresh has read, by path, with the time and size they had: read again only when those change.
 const readFiles = new Map<string, { stamp: string; text: string }>();
 let temporaryFolder: string | undefined;
@@ -112,7 +115,10 @@ export const register: Register = (on, options) => {
             await update($, runs, list => list.map(run => (isLost(run) ? { ...run, status: "failed" as const, endedAt: run.steppedAt ?? run.startedAt } : run)));
         }
 
-        language = languageOf(options.language, await settingsLanguage($), await $.env.get("LANG"), systemLocale());
+        detectedLanguage = languageOf(options.language, await settingsLanguage($), await $.env.get("LANG"), systemLocale());
+        const chosen = await storedPreferences($);
+        await update($, preferences, () => chosen);
+        language = languageChosen(chosen);
         await $.tool.register({
             name: "step",
             description: "For a colleague at work on a round or a task: report your progress to the Crew panel. Right after reading the brief, call it with "
@@ -395,7 +401,7 @@ export const register: Register = (on, options) => {
             );
 
             const pickedTeam = picked.flatMap(id => byId.get(id) ?? []);
-            const pickedNames = pickedTeam.length ? listNames(pickedTeam.map(colleague => colleague.name), say.and) : "";
+            const pickedNames = pickedTeam.length ? listNames(pickedTeam.map(colleague => colleague.name), say.and, say.comma) : "";
             // A meeting with everyone takes whoever is free; while a meeting goes on, the band above the prompt invites.
             const free = colleagues.filter(colleague => !busy.has(colleague.id) && !inMeeting.has(colleague.id));
             const canMeet = !talk.members.length && (pickedTeam.length > 0 || free.length > 0);
@@ -424,7 +430,7 @@ export const register: Register = (on, options) => {
             );
             // In the error color: a firing is the one action that takes someone away. The command asks for a yes first.
             const fireButton = (key: string, members: Colleague[]) => (
-                <Button key={key} onPress={() => runCommand("crew:fire", members)}><Text color={errorColor}>{`✕ ${say.fire(listNames(members.map(member => member.name), say.and))}`}</Text></Button>
+                <Button key={key} onPress={() => runCommand("crew:fire", members)}><Text color={errorColor}>{`✕ ${say.fire(listNames(members.map(member => member.name), say.and, say.comma))}`}</Text></Button>
             );
             // A talk with one colleague from their card starts at once, with no topic asked.
             const talkWith = (colleague: Colleague) => $.command.run({ command: "crew:talk", args: colleague.name });
@@ -459,6 +465,32 @@ export const register: Register = (on, options) => {
                 </Box>
             );
 
+            const chosen = await read($, preferences);
+            const settingsButton = <Button key="open-settings" label={`⚙\uFE0E ${say.panelSettings}`} plain dimColor onPress={() => update($, view, current => ({ ...current, isSettingsOpen: true }))} />;
+
+            if (panel.isSettingsOpen) {
+                const codes = Object.keys(languageNames) as Language[];
+                const current = codes.includes(chosen.language as Language) ? chosen.language : "auto";
+                const order = ["auto", ...codes];
+                const labelOf = (value: string) => (value === "auto" ? say.automatic(languageNames[detectedLanguage]) : languageNames[value as Language]);
+                const choose = (value: string) => choosePreferences($, now => ({ ...now, language: value }));
+                return (
+                    <Box flexDirection="column" gap={1}>
+                        <Button key="settings-back" label={`← ${say.back}`} plain onPress={() => update($, view, current => ({ ...current, isSettingsOpen: false }))} />
+                        <Text key="settings-title" bold>{say.panelSettings}</Text>
+                        {outlined("settings-list", [
+                            <Box key="language-row" flexDirection="row" flexWrap="wrap" alignItems="center" columnGap={1}>
+                                <Text dimColor>{say.language}</Text>
+                                {"Select" in ui
+                                    ? <ui.Select key="settings-language" value={current} options={order.map(value => ({ value, label: labelOf(value) }))} onSelect={choose} />
+                                    : <Button key="settings-language" label={labelOf(current)} plain onPress={() => choose(order[(order.indexOf(current) + 1) % order.length] ?? "auto")} />}
+                            </Box>,
+                            <Button key="settings-auto-open" label={`${chosen.autoOpen ? "☑\uFE0E" : "☐"} ${say.autoOpen}`} plain onPress={() => choosePreferences($, now => ({ ...now, autoOpen: !now.autoOpen }))} />,
+                        ])}
+                    </Box>
+                );
+            }
+
             if (!colleagues.length) {
                 return (
                     <Box flexDirection="column" gap={1} alignItems="flex-start">
@@ -466,6 +498,7 @@ export const register: Register = (on, options) => {
                         {latest.hasCommands
                             ? <Button key="act-init" label={`+ ${say.setUp}`} onPress={() => $.command.run({ command: "crew:init", args: "" })} />
                             : <Text key="install" dimColor>{say.installSkill}</Text>}
+                        {settingsButton}
                     </Box>
                 );
             }
@@ -514,7 +547,7 @@ export const register: Register = (on, options) => {
                             </Box>
                         </Box>
                         <Box key="card-actions" flexDirection="row" flexWrap="wrap" gap={1}>
-                            {isBusy ? null : <Button key="talk" variant="primary" label={`☰ ${say.talk} ${selected.name}`} onPress={() => talkWith(selected)} />}
+                            {isBusy ? null : <Button key="talk" variant="primary" label={`☰ ${say.talk(selected.name)}`} onPress={() => talkWith(selected)} />}
                             {isBusy ? null : <Button key="card-round" label={`↻ ${say.roundWith(selected.name)}`} onPress={() => runCommand("crew:review", [selected])} />}
                             {retests ? <Button key="card-retest" label={`↻ ${say.retest(retests)}`} onPress={() => send(say.retestPrompt(selected.name))} /> : null}
                             {stuck.length ? <Button key="card-free" label={say.markFree} plain onPress={markFree} /> : null}
@@ -678,8 +711,9 @@ export const register: Register = (on, options) => {
             const heavy = (latest.heavy ?? []).map(id => byId.get(id)?.name ?? id);
             return (
                 <Box flexDirection="column" gap={1}>
+                    <Box key="top" flexDirection="row" justifyContent="flex-end">{settingsButton}</Box>
                     {latest.error ? <Text key="error" dimColor>{say.readError(latest.error)}</Text> : null}
-                    {heavy.length ? <Text key="heavy" dimColor>{say.heavyPortraits(listNames(heavy, say.and))}</Text> : null}
+                    {heavy.length ? <Text key="heavy" dimColor>{say.heavyPortraits(listNames(heavy, say.and, say.comma))}</Text> : null}
                     {latest.hasCommands ? null : <Text key="install" dimColor>{say.installSkill}</Text>}
                     {tiles.length
                         ? (
@@ -1588,13 +1622,40 @@ async function systemTemp($: EngineInterface): Promise<string>
 
 async function openOnce($: EngineInterface): Promise<void>
 {
-    if ((await read($, view)).autoOpened) {
+    if ((await read($, view)).autoOpened || !(await read($, preferences)).autoOpen) {
         return;
     }
 
     await update($, view, current => ({ ...current, autoOpened: true }));
     // A session with nowhere to draw (headless) has no pane to open.
     void $.ui.open({ id: pane, title: say().pane }).catch(() => undefined);
+}
+
+// The panel's settings as the store keeps them, over the defaults; the defaults when the store cannot be read.
+async function storedPreferences($: EngineInterface): Promise<Preferences>
+{
+    const defaults: Preferences = { language: "auto", autoOpen: true };
+
+    try {
+        const stored = await $.store.get("preferences");
+        return stored && typeof stored === "object" ? { ...defaults, ...(stored as Partial<Preferences>) } : defaults;
+    } catch {
+        return defaults;
+    }
+}
+
+// A change of the panel's settings: kept across sessions, and drawn at once in the language it names.
+async function choosePreferences($: EngineInterface, change: (current: Preferences) => Preferences): Promise<void>
+{
+    const chosen = change(await read($, preferences));
+    await $.store.set("preferences", chosen).catch(() => undefined);
+    language = languageChosen(chosen);
+    await update($, preferences, () => chosen);
+}
+
+function languageChosen(chosen: Preferences): Language
+{
+    return chosen.language === "auto" ? detectedLanguage : languageOf(chosen.language);
 }
 
 // The language the settings ask for: the plugin's own option, as written there, then Claude Code's language.

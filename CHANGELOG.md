@@ -2,6 +2,11 @@
 
 What changes for whoever uses Crew, version by version. Plugins update in a new chat: `/plugin`, Marketplaces, claude-crew, Update marketplace, or turn its auto-update on there.
 
+## 0.6.0
+
+- The panel in eleven languages: English, Italian, Spanish, French, German, Portuguese, Japanese, Chinese, Korean, Arabic and Russian. It follows Claude Code's language, then the system's; everything Claude writes in the chat was already in yours.
+- A settings page in the panel (⚙ at its top): the panel's language, and whether it opens by itself at the start of a session. Both are kept across sessions.
+
 ## 0.5.0
 
 - The panel's buttons run commands that ask in the chat what they need, with the choice form: `/crew:review` asks what to review, `/crew:meeting` the meeting's topic (three proposals from the work and the todos, and a box for your own), `/crew:hire` starts the interview, `/crew:fire` asks for a yes, `/crew:portraits` the style. You can type them too, with the answer already given: `/crew:meeting Sara -- the map`.

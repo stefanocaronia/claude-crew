@@ -753,3 +753,29 @@ test("without the crew plugin's commands, the empty panel says to install it ins
     expect(await ui.find({ type: "Text", text: /need the crew plugin/ })).toBeDefined();
     await ui.unmount();
 });
+
+test("the panel's settings: its language and whether it opens at the start, kept across sessions", async ($, on) => {
+    world(on, []);
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+
+    for (const surface of surfaces) {
+        const ui = await $.ui.mount({ plugin, surface, component: "Pane", requestId: "crew", props: { title: "Crew", isFocused: false, bodyColumns: 50, placement: "dock" } as never });
+        await ui.press({ key: "open-settings" });
+        expect(await ui.find({ type: "Text", text: "Panel settings" })).toBeDefined();
+        await ui.select({ key: "settings-language", value: "it" });
+        expect(await ui.find({ type: "Text", text: "Impostazioni del pannello" })).toBeDefined();
+        expect((await ui.find({ key: "settings-auto-open" }))?.props.label).toBe("☑︎ Apri il pannello a inizio sessione");
+        await ui.press({ key: "settings-auto-open" });
+        // A new session reads them again from the store: still Italian, still closed at the start.
+        await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+        expect((await ui.find({ key: "settings-auto-open" }))?.props.label).toBe("☐ Apri il pannello a inizio sessione");
+        expect((await ui.find({ key: "settings-back" }))?.props.label).toBe("← Indietro");
+        // Back to automatic and opening at the start, for the next surface.
+        await ui.press({ key: "settings-auto-open" });
+        await ui.select({ key: "settings-language", value: "auto" });
+        expect((await ui.find({ key: "settings-back" }))?.props.label).toBe("← Back");
+        await ui.press({ key: "settings-back" });
+        expect(await ui.find({ key: "open-settings" })).toBeDefined();
+        await ui.unmount();
+    }
+});

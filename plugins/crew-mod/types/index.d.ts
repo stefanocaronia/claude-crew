@@ -93,6 +93,8 @@ export type PanelView = {
     picked?: string[];
     /** The colleague whose card the panel shows, by id. */
     selected?: string;
+    /** Whether the panel shows its own settings. */
+    isSettingsOpen?: boolean;
     /** The report the panel shows instead of the team or the card: whose, and its file in their notes. */
     reading?: { colleague: string; file: string };
 };
@@ -105,6 +107,13 @@ export type Card = {
     memory: string;
     /** The newest round report in their notes folder, by name: "2026-10-11-review-the-parser.md". */
     latestReport?: string;
+};
+
+/** The panel's own settings, kept across sessions in the plugin's store: its language ("auto" or a code) and whether it opens at
+ * the start of a session with colleagues. */
+export type Preferences = {
+    language: string;
+    autoOpen: boolean;
 };
 
 /** A report read from a colleague's notes for the panel, cut when it is longer than a drawing can carry. */
@@ -129,6 +138,7 @@ declare module "claude-code" {
             view: PanelView;
             card: Card | null;
             report: Report | null;
+            preferences: Preferences;
             board: Board;
             /** Changes when the portraits are read again, so the drawings that show them are redrawn. */
             gallery: number;

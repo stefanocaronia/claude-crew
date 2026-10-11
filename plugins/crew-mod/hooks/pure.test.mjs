@@ -6,7 +6,7 @@ import { segmentsOf, speakersOf } from "./meeting.ts";
 import { imagePathsIn, isInside, isOwnMemory, resolvedPath } from "./paths.ts";
 import { withCount } from "./progress.ts";
 import { backlogOf, cardFrom, colleagueFrom, colleagueOf, openTasks, permissionsOf, retestsOf, withEffort, withPermissions } from "./team.ts";
-import { dateOf, formatUntil, isoWeek, languageOf, listNames, modelName, slugOf } from "./text.ts";
+import { dateOf, formatTokens, formatUntil, isoWeek, languageOf, listNames, modelName, slugOf, words } from "./text.ts";
 
 const profile = "---\r\nname: matteo-conti\r\ndescription: \"Matteo Conti, architetto TypeScript. Usalo per le revisioni.\"\r\ntools: Read\r\nmemory: project\r\neffort: high\r\ncolor: red\r\n---\r\n\r\n# Matteo Conti, architetto TypeScript\r\n\r\nChi sei.";
 const matteo = colleagueFrom("matteo-conti", profile, "# todo\n- [ ] uno\n- [x] fatto\n- [ ] due\n", 7);
@@ -115,16 +115,35 @@ describe("meetings in the chat", () => {
 });
 
 describe("words", () => {
-    it("picks Italian from the setting or the locale, English otherwise", () => {
+    it("picks the language from the setting or the locale, by code or by name, English otherwise", () => {
         assert.equal(languageOf("auto", "italiano", undefined), "it");
         assert.equal(languageOf(undefined, undefined, "it_IT.UTF-8"), "it");
         assert.equal(languageOf("en", "italiano"), "en");
         assert.equal(languageOf(undefined, undefined, undefined), "en");
+        const cases = { "es-ES": "es", "español": "es", "French": "fr", "de_DE.UTF-8": "de", "Deutsch": "de", "pt-BR": "pt", "português": "pt", "ja-JP": "ja", "日本語": "ja", "zh-CN": "zh", "中文": "zh", "ko": "ko", "korean": "ko", "ar-EG": "ar", "العربية": "ar", "ru_RU.UTF-8": "ru", "русский": "ru" };
+
+        for (const [hint, language] of Object.entries(cases)) {
+            assert.equal(languageOf(hint), language, hint);
+        }
+
+        // A hint that names none of them gives way to the next: the POSIX locale, then the system's.
+        assert.equal(languageOf("C.UTF-8", "fr-FR"), "fr");
+        assert.equal(languageOf("klingon"), "en");
+        assert.equal(languageOf("estonian"), "en");
+    });
+
+    it("writes plurals, units and lists as each language does", () => {
+        assert.deepEqual([1, 2, 5, 21, 112].map(count => words.ru.toDo(count)), ["1 задача", "2 задачи", "5 задач", "21 задача", "112 задач"]);
+        assert.deepEqual([0, 1, 2, 3, 11].map(count => words.ar.toDo(count)), ["لا مهام", "مهمة واحدة", "مهمتان", "3 مهام", "11 مهمة"]);
+        assert.equal(formatTokens(1_250_000, words.de.units), "1,3 Mio.");
+        assert.equal(formatUntil(new Date(Date.UTC(2026, 9, 12, 5, 0)).toISOString(), Date.UTC(2026, 9, 10, 0, 0), words.ja.units), "2日 5時間");
+        assert.equal(formatUntil(new Date(Date.UTC(2026, 9, 10, 3, 10)).toISOString(), Date.UTC(2026, 9, 10, 0, 0), words.ru.units), "3 ч 10 мин");
+        assert.equal(listNames(["Matteo", "Giulia", "Sara"], words.ja.and, words.ja.comma), "Matteo、GiuliaとSara");
     });
 
     it("lists names", () => {
-        assert.equal(listNames(["Matteo", "Giulia", "Sara"], "e"), "Matteo, Giulia e Sara");
-        assert.equal(listNames(["Matteo"], "and"), "Matteo");
+        assert.equal(listNames(["Matteo", "Giulia", "Sara"], " e "), "Matteo, Giulia e Sara");
+        assert.equal(listNames(["Matteo"], " and "), "Matteo");
     });
 
     it("writes models and the time to a reset", () => {

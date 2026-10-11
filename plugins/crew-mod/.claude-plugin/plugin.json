@@ -1,6 +1,6 @@
 {
   "name": "crew-mod",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "A panel for the crew plugin: the team with their portraits, who is at work and the steps they report, the week's budget; meetings drawn as a group chat, with controls to invite, let go and close.",
   "author": {
     "name": "Stefano Caronia",
@@ -14,12 +14,21 @@
     "language": {
       "type": "string",
       "title": "Panel language",
-      "description": "auto follows Claude Code's language setting, then the system locale",
+      "description": "auto follows Claude Code's language setting, then the system locale; the panel's own settings page overrides it",
       "default": "auto",
       "options": [
         "auto",
         "en",
-        "it"
+        "it",
+        "es",
+        "fr",
+        "de",
+        "pt",
+        "ja",
+        "zh",
+        "ko",
+        "ar",
+        "ru"
       ]
     }
   },

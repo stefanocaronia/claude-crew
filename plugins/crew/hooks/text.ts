@@ -95,6 +95,15 @@ const en = {
     readReport: "Read the report",
     pickTip: "Pick for a meeting or a review",
     sendBack: "Back to the coffee break",
+    // What a colleague does, around a file, a pattern, a program or a query.
+    doing: {
+        read: (what: string) => `Reading ${what}`,
+        edit: (what: string) => `Editing ${what}`,
+        search: (what: string) => `Searching for ${what}`,
+        run: (what: string) => `Running ${what}`,
+        web: (what: string) => `Searching the web: ${what}`,
+        tool: (what: string) => `Using ${what}`,
+    },
 };
 
 export const words: Record<Language, Words> = {
@@ -175,6 +184,15 @@ export const words: Record<Language, Words> = {
         readReport: "Leggi il rapporto",
         pickTip: "Scegli per una riunione o una revisione",
         sendBack: "Rimanda in pausa caffè",
+        // What a colleague does, around a file, a pattern, a program or a query.
+        doing: {
+            read: (what: string) => `Legge ${what}`,
+            edit: (what: string) => `Modifica ${what}`,
+            search: (what: string) => `Cerca ${what}`,
+            run: (what: string) => `Lancia ${what}`,
+            web: (what: string) => `Cerca sul web: ${what}`,
+            tool: (what: string) => `Usa ${what}`,
+        },
     },
     es: {
         pane: "👥 Crew",
@@ -252,6 +270,15 @@ export const words: Record<Language, Words> = {
         readReport: "Leer el informe",
         pickTip: "Elegir para una reunión o una revisión",
         sendBack: "De vuelta a la pausa del café",
+        // What a colleague does, around a file, a pattern, a program or a query.
+        doing: {
+            read: (what: string) => `Lee ${what}`,
+            edit: (what: string) => `Edita ${what}`,
+            search: (what: string) => `Busca ${what}`,
+            run: (what: string) => `Ejecuta ${what}`,
+            web: (what: string) => `Busca en la web: ${what}`,
+            tool: (what: string) => `Usa ${what}`,
+        },
     },
     fr: {
         pane: "👥 Crew",
@@ -329,6 +356,15 @@ export const words: Record<Language, Words> = {
         readReport: "Lire le rapport",
         pickTip: "Choisir pour une réunion ou une revue",
         sendBack: "Retour à la pause café",
+        // What a colleague does, around a file, a pattern, a program or a query.
+        doing: {
+            read: (what: string) => `Lit ${what}`,
+            edit: (what: string) => `Modifie ${what}`,
+            search: (what: string) => `Cherche ${what}`,
+            run: (what: string) => `Lance ${what}`,
+            web: (what: string) => `Cherche sur le web : ${what}`,
+            tool: (what: string) => `Utilise ${what}`,
+        },
     },
     de: {
         pane: "👥 Crew",
@@ -406,6 +442,15 @@ export const words: Record<Language, Words> = {
         readReport: "Bericht lesen",
         pickTip: "Für ein Meeting oder ein Review auswählen",
         sendBack: "Zurück in die Kaffeepause",
+        // What a colleague does, around a file, a pattern, a program or a query.
+        doing: {
+            read: (what: string) => `Liest ${what}`,
+            edit: (what: string) => `Bearbeitet ${what}`,
+            search: (what: string) => `Sucht ${what}`,
+            run: (what: string) => `Führt ${what} aus`,
+            web: (what: string) => `Sucht im Web: ${what}`,
+            tool: (what: string) => `Nutzt ${what}`,
+        },
     },
     pt: {
         pane: "👥 Crew",
@@ -483,6 +528,15 @@ export const words: Record<Language, Words> = {
         readReport: "Ler o relatório",
         pickTip: "Escolher para uma reunião ou uma revisão",
         sendBack: "De volta à pausa do café",
+        // What a colleague does, around a file, a pattern, a program or a query.
+        doing: {
+            read: (what: string) => `Lê ${what}`,
+            edit: (what: string) => `Edita ${what}`,
+            search: (what: string) => `Procura ${what}`,
+            run: (what: string) => `Executa ${what}`,
+            web: (what: string) => `Pesquisa na web: ${what}`,
+            tool: (what: string) => `Usa ${what}`,
+        },
     },
     ja: {
         pane: "👥 Crew",
@@ -560,6 +614,15 @@ export const words: Record<Language, Words> = {
         readReport: "レポートを読む",
         pickTip: "会議やレビューに選ぶ",
         sendBack: "コーヒー休憩に戻す",
+        // What a colleague does, around a file, a pattern, a program or a query.
+        doing: {
+            read: (what: string) => `${what} を読んでいます`,
+            edit: (what: string) => `${what} を編集しています`,
+            search: (what: string) => `${what} を検索しています`,
+            run: (what: string) => `${what} を実行しています`,
+            web: (what: string) => `Web で検索: ${what}`,
+            tool: (what: string) => `${what} を使っています`,
+        },
     },
     zh: {
         pane: "👥 Crew",
@@ -637,6 +700,15 @@ export const words: Record<Language, Words> = {
         readReport: "阅读报告",
         pickTip: "选入会议或评审",
         sendBack: "回到咖啡休息",
+        // What a colleague does, around a file, a pattern, a program or a query.
+        doing: {
+            read: (what: string) => `正在读取 ${what}`,
+            edit: (what: string) => `正在编辑 ${what}`,
+            search: (what: string) => `正在搜索 ${what}`,
+            run: (what: string) => `正在运行 ${what}`,
+            web: (what: string) => `正在网上搜索：${what}`,
+            tool: (what: string) => `正在使用 ${what}`,
+        },
     },
     ko: {
         pane: "👥 Crew",
@@ -714,6 +786,15 @@ export const words: Record<Language, Words> = {
         readReport: "보고서 읽기",
         pickTip: "회의나 리뷰에 선택",
         sendBack: "커피 휴식으로 돌려보내기",
+        // What a colleague does, around a file, a pattern, a program or a query.
+        doing: {
+            read: (what: string) => `${what} 읽는 중`,
+            edit: (what: string) => `${what} 편집 중`,
+            search: (what: string) => `${what} 검색 중`,
+            run: (what: string) => `${what} 실행 중`,
+            web: (what: string) => `웹 검색: ${what}`,
+            tool: (what: string) => `${what} 사용 중`,
+        },
     },
     ar: {
         pane: "👥 Crew",
@@ -791,6 +872,15 @@ export const words: Record<Language, Words> = {
         readReport: "قراءة التقرير",
         pickTip: "اختيار لاجتماع أو مراجعة",
         sendBack: "العودة إلى استراحة القهوة",
+        // What a colleague does, around a file, a pattern, a program or a query.
+        doing: {
+            read: (what: string) => `يقرأ ${what}`,
+            edit: (what: string) => `يعدّل ${what}`,
+            search: (what: string) => `يبحث عن ${what}`,
+            run: (what: string) => `يشغّل ${what}`,
+            web: (what: string) => `يبحث على الويب: ${what}`,
+            tool: (what: string) => `يستخدم ${what}`,
+        },
     },
     ru: {
         pane: "👥 Crew",
@@ -868,6 +958,15 @@ export const words: Record<Language, Words> = {
         readReport: "Читать отчёт",
         pickTip: "Выбрать для совещания или ревью",
         sendBack: "Обратно на кофе-брейк",
+        // What a colleague does, around a file, a pattern, a program or a query.
+        doing: {
+            read: (what: string) => `Читает ${what}`,
+            edit: (what: string) => `Правит ${what}`,
+            search: (what: string) => `Ищет ${what}`,
+            run: (what: string) => `Запускает ${what}`,
+            web: (what: string) => `Ищет в интернете: ${what}`,
+            tool: (what: string) => `Использует ${what}`,
+        },
     },
 };
 

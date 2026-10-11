@@ -781,25 +781,34 @@ test("the panel's settings: its language and whether it opens at the start, kept
 });
 
 test("a colleague at work shows what they are doing now, on their row and in their card with their bar; finished, their report is one press away", async ($, on) => {
-    world(on, []);
+    const { files } = world(on, []);
+    // Matteo runs commands here.
+    files["/p/.claude/agents/matteo-conti.md"] = (files["/p/.claude/agents/matteo-conti.md"] ?? "").replace("tools: Read", "tools: Read, Grep, Glob, Bash");
     on("turn.complete", () => ({ text: "" }) as never);
-    // The tool itself, beneath the panel.
+    // The tools themselves, beneath the panel.
     on("tool.call", { tool: "Read" }, () => ({ result: "" }) as never);
+    on("tool.call", { tool: "Bash" }, () => ({ result: "" }) as never);
     await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
     await $.agent.spawn({ prompt: "Review the parser.", description: "review the parser", subagentType: "matteo-conti" } as never);
     await $.tool.call({ tool: "Read", file_path: "/p/.claude/agent-memory/matteo-conti/MEMORY.md", agentId: "a1", tool_use_id: "r1" } as never);
     await $.tool.call({ tool: "mcp__crew__step", done: 1, total: 3, note: "reading my notes", agentId: "a1", tool_use_id: "s1" } as never);
     const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: { title: "Crew", isFocused: false, bodyColumns: 50, placement: "dock" } as never });
-    expect(await ui.find({ type: "Text", text: "📄 MEMORY.md" })).toBeDefined();
+    expect(await ui.find({ type: "Text", text: "Reading MEMORY.md" })).toBeDefined();
     await ui.press({ key: "open-matteo-conti" });
     expect(await ui.find({ type: "Text", text: "Working" })).toBeDefined();
     expect(await ui.find({ type: "Text", text: /Review the parser · step 1 of 3: reading my notes/ })).toBeDefined();
-    expect(await ui.find({ type: "Text", text: "📄 MEMORY.md" })).toBeDefined();
+    expect(await ui.find({ type: "Text", text: "Reading MEMORY.md" })).toBeDefined();
     await ui.press({ key: "back" });
     await $.turn.complete({ agentId: "a1", reason: "answer", answer: "The parser holds.", durationMs: 1000, isAborted: false, turnId: "t1" } as never);
-    expect(await ui.find({ type: "Text", text: "📄 MEMORY.md" })).toBeUndefined();
+    expect(await ui.find({ type: "Text", text: "Reading MEMORY.md" })).toBeUndefined();
     await ui.press({ key: "report-a1" });
     expect((await ui.find({ key: "report-text" }))?.text).toMatch(/The parser holds\./);
+    await ui.press({ key: "report-back" });
+    // A command says what it does in its own words.
+    await $.agent.spawn({ prompt: "Run the tests.", description: "run the tests", subagentType: "matteo-conti" } as never);
+    await $.tool.call({ tool: "Bash", command: "npm test -- --run plugins/crew", description: "run the panel's tests", agentId: "a2", tool_use_id: "b1" } as never);
+    await $.tool.call({ tool: "mcp__crew__step", done: 1, total: 2, agentId: "a2", tool_use_id: "s2" } as never);
+    expect(await ui.find({ type: "Text", text: "Run the panel's tests" })).toBeDefined();
     await ui.unmount();
 });
 

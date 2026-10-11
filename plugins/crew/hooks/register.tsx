@@ -4,7 +4,7 @@
 import { atom, read, update } from "claude-code";
 import type { EngineInterface, Register } from "claude-code";
 
-import type { Colleague, Meeting, Permissions, Preferences, Run, Speaker, WeeklyCounts } from "../types";
+import type { Activity, Colleague, Meeting, Permissions, Preferences, Run, Speaker, WeeklyCounts } from "../types";
 
 import { avatarSvg, barSvg, blankSvg, captionSvg, claudeSvg, effortSvg, iconSvg, nameSvg, thumbnailSvg, wideBarSvg } from "./draw.ts";
 import { claudeId, segmentsOf, speakersOf } from "./meeting.ts";
@@ -67,7 +67,7 @@ const stepRedrawEvery = 15_000;
 type Steps = { model: string; effort?: string; contextTokens: number; tokens: number; at: number };
 const unshown = new Map<string, Steps>();
 // What each colleague at work did last, shown with their next steps.
-const activities = new Map<string, string>();
+const activities = new Map<string, Activity>();
 // The agents at work that are no colleague of the team.
 const strangers = new Set<string>();
 const shownAt = new Map<string, number>();
@@ -588,7 +588,7 @@ export const register: Register = (on, options) => {
                                     <Text bold>{say.working}</Text>
                                     {outlined("card-work-box", [
                                         <Text key="work-task" wrap="truncate-end">{[taskOf(current.task, selected), current.stepTotal ? say.step(current.stepDone ?? 0, current.stepTotal, current.stepNote) : ""].filter(Boolean).join(" · ")}</Text>,
-                                        current.activity ? <Text key="work-activity" dimColor italic wrap="truncate-end">{current.activity}</Text> : null,
+                                        current.activity ? <Text key="work-activity" dimColor italic wrap="truncate-end">{activityText(say, current.activity)}</Text> : null,
                                         <Box key="work-bar" marginTop={1}>{wideBar(ui, e.surface, progressOf(current) ?? contextShare(current), progressOf(current) === undefined ? undefined : selected.color)}</Box>,
                                     ])}
                                 </Box>
@@ -671,7 +671,7 @@ export const register: Register = (on, options) => {
                         ])}
                         <Text key={`role-${run.agentId}`} wrap="truncate-end">{roleOf(colleague)}</Text>
                         <Text key={`task-${run.agentId}`} dimColor wrap="truncate-end">{[taskOf(run.task, colleague), steps].filter(Boolean).join(" · ")}</Text>
-                        {isRunning && run.activity ? <Text key={`activity-${run.agentId}`} dimColor italic wrap="truncate-end">{run.activity}</Text> : null}
+                        {isRunning && run.activity ? <Text key={`activity-${run.agentId}`} dimColor italic wrap="truncate-end">{activityText(say, run.activity)}</Text> : null}
                         {!isRunning && run.report ? <Button key={`report-${run.agentId}`} label={`${say.report} ❯`} plain dimColor onPress={() => openReport($, colleague.id, run.report ?? "")} /> : null}
                         <Box key={`model-${run.agentId}`} flexDirection="row" flexWrap="nowrap" alignItems="center" minWidth={0} overflow="hidden">
                             <Box flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
@@ -1539,8 +1539,8 @@ async function adopt($: EngineInterface, agentId: string, at: number): Promise<v
     await update($, runs, list => [...list, run].slice(-100));
 }
 
-// What a colleague is doing, from the tool they call: a sign and its object, in no language.
-function activityOf(tool: string, args: Record<string, unknown>): string | undefined
+// What a colleague is doing, from the tool they call: the description of their command, or the kind of action and its object.
+function activityOf(tool: string, args: Record<string, unknown>): Activity | undefined
 {
     const text = (key: string) => (typeof args[key] === "string" ? args[key] as string : "");
     const file = (key: string) => text(key).replace(/\\/g, "/").split("/").pop() ?? "";
@@ -1550,19 +1550,31 @@ function activityOf(tool: string, args: Record<string, unknown>): string | undef
         return undefined;
     }
 
-    const signs: Record<string, () => string> = {
-        Read: () => `📄 ${file("file_path")}`,
-        Edit: () => `✎ ${file("file_path")}`,
-        Write: () => `✎ ${file("file_path")}`,
-        NotebookEdit: () => `✎ ${file("notebook_path")}`,
-        Grep: () => `🔎 ${short(text("pattern"))}`,
-        Glob: () => `🔎 ${short(text("pattern"))}`,
-        Bash: () => `▶ ${short(text("command"))}`,
-        PowerShell: () => `▶ ${short(text("command"))}`,
-        WebSearch: () => `🌐 ${short(text("query"))}`,
-        WebFetch: () => `🌐 ${short(text("url").replace(/^https?:\/\//, ""))}`,
+    // A command says what it does in its description; without one, its program alone.
+    const command = (): Activity => (text("description") ? { kind: "do", what: short(text("description")) } : { kind: "run", what: text("command").trim().split(/\s+/)[0] ?? "" });
+    const actions: Record<string, () => Activity> = {
+        Read: () => ({ kind: "read", what: file("file_path") }),
+        Edit: () => ({ kind: "edit", what: file("file_path") }),
+        Write: () => ({ kind: "edit", what: file("file_path") }),
+        NotebookEdit: () => ({ kind: "edit", what: file("notebook_path") }),
+        Grep: () => ({ kind: "search", what: `"${short(text("pattern"))}"` }),
+        Glob: () => ({ kind: "search", what: short(text("pattern")) }),
+        Bash: command,
+        PowerShell: command,
+        WebSearch: () => ({ kind: "web", what: short(text("query")) }),
+        WebFetch: () => ({ kind: "web", what: short(text("url").replace(/^https?:\/\//, "")) }),
     };
-    return signs[tool]?.() ?? `⚙ ${tool.replace(/^mcp__[^_]+__/, "")}`;
+    return actions[tool]?.() ?? { kind: "tool", what: tool.replace(/^mcp__[^_]+__/, "") };
+}
+
+// What a colleague is doing, in the panel's words: their command's own description as written, a sentence around the rest.
+function activityText(say: Words, activity: Activity | string | undefined): string
+{
+    if (!activity || typeof activity === "string") {
+        return activity ?? "";
+    }
+
+    return activity.kind === "do" ? activity.what.charAt(0).toLocaleUpperCase() + activity.what.slice(1) : say.doing[activity.kind](activity.what);
 }
 
 // The steps of a run not yet on screen, taken to be shown.

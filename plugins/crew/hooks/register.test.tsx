@@ -802,3 +802,22 @@ test("a colleague at work shows what they are doing now, on their row and in the
     expect((await ui.find({ key: "report-text" }))?.text).toMatch(/The parser holds\./);
     await ui.unmount();
 });
+
+test("a colleague who had finished and is resumed by a message is at work again, and gives a new report at the end", async ($, on) => {
+    const { files } = world(on, []);
+    on("turn.complete", () => ({ text: "" }) as never);
+    on("tool.call", { tool: "Read" }, () => ({ result: "" }) as never);
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+    await $.agent.spawn({ prompt: "Review the setup.", description: "review the setup", subagentType: "matteo-conti" } as never);
+    await $.turn.complete({ agentId: "a1", reason: "answer", answer: "First look.", durationMs: 1000, isAborted: false, turnId: "t1" } as never);
+    const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: { title: "Crew", isFocused: false, bodyColumns: 50, placement: "dock" } as never });
+    expect((await ui.find({ key: "finished" }))?.props.label).toBe("▾ ✓ Finished · 1");
+    // SendMessage resumes the same agent: its next call shows them at work again.
+    await $.tool.call({ tool: "Read", file_path: "/p/.claude/agent-memory/matteo-conti/MEMORY.md", agentId: "a1", tool_use_id: "r1" } as never);
+    expect((await ui.find({ key: "working-toggle" }))?.props.label).toBe("▾ ⚒︎ Working · 1");
+    expect(await ui.find({ key: "finished" })).toBeUndefined();
+    await $.turn.complete({ agentId: "a1", reason: "answer", answer: "Second look.", durationMs: 1000, isAborted: false, turnId: "t2" } as never);
+    expect((await ui.find({ key: "finished" }))?.props.label).toBe("▾ ✓ Finished · 1");
+    expect(Object.keys(files).filter(path => path.includes("/matteo-conti/notes/")).length).toBe(2);
+    await ui.unmount();
+});

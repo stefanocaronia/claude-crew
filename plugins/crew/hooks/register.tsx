@@ -225,6 +225,10 @@ export const register: Register = (on, options) => {
 
         const activity = e.agentId ? activityOf(e.tool, args) : undefined;
 
+        if (e.agentId) {
+            await resume($, e.agentId);
+        }
+
         if (e.agentId && activity) {
             activities.set(e.agentId, activity);
         }
@@ -278,6 +282,10 @@ export const register: Register = (on, options) => {
 
     // Each model request of a colleague at work: how full their context is, the tokens, the effort.
     on("turn.step", async function* ($, e, next) {
+        if (e.agentId) {
+            await resume($, e.agentId);
+        }
+
         const result = yield* next(e);
         const usage = result.usage;
 
@@ -1485,6 +1493,22 @@ async function showSteps($: EngineInterface, agentId: string): Promise<void>
     if (steps || activity) {
         await update($, runs, list => list.map(run => (run.agentId !== agentId ? run : { ...withSteps(run, steps), ...(activity ? { activity } : {}) })));
     }
+}
+
+// A colleague who had finished and is resumed by a message (SendMessage) is at work again, on the same run: the panel shows them so,
+// and gives them no other task meanwhile.
+async function resume($: EngineInterface, agentId: string): Promise<void>
+{
+    const run = (await read($, runs)).find(other => other.agentId === agentId);
+
+    if (!run || run.status === "running") {
+        return;
+    }
+
+    const at = await $.clock.now();
+    await update($, runs, list => list.map(other => (other.agentId !== agentId
+        ? other
+        : { ...other, status: "running" as const, startedAt: at, steppedAt: at, endedAt: undefined, isBack: undefined, stepDone: undefined, stepTotal: undefined, stepNote: undefined, activity: undefined })));
 }
 
 // What a colleague is doing, from the tool they call: a sign and its object, in no language.

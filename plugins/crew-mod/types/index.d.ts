@@ -16,6 +16,9 @@ export type Colleague = {
     avatarStamp: number;
 };
 
+/** What the chat draws of a colleague who speaks, kept apart from the team: a change of tasks or settings redraws no message. */
+export type Speaker = Pick<Colleague, "id" | "name" | "fullName" | "role" | "color">;
+
 /** A colleague's permissions: reading the project, changing its files, running commands, searching the web. */
 export type Permissions = {
     read: boolean;
@@ -98,12 +101,18 @@ export type Card = {
     description: string;
     openTasks: string[];
     memory: string;
+    /** The newest round report in their notes folder, by name: "2026-10-11-review-the-parser.md". */
+    latestReport?: string;
 };
+
+/** What the colleagues did in each ISO week, kept across sessions in the plugin's store: by week ("2026-W41"), then by id. */
+export type WeeklyCounts = Record<string, Record<string, { tasks: number; refusals: number }>>;
 
 declare module "claude-code" {
     interface PluginState {
         "crew-mod": {
             team: Colleague[];
+            speakers: Speaker[];
             runs: Run[];
             meeting: Meeting;
             budget: Budget[];
@@ -112,7 +121,6 @@ declare module "claude-code" {
             board: Board;
             /** Changes when the portraits are read again, so the drawings that show them are redrawn. */
             gallery: number;
-            now: number;
         };
     }
 }

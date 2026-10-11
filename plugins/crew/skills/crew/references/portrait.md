@@ -11,6 +11,8 @@ Realistic and anime need an image generator (a connector or Codex); pixel art an
 
 **Doing them again**: the user may ask for new portraits in a style, for the whole team or for some colleagues (the panel's "Rifai i ritratti…" writes the request in the prompt). Make only those asked for. When the whole team changes, change the style line too; when only some change, the team mixes styles, as the user chose.
 
+**A made-up person**: never the likeness of a real person, nor the style of a named artist or series.
+
 **The picture**: head and shoulders, centered, facing the viewer, on a plain background in the colleague's color, nothing important near the edges (panels crop it to a circle). Their age and look from the profile, and one detail of their craft. No text.
 
 **Who makes it**, the first one available:

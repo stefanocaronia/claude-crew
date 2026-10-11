@@ -1,16 +1,16 @@
 // A conversation with the colleagues as the chat shows it: each turn starts with "[Matteo]", Claude's narrator lines are in italics.
-import type { Colleague } from "../types";
+import type { Speaker } from "../types";
 
 /** One piece of a reply: a colleague's turn, or a narrator line when `speaker` is absent. */
 export type Segment = {
-    speaker?: Colleague;
+    speaker?: Speaker;
     text: string;
     /** The same speaker going on after a narrator line: drawn without their name again. */
     isContinued?: boolean;
 };
 
 /** The reply cut at each "[Name]" that starts a line, Name being a colleague's first name; undefined when no colleague speaks in it. */
-export function segmentsOf(text: string, team: Colleague[]): Segment[] | undefined
+export function segmentsOf(text: string, team: Speaker[]): Segment[] | undefined
 {
     if (!team.length) {
         return undefined;
@@ -35,14 +35,14 @@ export function segmentsOf(text: string, team: Colleague[]): Segment[] | undefin
 }
 
 /** The colleagues who speak in a reply, in order, each once. */
-export function speakersOf(text: string, team: Colleague[]): Colleague[]
+export function speakersOf(text: string, team: Speaker[]): Speaker[]
 {
     const speakers = (segmentsOf(text, team) ?? []).flatMap(segment => (segment.speaker ? [segment.speaker] : []));
     return speakers.filter((speaker, index) => speakers.indexOf(speaker) === index);
 }
 
 // A speaker's turn, with the narrator lines inside it split out.
-function turn(text: string, speaker: Colleague | undefined): Segment[]
+function turn(text: string, speaker: Speaker | undefined): Segment[]
 {
     const segments: Segment[] = [];
     let spoken: string[] = [];

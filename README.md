@@ -16,8 +16,8 @@ Two plugins: the skill works on its own, and the panel installs the skill with i
 
 ## Requirements
 
-- **Node.js 20 or later on the PATH** (`node -v`): the hook and the conversation commands run it. Claude Code installed with its native installer does not bring it. Without it the panel still works and Claude keeps conversations by hand, less reliably, and offers to install Node.
-- **Claude Code 2.1.287 or later** for the mod (the desktop app from 2.1.286). The panel shows in the terminal and in the desktop app's Code tab; in VS Code the hooks run but the panel does not show.
+- **Node.js 20 or later**: check with `node -v` in a terminal. If it says the command is not found, install the LTS version from nodejs.org and open the terminal again. If you don't have it, that's fine too: the panel works, Claude keeps conversations by hand and offers to install Node for you.
+- **Claude Code 2.1.287 or later** for the panel: check with `claude --version` (the desktop app from 2.1.286). The panel shows in the terminal and in the desktop app's Code tab; in VS Code the hooks run but the panel does not show.
 - Install from a terminal `claude` session: the desktop app's Code tab does not take `/plugin install`. The commands run `node` through Bash: allow it once when Claude asks.
 - Optional, for painted portraits: the Codex CLI logged in with ChatGPT, or an image-generation connector. Without them, Claude draws pixel-art or cartoon portraits in SVG.
 
@@ -28,6 +28,13 @@ Two plugins: the skill works on its own, and the panel installs the skill with i
 /plugin install crew@claude-crew
 /plugin install crew-mod@claude-crew
 ```
+
+## First steps
+
+1. Open a terminal in your project's folder and type `claude`.
+2. Paste the three install lines above. The panel brings the skill with it, so the last line alone is enough.
+3. Open a new chat (or restart the app): plugins load when a chat starts.
+4. Ask: "set up a team of colleagues for this project". Claude reads the project, proposes a few roles, and you pick.
 
 ## Use
 
@@ -50,7 +57,9 @@ The panel opens by itself at the start of a session in a project with colleagues
 
 ## Permissions and tasks
 
-Each colleague has four permissions, set in their card or by Claude at hiring: **Read** the project, **Write** its files, **Testing** (run commands), **Web**. Without Read or Write, the panel refuses their reading or writing outside their own memory. Claude hands a colleague a check, a test or a change in their field whenever it helps, within those permissions; a colleague at work or in a meeting takes no other task.
+Each colleague has four permissions, set in their card or by Claude at hiring from their field: **Read** the project, **Write** its files, **Testing** (run commands, which brings Write, since a command can change files), **Web**. A reviewer starts with Read only: they give opinions and touch nothing but their own notes. Without Read or Write, the panel refuses their reading or writing outside their own memory. Claude hands a colleague a check, a test or a change in their field whenever it helps, within those permissions; a colleague at work or in a meeting takes no other task.
+
+**Cost.** Each colleague at work is a subagent and spends your plan's usage like Claude does: a review round with five colleagues costs about five tasks. Fewer colleagues, narrower rounds, lower effort in their card: all spend less.
 
 A meeting can open on a topic: `/crew:talk Matteo Giulia -- the parser`, or in words.
 
@@ -86,4 +95,4 @@ The step tool, the run tracking and the drawings' light and dark colors follow [
 
 ## License
 
-MIT
+MIT. Crew is an independent project, not affiliated with or endorsed by Anthropic. Claude is a trademark of Anthropic.

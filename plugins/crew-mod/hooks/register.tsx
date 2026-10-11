@@ -4,19 +4,21 @@
 import { atom, read, update } from "claude-code";
 import type { EngineInterface, Register } from "claude-code";
 
-import type { Colleague, Meeting, Permissions, Run } from "../types";
+import type { Colleague, Meeting, Permissions, Run, Speaker, WeeklyCounts } from "../types";
 
-import { avatarSvg, barSvg, blankSvg, captionSvg, effortSvg, iconSvg, nameSvg, wideBarSvg } from "./draw.ts";
+import { avatarSvg, barSvg, blankSvg, captionSvg, effortSvg, iconSvg, nameSvg, thumbnailSvg, wideBarSvg } from "./draw.ts";
 import { segmentsOf, speakersOf } from "./meeting.ts";
-import { contextShare, progressOf, totalTime } from "./progress.ts";
-import { backlogOf, cardFrom, colleagueFrom, colleagueOf, openTasks, withEffort, withPermissions } from "./team.ts";
-import { contextWindowOf, formatTime, formatTokens, formatUntil, languageOf, listNames, modelName, words } from "./text.ts";
+import { imagePathsIn, imageTypeOf, isInside, isOwnMemory, resolvedPath } from "./paths.ts";
+import { contextShare, progressOf, totalTime, withCount } from "./progress.ts";
+import { backlogOf, cardFrom, colleagueFrom, colleagueOf, openTasks, retestsOf, withEffort, withPermissions } from "./team.ts";
+import { contextWindowOf, dateOf, formatTime, formatTokens, formatUntil, isoWeek, languageOf, listNames, modelName, slugOf, words } from "./text.ts";
 import type { Language, Words } from "./text.ts";
 
 const pane = "crew";
 const stepTool = "mcp__crew-mod__step";
 const panelTool = "mcp__crew-mod__panel";
 const team = atom({ plugin: "crew-mod", key: "team" } as const, []);
+const speakers = atom({ plugin: "crew-mod", key: "speakers" } as const, []);
 const runs = atom({ plugin: "crew-mod", key: "runs" } as const, []);
 const meeting = atom({ plugin: "crew-mod", key: "meeting" } as const, { members: [] });
 const budget = atom({ plugin: "crew-mod", key: "budget" } as const, []);
@@ -24,7 +26,6 @@ const view = atom({ plugin: "crew-mod", key: "view" } as const, { isFinishedColl
 const card = atom({ plugin: "crew-mod", key: "card" } as const, null);
 const gallery = atom({ plugin: "crew-mod", key: "gallery" } as const, 0);
 const board = atom({ plugin: "crew-mod", key: "board" } as const, { tasks: [], checkedAt: 0, hasCommands: true });
-const now = atom({ plugin: "crew-mod", key: "now" } as const, 0);
 
 // Module scope, set again at every load: the portraits as data URIs (too large for the state, whose `gallery` says when they
 // changed), and the panel's language.
@@ -33,13 +34,16 @@ let portraits = new Map<string, string>();
 let smallPortraits = new Map<string, string>();
 let portraitsRead = "";
 let language: Language = "en";
-// The desktop drops a drawing that carries too much: a portrait's characters as a data URI, and all of them together.
+// The files the refresh has read, by path, with the time and size they had: read again only when those change.
+const readFiles = new Map<string, { stamp: string; text: string }>();
+let temporaryFolder: string | undefined;
+// The desktop drops a drawing that carries more than about 110 KB: a portrait's characters as a data URI, and all the pictures of
+// one drawing (the panel, a message) together.
 const portraitLimit = 24_000;
-const portraitBudget = 100_000;
+const drawingBudget = 100_000;
 const smallLimit = 3_000;
 // How long a colleague who finished stays among the finished before the coffee break.
 const restAfter = 5 * 60_000;
-const backlogPortraitBudget = 40_000;
 // Material's outline and hover state layer, in grays that read on light and dark themes.
 // The sections' icons, drawn as text (U+FE0E) so they stay monochrome like the buttons' symbols.
 const sectionIcons = { meeting: "☰", working: "⚒\uFE0E", finished: "✓", resting: "☕\uFE0E" };
@@ -54,7 +58,8 @@ const cardNameSize = 18;
 const chatFace = 32;
 // How often a colleague at work redraws the panel with their latest figures, and what is waiting to be shown, by run.
 const stepRedrawEvery = 15_000;
-const unshown = new Map<string, { model: string; effort?: string; contextTokens: number; tokens: number; at: number }>();
+type Steps = { model: string; effort?: string; contextTokens: number; tokens: number; at: number };
+const unshown = new Map<string, Steps>();
 const shownAt = new Map<string, number>();
 // The permissions, in the order the card shows them.
 const permissionKinds = ["read", "write", "test", "web"] as const;
@@ -70,6 +75,21 @@ const cardWidth = 30;
 // A tooltip in Material's inverse colors, which read on both themes.
 const tooltipBackground = "#2b2b29";
 const tooltipText = "#f4f4f1";
+// The colleagues whose task is being started, by id, with the task: two spawns at once both pass the check before either runs.
+const starting = new Map<string, string>();
+// Two colleagues never change the same file at once: each file a colleague at work has written, by resolved path, holds their run.
+const heldFiles = new Map<string, string>();
+const writingTools = ["Edit", "Write", "MultiEdit", "NotebookEdit"];
+// The week's counts are written one after the other, so two at once both count.
+let counting: Promise<void> = Promise.resolve();
+const weeksKept = 8;
+// The pictures a colleague names in the chat, drawn small under their turn: light enough files only, and few, since the desktop
+// drops a drawing that carries too much.
+const thumbnailWidth = 320;
+const thumbnailHeight = 180;
+const thumbnailFileLimit = 60_000;
+const thumbnailsPerMessage = 2;
+const thumbnails = new Map<string, { mtimeMs: number; uri: string | undefined }>();
 const say = (): Words => words[language];
 
 type Table = ReturnType<EngineInterface["ui"]["resolve"]>;
@@ -77,17 +97,25 @@ type Table = ReturnType<EngineInterface["ui"]["resolve"]>;
 export const register: Register = (on, options) => {
     // The option alone, at once: after /reload-plugins the session does not start again.
     language = languageOf(options.language);
+    // A load that reuses the module (a test) reads the files again.
+    readFiles.clear();
+    temporaryFolder = undefined;
     on("session.start", async ($, e, next) => {
         const started = await next(e);
-        // A new session has no colleague still at work from the one before: what was left running stopped with it.
-        if ((await read($, runs)).some(run => run.status === "running")) {
-            await update($, runs, list => list.map(run => (run.status === "running" ? { ...run, status: "failed" as const, endedAt: run.steppedAt ?? run.startedAt } : run)));
+        // The session starts again at /reload-plugins too, with its colleagues still at work: only a run whose agent the engine no
+        // longer has stopped with what went before. Without the list, nobody is taken for stopped.
+        const agents = await $.agent.list().catch(() => undefined);
+        const alive = new Set((agents ?? []).filter(agent => !["completed", "failed", "killed"].includes(agent.status)).map(agent => agent.id));
+        const isLost = (run: Run) => agents !== undefined && run.status === "running" && !alive.has(run.agentId);
+
+        if ((await read($, runs)).some(isLost)) {
+            await update($, runs, list => list.map(run => (isLost(run) ? { ...run, status: "failed" as const, endedAt: run.steppedAt ?? run.startedAt } : run)));
         }
 
         language = languageOf(options.language, await settingsLanguage($), await $.env.get("LANG"), systemLocale());
         await $.tool.register({
             name: "step",
-            description: "For a colleague in a review round: report your progress to the Crew panel. Right after reading the brief, call it with "
+            description: "For a colleague at work on a round or a task: report your progress to the Crew panel. Right after reading the brief, call it with "
                 + "`total` (your plan in 3 to 8 steps) and `done: 0`; then call it again as each step finishes, with `note` naming the step now in "
                 + "progress. Silent and cheap: it only draws a bar.",
             inputSchema: {
@@ -171,45 +199,64 @@ export const register: Register = (on, options) => {
         return { result: say().stepDone };
     });
 
-    // A colleague without reading or writing works only in their own memory folder: the panel refuses the rest.
+    // A colleague without reading or writing works only in their own memory folder, and never changes a file another colleague at
+    // work is changing: the panel refuses the rest. A command of the main loop never brings a colleague at work into a meeting.
     on("tool.call", async ($, e, next) => {
         const args = e as unknown as Record<string, unknown>;
-        const reason = e.agentId ? await refusalFor($, e.tool, e.agentId, args) : e.tool === "Bash" ? await meetingRefusal($, String(args.command ?? "")) : undefined;
-        return reason ? { deny: reason } : next(e);
-    });
-
-    on("agent.spawn", async ($, e, next) => {
-        const colleague = colleagueOf(await read($, team), e.subagentType);
-        // One thing at a time: a colleague at work or in the meeting takes no other task.
-        const reason = colleague ? await busyReason($, colleague) : undefined;
+        const command = !e.agentId && typeof args.command === "string" ? args.command : undefined;
+        const reason = e.agentId
+            ? (await refusalFor($, e.tool, e.agentId, args)) ?? (await lockRefusal($, e.tool, e.agentId, args))
+            : command ? await meetingRefusal($, command) : undefined;
 
         if (reason) {
             return { deny: reason };
         }
 
-        const started = await next(e);
+        const result = await next(e);
 
-        if (started.deny !== undefined || !colleague || !started.agentId) {
-            return started;
+        // The conversation script (talk, invite, leave, end) changes the meeting now, not at the next prompt.
+        if (command?.includes("conversation.mjs")) {
+            await refreshMeeting($).catch(() => undefined);
         }
 
-        const at = await $.clock.now();
-        const run: Run = {
-            agentId: started.agentId,
-            colleague: colleague.id,
-            task: e.description,
-            model: started.model,
-            status: "running",
-            startedAt: at,
-            contextTokens: 0,
-            contextMax: contextWindowOf(started.model),
-            tokens: 0,
-        };
-        // A new task sends whoever had finished back to the coffee break: the panel shows the work now going on.
-        await update($, runs, list => [...list.filter(other => other.agentId !== run.agentId).map(other => (other.status !== "running" ? { ...other, isBack: true } : other)), run].slice(-100));
-        await update($, now, () => at);
-        await openOnce($);
-        return started;
+        return result;
+    });
+
+    on("agent.spawn", async ($, e, next) => {
+        const colleague = colleagueOf(await read($, team), e.subagentType);
+
+        if (!colleague) {
+            return next(e);
+        }
+
+        // One thing at a time: a colleague at work, being started or in the meeting takes no other task. The mark is set before any
+        // wait, so a second spawn at the same moment finds it.
+        const startingTask = starting.get(colleague.id);
+
+        if (startingTask !== undefined) {
+            await countWeek($, colleague.id, "refusals");
+            return { deny: atWork(colleague, startingTask) };
+        }
+
+        starting.set(colleague.id, e.description);
+
+        try {
+            const reason = await busyReason($, colleague);
+
+            if (reason) {
+                return { deny: reason };
+            }
+
+            const started = await next(e);
+
+            if (started.deny === undefined && started.agentId) {
+                await recordRun($, colleague, e.description, started.agentId, started.model);
+            }
+
+            return started;
+        } finally {
+            starting.delete(colleague.id);
+        }
     });
 
     // Each model request of a colleague at work: how full their context is, the tokens, the effort.
@@ -248,14 +295,23 @@ export const register: Register = (on, options) => {
     });
 
     on("turn.complete", async ($, e, next) => {
-        const at = await $.clock.now();
-
-        if (e.agentId) {
-            await showSteps($, e.agentId);
-            await update($, runs, list => list.map(run => (run.agentId !== e.agentId ? run : { ...run, status: e.reason === "answer" ? "done" : "failed", endedAt: at })));
-            await update($, now, () => at);
-        } else {
+        if (!e.agentId) {
+            // The team is read again once the turn has ended, so the reading never delays it.
+            const completed = await next(e);
             await safeRefresh($);
+            return completed;
+        }
+
+        const agentId = e.agentId;
+        const at = await $.clock.now();
+        const steps = takeSteps(agentId);
+        releaseFiles([agentId]);
+        // One write, so the panel is redrawn once: the steps not yet shown, and the end.
+        await update($, runs, list => list.map(run => (run.agentId !== agentId ? run : { ...withSteps(run, steps), status: e.reason === "answer" ? "done" : "failed", endedAt: at })));
+        const run = (await read($, runs)).find(other => other.agentId === agentId);
+
+        if (run && e.reason === "answer" && e.answer.trim()) {
+            await saveReport($, run, e.answer, at).catch(() => undefined);
         }
 
         return next(e);
@@ -269,19 +325,17 @@ export const register: Register = (on, options) => {
             return stored;
         }
 
-        // A command run in this reply (talk, invite, leave, end) changes the meeting now, not at the next prompt.
-        await refreshMeeting($);
         const text = e.message.content.flatMap(block => (block.type === "text" && typeof block.text === "string" ? [block.text] : [])).join("\n\n");
 
         if (!text.trim()) {
             return stored;
         }
 
-        const speakers = speakersOf(text, await read($, team));
+        const speaking = speakersOf(text, await read($, speakers));
 
-        if (speakers.length) {
+        if (speaking.length) {
             const current = await read($, meeting);
-            await setMeeting($, [...new Set([...current.members, ...speakers.map(speaker => speaker.id)])], current.pending);
+            await setMeeting($, [...new Set([...current.members, ...speaking.map(speaker => speaker.id)])], current.pending);
         }
 
         return stored;
@@ -301,7 +355,8 @@ export const register: Register = (on, options) => {
             const panel = await read($, view);
             const stamp = await read($, gallery);
             const latest = await read($, board);
-            const at = Math.max(await read($, now), latest.checkedAt, ...list.map(run => run.startedAt), 0);
+            // The latest moment the state knows of, for the times drawn: a start, a step, an end, a reading of the files.
+            const at = Math.max(latest.checkedAt, ...list.map(run => Math.max(run.startedAt, run.steppedAt ?? 0, run.endedAt ?? 0)), 0);
             const byId = new Map(colleagues.map(colleague => [colleague.id, colleague]));
             // Each colleague in one section: in the meeting; at work while a task runs; finished, with their latest task, until the user
             // sends them back or something new starts; on a coffee break otherwise.
@@ -424,6 +479,16 @@ export const register: Register = (on, options) => {
 
             if (selected) {
                 const details = (await read($, card))?.id === selected.id ? await read($, card) : null;
+                // A run left at work by an event that never came keeps the colleague busy: the user can free them.
+                const stuck = list.filter(run => run.colleague === selected.id && run.status === "running").map(run => run.agentId);
+                const isBusy = busy.has(selected.id) || talk.members.includes(selected.id);
+                const retests = details ? retestsOf(details.openTasks).length : 0;
+                const week = (await weeklyCounts($))[isoWeek(at)]?.[selected.id];
+                const markFree = async () => {
+                    const freedAt = await $.clock.now();
+                    releaseFiles(stuck);
+                    await update($, runs, all => all.map(run => (stuck.includes(run.agentId) && run.status === "running" ? { ...run, status: "failed" as const, endedAt: freedAt } : run)));
+                };
                 return (
                     <Box flexDirection="column" gap={1}>
                         <Button key="back" label={`← ${say.team}`} plain onPress={() => update($, view, current => ({ ...current, selected: undefined }))} />
@@ -435,11 +500,15 @@ export const register: Register = (on, options) => {
                                 <Box flexDirection="row" flexWrap="wrap" alignItems="center">
                                     <Text dimColor>{[presence(selected), say.toDo(selected.openTasks), selected.model ? modelName(selected.model) : ""].filter(Boolean).join(" · ")}</Text>
                                 </Box>
+                                {week ? <Text key="week" dimColor>{say.thisWeek(week.tasks, week.refusals)}</Text> : null}
+                                {details?.latestReport ? <Text key="report" dimColor>{say.latestReport(details.latestReport)}</Text> : null}
                             </Box>
                         </Box>
                         <Box key="card-actions" flexDirection="row" flexWrap="wrap" gap={1}>
-                            <Button key="talk" variant="primary" label={`☰ ${say.talk} ${selected.name}`} onPress={() => meet([selected])} />
-                            <Button key="card-round" label={`↻ ${say.roundWith(selected.name)}`} onPress={() => ask(say.roundPromptWith(selected.name))} />
+                            {isBusy ? null : <Button key="talk" variant="primary" label={`☰ ${say.talk} ${selected.name}`} onPress={() => meet([selected])} />}
+                            {isBusy ? null : <Button key="card-round" label={`↻ ${say.roundWith(selected.name)}`} onPress={() => ask(say.roundPromptWith(selected.name))} />}
+                            {retests ? <Button key="card-retest" label={`↻ ${say.retest(retests)}`} onPress={() => send(say.retestPrompt(selected.name))} /> : null}
+                            {stuck.length ? <Button key="card-free" label={say.markFree} plain onPress={markFree} /> : null}
                             {portraitButtons("card-portrait", say.portrait, selected.name)}
                             {fireButtons("card-fire", [selected])}
                         </Box>
@@ -492,7 +561,10 @@ export const register: Register = (on, options) => {
                 }
 
                 const progress = progressOf(run);
-                const steps = run.stepTotal ? say.step(run.stepDone ?? 0, run.stepTotal, run.stepNote) : "";
+                // While at work, the step in progress; once finished, how long it took, or that it stopped.
+                const steps = run.status === "running"
+                    ? (run.stepTotal ? say.step(run.stepDone ?? 0, run.stepTotal, run.stepNote) : "")
+                    : run.status === "done" ? say.doneIn(formatTime((run.endedAt ?? at) - run.startedAt)) : say.failed;
                 const stats = [say.memoryUsed(Math.round(contextShare(run) * 100)), say.tokens(formatTokens(run.tokens, say.units)), formatTime((run.endedAt ?? run.steppedAt ?? at) - run.startedAt)].join(" · ");
                 const mark = run.status === "running" ? "●" : run.status === "done" ? "✓" : "✗";
                 const isRunning = run.status === "running";
@@ -507,7 +579,7 @@ export const register: Register = (on, options) => {
                             opener(isRunning ? `open-${colleague.id}` : `open-run-${run.agentId}`, colleague),
                         ])}
                         <Text key={`role-${run.agentId}`} wrap="truncate-end">{roleOf(colleague)}</Text>
-                        <Text key={`task-${run.agentId}`} dimColor wrap="truncate-end">{[taskOf(run.task, colleague), steps, run.status === "failed" ? say.failed : ""].filter(Boolean).join(" · ")}</Text>
+                        <Text key={`task-${run.agentId}`} dimColor wrap="truncate-end">{[taskOf(run.task, colleague), steps].filter(Boolean).join(" · ")}</Text>
                         <Box key={`model-${run.agentId}`} flexDirection="row" flexWrap="nowrap" alignItems="center" minWidth={0} overflow="hidden">
                             <Box flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
                                 <Text dimColor wrap="truncate-end">{[modelName(run.model), run.effort ? say.effort(run.effort) : "", stats].filter(Boolean).join(" · ")}</Text>
@@ -565,8 +637,10 @@ export const register: Register = (on, options) => {
                 </Box>
             );
             const backlog = backlogOf(latest.tasks, backlogSize);
-            // One portrait a row while they weigh little all together; past that, initials.
-            const isBacklogLight = backlog.reduce((sum, task) => sum + (smallPortraits.get(task.colleague)?.length ?? 0), 0) <= backlogPortraitBudget;
+            // One weight for the whole panel: the team's portraits first, then one small portrait a row with what is left; past that,
+            // initials.
+            const portraitWeight = colleagues.reduce((sum, colleague) => sum + (portraits.get(colleague.id)?.length ?? 0), 0);
+            const isBacklogLight = backlog.reduce((sum, task) => sum + (smallPortraits.get(task.colleague)?.length ?? 0), 0) <= drawingBudget - portraitWeight;
             const backlogRows = backlog.map((task, index) => {
                 const colleague = byId.get(task.colleague);
                 const text = plainText(task.text);
@@ -679,7 +753,7 @@ export const register: Register = (on, options) => {
                 return next(e);
             }
 
-            const segments = segmentsOf(e.props.text, await read($, team));
+            const segments = segmentsOf(e.props.text, await read($, speakers));
 
             if (!segments) {
                 return next(e);
@@ -688,6 +762,15 @@ export const register: Register = (on, options) => {
             const ui = $.ui.resolve(e);
             const { Box, Text, Markdown } = ui;
             const stamp = await read($, gallery);
+            // One weight for the whole message: the speakers' portraits first, in order, then the thumbnails with what is left.
+            let left = drawingBudget;
+            const hasPortrait = segments.map(segment => {
+                const weight = segment.speaker && !segment.isContinued ? portraits.get(segment.speaker.id)?.length ?? 0 : 0;
+                const fits = weight <= left;
+                left -= fits ? weight : 0;
+                return fits;
+            });
+            const pictures = e.surface !== "terminal" && "Svg" in ui ? await picturesOf($, segments.map(segment => (segment.speaker ? segment.text : "")), left) : [];
             return (
                 <Box flexDirection="column" gap={1}>
                     {segments.map((segment, index) => {
@@ -700,11 +783,17 @@ export const register: Register = (on, options) => {
                         // The portrait at the left; name, role and message in one column, so they start at the same place.
                         return (
                             <Box key={`s${index}`} flexDirection="row" flexWrap="nowrap" gap={1} alignItems="flex-start">
-                                {segment.isContinued ? spacer(ui, e.surface, speaker) : faceOf(ui, e.surface, speaker, chatFace, stamp)}
+                                {segment.isContinued ? spacer(ui, e.surface, speaker) : faceOf(ui, e.surface, speaker, chatFace, stamp, false, false, hasPortrait[index] ? "main" : "initials")}
                                 <Box flexDirection="column" flexGrow={1} flexShrink={1} minWidth={0}>
                                     {segment.isContinued ? null : nameOf(ui, e.surface, speaker, speaker.fullName)}
                                     {segment.isContinued ? null : caption(ui, e.surface, roleOf(speaker))}
                                     <Markdown text={segment.text} />
+                                    {(pictures[index] ?? []).map(picture => (
+                                        <Box key={`picture-${picture.path}`} flexDirection="column" marginTop={1}>
+                                            {picture.uri && "Svg" in ui ? <ui.Svg source={thumbnailSvg(picture.uri, thumbnailWidth, thumbnailHeight)} alt={picture.path} width={thumbnailWidth} height={thumbnailHeight} /> : null}
+                                            <Text dimColor wrap="truncate-end">{picture.path}</Text>
+                                        </Box>
+                                    ))}
                                 </Box>
                             </Box>
                         );
@@ -733,7 +822,7 @@ function caption(ui: Table, surface: string, text: string)
 }
 
 // The room of a portrait, for a speaker going on after a narrator line.
-function spacer(ui: Table, surface: string, colleague: Colleague)
+function spacer(ui: Table, surface: string, colleague: Speaker)
 {
     if (surface === "terminal" || !("Svg" in ui)) {
         return <ui.Text key={`face-${colleague.id}`}> </ui.Text>;
@@ -743,13 +832,13 @@ function spacer(ui: Table, surface: string, colleague: Colleague)
 }
 
 // A colleague's role as the panel and the chat write it, with a capital.
-function roleOf(colleague: Colleague): string
+function roleOf(colleague: Speaker): string
 {
     return colleague.role.charAt(0).toLocaleUpperCase() + colleague.role.slice(1);
 }
 
 // A colleague's name in their color, a little larger than the text around it; on the terminal, bold text.
-function nameOf(ui: Table, surface: string, colleague: Colleague, text: string, size = nameSize)
+function nameOf(ui: Table, surface: string, colleague: Speaker, text: string, size = nameSize)
 {
     if (surface === "terminal" || !("Svg" in ui)) {
         return <ui.Text key={`name-${colleague.id}`} bold color={colleague.color} wrap="truncate-end">{text}</ui.Text>;
@@ -760,7 +849,7 @@ function nameOf(ui: Table, surface: string, colleague: Colleague, text: string, 
 }
 
 // A colleague's portrait at a fixed size; the terminal draws no pictures, so a dot in their color stands for it there.
-function faceOf(ui: Table, surface: string, colleague: Colleague, size: number, stamp: number, isRinged = false, isWorking = false, picture: "main" | "small" | "initials" = "main")
+function faceOf(ui: Table, surface: string, colleague: Speaker, size: number, stamp: number, isRinged = false, isWorking = false, picture: "main" | "small" | "initials" = "main")
 {
     const { Text } = ui;
 
@@ -856,7 +945,8 @@ async function safeRefresh($: EngineInterface): Promise<void>
     }
 }
 
-// The team from their files, their open tasks, the budget's windows, and who is in the conversation.
+// The team from their files, their open tasks, the budget's windows, and who is in the conversation. One listing of each folder
+// says which files changed since the last reading: only those are read again.
 async function refresh($: EngineInterface): Promise<void>
 {
     const root = await projectRoot($);
@@ -866,16 +956,18 @@ async function refresh($: EngineInterface): Promise<void>
     const small = new Map<string, string>();
     const tasks: { colleague: string; lines: string[] }[] = [];
 
-    for (const entry of (await $.fs.exists(agents)) ? await $.fs.list(agents) : []) {
-        const id = entry.name.endsWith(".md") ? entry.name.slice(0, -".md".length) : "";
+    for (const [name, profile] of (await $.fs.exists(agents)) ? await filesIn($, agents) : new Map<string, FileStamp>()) {
+        const id = name.endsWith(".md") ? name.slice(0, -".md".length) : "";
         const folder = `${root}/.claude/agent-memory/${id}`;
+        const files = id ? await filesIn($, folder).catch(() => undefined) : undefined;
+        const todoFile = files?.get("todo.md");
 
-        if (!id || !(await $.fs.exists(`${folder}/todo.md`))) {
+        if (!files || !todoFile) {
             continue;
         }
 
-        const portrait = await readPortrait($, folder);
-        const todo = await $.fs.read(`${folder}/todo.md`);
+        const portrait = await portraitIn($, folder, files);
+        const todo = await cached(`${folder}/todo.md`, todoFile, () => $.fs.read(`${folder}/todo.md`));
         const lines = openTasks(todo);
 
         if (portrait) {
@@ -893,17 +985,7 @@ async function refresh($: EngineInterface): Promise<void>
             tasks.push({ colleague: id, lines });
         }
 
-        loaded.push(colleagueFrom(id, await $.fs.read(`${agents}/${entry.name}`), todo, portrait?.stamp ?? 0));
-    }
-
-    const checkedAt = await $.clock.now();
-    const hasCommands = (await $.command.list()).some(info => info.plugin === "crew" || info.name.startsWith("crew:"));
-    const sortedTasks = tasks.sort((first, second) => second.lines.length - first.lines.length || first.colleague.localeCompare(second.colleague));
-    const previous = await read($, board);
-
-    // Every write redraws the panel, and a click that lands on a drawing already replaced is lost: write only what changed.
-    if (previous.hasCommands !== hasCommands || previous.error || JSON.stringify(previous.tasks) !== JSON.stringify(sortedTasks)) {
-        await update($, board, current => ({ ...current, hasCommands, tasks: sortedTasks, error: undefined, checkedAt }));
+        loaded.push(colleagueFrom(id, await cached(`${agents}/${name}`, profile, () => $.fs.read(`${agents}/${name}`)), todo, portrait?.stamp ?? 0));
     }
 
     // The drawings read the portraits from the module, which a reload empties: `gallery` tells them to draw again.
@@ -913,7 +995,7 @@ async function refresh($: EngineInterface): Promise<void>
     let weight = 0;
 
     for (const [id, uri] of found) {
-        if (uri.length > portraitLimit || weight + uri.length > portraitBudget) {
+        if (uri.length > portraitLimit || weight + uri.length > drawingBudget) {
             heavy.push(id);
         } else {
             kept.set(id, uri);
@@ -921,12 +1003,19 @@ async function refresh($: EngineInterface): Promise<void>
         }
     }
 
+    const hasCommands = (await $.command.list()).some(info => info.plugin === "crew" || info.name.startsWith("crew:"));
+    const sortedTasks = tasks.sort((first, second) => second.lines.length - first.lines.length || first.colleague.localeCompare(second.colleague));
+    const previous = await read($, board);
+
+    // Every write redraws the panel, and a click that lands on a drawing already replaced is lost: write only what changed.
+    if (previous.hasCommands !== hasCommands || previous.error || JSON.stringify(previous.tasks) !== JSON.stringify(sortedTasks) || JSON.stringify(previous.heavy ?? []) !== JSON.stringify(heavy)) {
+        const checkedAt = await $.clock.now();
+        await update($, board, current => ({ ...current, hasCommands, tasks: sortedTasks, heavy, error: undefined, checkedAt }));
+    }
+
     const signature = [...kept, ...small].map(([id, uri]) => `${id}:${uri.length}`).join("|");
     portraits = kept;
     smallPortraits = small;
-    if (JSON.stringify((await read($, board)).heavy ?? []) !== JSON.stringify(heavy)) {
-        await update($, board, current => ({ ...current, heavy }));
-    }
 
     if (signature !== portraitsRead) {
         portraitsRead = signature;
@@ -936,9 +1025,15 @@ async function refresh($: EngineInterface): Promise<void>
 
     const sorted = loaded.sort((first, second) => first.name.localeCompare(second.name));
 
-    // Every message in the chat draws from the team: it is written only when it changed.
     if (JSON.stringify(sorted) !== JSON.stringify(await read($, team))) {
         await update($, team, () => sorted);
+    }
+
+    // Every message in the chat draws its speakers: they are written apart from the team, and only when they changed.
+    const voices: Speaker[] = sorted.map(({ id, name, fullName, role, color }) => ({ id, name, fullName, role, color }));
+
+    if (JSON.stringify(voices) !== JSON.stringify(await read($, speakers))) {
+        await update($, speakers, () => voices);
     }
 
     const usage = await $.session.usage();
@@ -951,39 +1046,88 @@ async function refresh($: EngineInterface): Promise<void>
     await refreshMeeting($);
 }
 
+type FileStamp = { mtimeMs: number; size: number };
+
+// The files of a folder by name, with their time and size; a link with those of the file it leads to.
+async function filesIn($: EngineInterface, folder: string): Promise<Map<string, FileStamp>>
+{
+    const files = new Map<string, FileStamp>();
+
+    for (const entry of await $.fs.list(folder)) {
+        const file = entry.isLink ? await $.fs.stat(`${folder}/${entry.name}`).catch(() => undefined) : entry;
+
+        if (file?.kind === "file") {
+            files.set(entry.name, { mtimeMs: file.mtimeMs, size: file.size });
+        }
+    }
+
+    return files;
+}
+
+// A file's text, or what `load` makes of it, read again only when its time or size changed.
+async function cached(path: string, file: FileStamp, load: () => Promise<string>): Promise<string>
+{
+    const stamp = `${file.mtimeMs}:${file.size}`;
+    const kept = readFiles.get(path);
+
+    if (kept?.stamp === stamp) {
+        return kept.text;
+    }
+
+    const text = await load();
+    readFiles.set(path, { stamp, text });
+    return text;
+}
+
+// A colleague's files read again at the next refresh: the panel has just written one of them.
+function forgetFiles(root: string, id: string): void
+{
+    for (const path of readFiles.keys()) {
+        if (path === `${root}/.claude/agents/${id}.md` || path.startsWith(`${root}/.claude/agent-memory/${id}/`)) {
+            readFiles.delete(path);
+        }
+    }
+}
+
 // The portrait as a data URI (avatar.jpg, .webp, .png or .svg) with the file's time, so a new one is drawn again, and the 32 px
 // avatar-small.jpg when there is one.
-async function readPortrait($: EngineInterface, folder: string): Promise<{ uri: string; stamp: number; small?: string } | undefined>
+async function portraitIn($: EngineInterface, folder: string, files: Map<string, FileStamp>): Promise<{ uri: string; stamp: number; small?: string } | undefined>
 {
-    const smallPath = `${folder}/avatar-small.jpg`;
-    const small = (await $.fs.exists(smallPath)) ? `data:image/jpeg;base64,${(await $.fs.read(smallPath, { as: "bytes" })).base64}` : undefined;
+    const smallFile = files.get("avatar-small.jpg");
+    const small = smallFile ? await cached(`${folder}/avatar-small.jpg`, smallFile, () => dataUri($, `${folder}/avatar-small.jpg`, "image/jpeg")) : undefined;
 
-    for (const [file, type] of [["avatar.jpg", "image/jpeg"], ["avatar.webp", "image/webp"], ["avatar.png", "image/png"], ["avatar.svg", "image/svg+xml"]] as const) {
-        const path = `${folder}/${file}`;
+    for (const [name, type] of [["avatar.jpg", "image/jpeg"], ["avatar.webp", "image/webp"], ["avatar.png", "image/png"], ["avatar.svg", "image/svg+xml"]] as const) {
+        const file = files.get(name);
 
-        if (await $.fs.exists(path)) {
-            const { base64 } = await $.fs.read(path, { as: "bytes" });
-            return { uri: `data:${type};base64,${base64}`, stamp: (await $.fs.stat(path)).mtimeMs, small };
+        if (file) {
+            return { uri: await cached(`${folder}/${name}`, file, () => dataUri($, `${folder}/${name}`, type)), stamp: file.mtimeMs, small };
         }
     }
 
     return undefined;
 }
 
-// A colleague's effort written in their profile, so their next task runs at it; the panel reads the team again.
+// A colleague's permissions written in their profile, so their next task runs with them; the panel reads the team again.
 async function setPermissions($: EngineInterface, id: string, permissions: Permissions): Promise<void>
 {
-    const path = `${await projectRoot($)}/.claude/agents/${id}.md`;
-    await $.fs.write(path, withPermissions(await $.fs.read(path), permissions));
-    await safeRefresh($);
-    await readCard($, id);
+    await writeProfile($, id, profile => withPermissions(profile, permissions));
 }
 
-// One permission switched; running commands reads any file, so Testing comes with Read and goes without it.
+// One permission switched. Running commands reads and changes any file, so Testing comes with Read and Write and goes without
+// either; changing a file needs reading it, so Write comes with Read and goes without it.
 function toggled(permissions: Permissions, kind: keyof Permissions): Permissions
 {
     const next = { ...permissions, [kind]: !permissions[kind] };
-    return kind === "test" && next.test ? { ...next, read: true } : kind === "read" && !next.read ? { ...next, test: false } : next;
+
+    if (kind === "test" && next.test) {
+        return { ...next, read: true, write: true };
+    }
+
+    if (kind === "write") {
+        return next.write ? { ...next, read: true } : { ...next, test: false };
+    }
+
+    return kind === "read" && !next.read ? { ...next, write: false, test: false } : next;
 }
 
 // The next effort a click gives, round to the session's own.
@@ -1007,15 +1151,15 @@ async function refusalFor($: EngineInterface, tool: string, agentId: string, arg
     }
 
     const root = await projectRoot($);
-    const target = tool === "Glob" ? args.path ?? args.pattern : tool === "Grep" ? args.path : args.file_path ?? args.notebook_path;
-    const path = (typeof target === "string" && target ? target : root).replace(/\\/g, "/");
-    const absolute = (/^([a-z]:)?\//i.test(path) ? path : `${root}/${path}`).toLowerCase();
     const folder = `.claude/agent-memory/${colleague.id}`;
+    // Every path the call names, `..` resolved: a Glob's pattern lies under its path.
+    const paths = targetsOf(tool, args).map(target => resolvedPath(target, root));
 
-    if (absolute.includes(`/${folder}/`) || absolute.endsWith(`/${folder}`)) {
+    if (paths.every(path => path !== undefined && isOwnMemory(path, root, colleague.id))) {
         return undefined;
     }
 
+    await countWeek($, colleague.id, "refusals");
     return kind === "read"
         ? `${colleague.name} reads only their own memory and todo (${folder}/): the user gave them no reading of the project's files. Work from what the brief says, and name what you would need to read.`
         : `${colleague.name} changes only their own memory and todo (${folder}/): the user gave them no writing of the project's files. Propose the change in your answer instead.`;
@@ -1030,30 +1174,236 @@ async function meetingRefusal($: EngineInterface, command: string): Promise<stri
         return undefined;
     }
 
-    const words = (call[1] ?? "").split(/\s+--(?:\s|$)/)[0]?.split(/[\s,]+/).map(word => word.toLowerCase()) ?? [];
+    // The names as the script reads them: quotes out, the topic after `--` left aside, split as its namesIn splits them.
+    const fold = (word: string) => word.normalize("NFC").toLocaleLowerCase();
+    const names = (call[1] ?? "").replace(/["']/g, " ").split(/\s+--(?:\s|$)/)[0] ?? "";
+    const words = names.split(/[\s,;:.!?()"«»]+|\s+(?:e|ed|and|&)\s+/u).filter(Boolean).map(fold);
     const working = (await read($, runs)).filter(run => run.status === "running");
     const busy = (await read($, team)).flatMap(colleague => {
         const run = working.find(each => each.colleague === colleague.id);
-        return run && (words.includes(colleague.name.toLowerCase()) || words.includes(colleague.id)) ? [`${colleague.name} (at work on "${run.task}")`] : [];
+        return run && (words.includes(fold(colleague.name)) || words.includes(colleague.id)) ? [{ colleague, run }] : [];
     });
 
+    for (const { colleague } of busy) {
+        await countWeek($, colleague.id, "refusals");
+    }
+
     return busy.length
-        ? `${busy.join(", ")}: a colleague at work on a task joins no meeting until it ends. Ask the user whether to wait, or to meet without them.`
+        ? `${busy.map(({ colleague, run }) => `${colleague.name} (at work on "${run.task}")`).join(", ")}: a colleague at work on a task joins no meeting until it ends. Ask the user whether to wait, or to meet without them.`
         : undefined;
 }
 
-// The steps of a run not yet on screen: their tokens added up, the latest context and model.
-async function showSteps($: EngineInterface, agentId: string): Promise<void>
+// Why a colleague's change of a file waits: another colleague at work is changing it. Their own memory folder is never held.
+async function lockRefusal($: EngineInterface, tool: string, agentId: string, args: Record<string, unknown>): Promise<string | undefined>
 {
-    const steps = unshown.get(agentId);
+    const target = writingTools.includes(tool) ? [args.file_path, args.notebook_path].find(value => typeof value === "string" && value) as string | undefined : undefined;
+    const list = target ? await read($, runs) : [];
+    const writer = list.find(run => run.agentId === agentId && run.status === "running");
 
-    if (!steps) {
+    // Most calls change no file: they cost nothing.
+    if (!target || !writer) {
+        return undefined;
+    }
+
+    const root = await projectRoot($);
+    const path = resolvedPath(target, root)?.toLowerCase();
+
+    if (!path || isOwnMemory(path, root, writer.colleague)) {
+        return undefined;
+    }
+
+    const holder = list.find(run => run.agentId === heldFiles.get(path) && run.status === "running");
+
+    if (!holder || holder.agentId === agentId) {
+        heldFiles.set(path, agentId);
+        return undefined;
+    }
+
+    const name = (await read($, team)).find(colleague => colleague.id === holder.colleague)?.name ?? holder.colleague;
+    await countWeek($, writer.colleague, "refusals");
+    return `${target} is being changed by ${name}, at work on "${holder.task}": wait until their task ends, then go on.`;
+}
+
+// The files a run held, let go: its task ended, or the user freed the colleague.
+function releaseFiles(agentIds: string[]): void
+{
+    for (const [path, holder] of heldFiles) {
+        if (agentIds.includes(holder)) {
+            heldFiles.delete(path);
+        }
+    }
+}
+
+// The paths a reading or writing call names: a Glob's folder and its pattern under it, a Grep's folder, the file of the others.
+function targetsOf(tool: string, args: Record<string, unknown>): string[]
+{
+    const text = (value: unknown) => (typeof value === "string" && value ? value : undefined);
+
+    if (tool === "Glob") {
+        const folder = text(args.path) ?? ".";
+        const pattern = text(args.pattern) ?? "";
+        return [folder, /^([a-z]:)?[\\/]/i.test(pattern) ? pattern : `${folder}/${pattern}`];
+    }
+
+    return [(tool === "Grep" ? text(args.path) : text(args.file_path) ?? text(args.notebook_path)) ?? "."];
+}
+
+// A colleague's task started: the run the panel shows, and the week's count.
+async function recordRun($: EngineInterface, colleague: Colleague, task: string, agentId: string, model: string): Promise<void>
+{
+    const at = await $.clock.now();
+    const run: Run = {
+        agentId,
+        colleague: colleague.id,
+        task,
+        model,
+        status: "running",
+        startedAt: at,
+        contextTokens: 0,
+        contextMax: contextWindowOf(model),
+        tokens: 0,
+    };
+    // A new task sends whoever had finished back to the coffee break: the panel shows the work now going on.
+    await update($, runs, list => [...list.filter(other => other.agentId !== run.agentId).map(other => (other.status !== "running" ? { ...other, isBack: true } : other)), run].slice(-100));
+    await countWeek($, colleague.id, "tasks");
+    await openOnce($);
+}
+
+// A colleague's answer kept in their notes, so the round's report outlives the session: notes/<date>-<task>.md, never over another.
+async function saveReport($: EngineInterface, run: Run, answer: string, at: number): Promise<void>
+{
+    const colleague = (await read($, team)).find(member => member.id === run.colleague);
+
+    if (!colleague) {
         return;
     }
 
-    unshown.delete(agentId);
-    shownAt.set(agentId, steps.at);
-    await update($, runs, list => list.map(run => (run.agentId !== agentId ? run : {
+    const task = taskOf(run.task, colleague);
+    const date = dateOf(at);
+    const folder = `${await projectRoot($)}/.claude/agent-memory/${colleague.id}/notes`;
+    const base = `${date}-${slugOf(task)}`;
+    let file = `${base}.md`;
+
+    for (let copy = 2; await $.fs.exists(`${folder}/${file}`); copy++) {
+        file = `${base}-${copy}.md`;
+    }
+
+    await $.fs.write(`${folder}/${file}`, `# ${task} (${date})\n\n${answer.trim()}\n`);
+
+    if ((await read($, card))?.id === colleague.id) {
+        await readCard($, colleague.id);
+    }
+}
+
+// The counts of the weeks kept, from the plugin's store; nothing when it cannot be read.
+async function weeklyCounts($: EngineInterface): Promise<WeeklyCounts>
+{
+    try {
+        const stored = await $.store.get("weekly");
+        return stored && typeof stored === "object" ? stored as WeeklyCounts : {};
+    } catch {
+        return {};
+    }
+}
+
+// One more task or refusal for a colleague this week, kept across sessions; only the last weeks stay.
+async function countWeek($: EngineInterface, id: string, kind: "tasks" | "refusals"): Promise<void>
+{
+    counting = counting.then(async () => {
+        await $.store.set("weekly", withCount(await weeklyCounts($), isoWeek(await $.clock.now()), id, kind, weeksKept));
+    }).catch(() => undefined);
+    await counting;
+}
+
+// The pictures each colleague's turn names, under the project's root: a thumbnail for the light ones, while the message can carry
+// them within `budget` characters; the path alone for the rest.
+async function picturesOf($: EngineInterface, texts: string[], budget: number): Promise<{ path: string; uri?: string }[][]>
+{
+    const root = await projectRoot($);
+    let count = 0;
+    let weight = 0;
+    const pictures: { path: string; uri?: string }[][] = [];
+
+    for (const text of texts) {
+        const found: { path: string; uri?: string }[] = [];
+
+        for (const path of imagePathsIn(text)) {
+            const resolved = resolvedPath(path, root);
+            const thumbnail = resolved && isInside(resolved, root) ? await thumbnailOf($, resolved) : undefined;
+
+            if (!thumbnail) {
+                continue;
+            }
+
+            const fits = thumbnail.uri !== undefined && count < thumbnailsPerMessage && weight + thumbnail.uri.length <= budget;
+            count += fits ? 1 : 0;
+            weight += fits ? thumbnail.uri?.length ?? 0 : 0;
+            found.push({ path, uri: fits ? thumbnail.uri : undefined });
+        }
+
+        pictures.push(found);
+    }
+
+    return pictures;
+}
+
+// A picture file as a data URI when it is light enough, read again only when it changes; undefined when there is no such file.
+async function thumbnailOf($: EngineInterface, path: string): Promise<{ uri: string | undefined } | undefined>
+{
+    const stat = await $.fs.stat(path).catch(() => undefined);
+
+    if (!stat || stat.kind !== "file") {
+        return undefined;
+    }
+
+    const kept = thumbnails.get(path);
+
+    if (kept?.mtimeMs === stat.mtimeMs) {
+        return kept;
+    }
+
+    const uri = stat.size <= thumbnailFileLimit ? await dataUri($, path, imageTypeOf(path)) : undefined;
+    thumbnails.set(path, { mtimeMs: stat.mtimeMs, uri });
+    return { uri };
+}
+
+// A file as a data URI of the given media type.
+async function dataUri($: EngineInterface, path: string, type: string): Promise<string>
+{
+    return `data:${type};base64,${(await $.fs.read(path, { as: "bytes" })).base64}`;
+}
+
+// The steps of a run not yet on screen, shown now.
+async function showSteps($: EngineInterface, agentId: string): Promise<void>
+{
+    const steps = takeSteps(agentId);
+
+    if (steps) {
+        await update($, runs, list => list.map(run => (run.agentId !== agentId ? run : withSteps(run, steps))));
+    }
+}
+
+// The steps of a run not yet on screen, taken to be shown.
+function takeSteps(agentId: string): Steps | undefined
+{
+    const steps = unshown.get(agentId);
+
+    if (steps) {
+        unshown.delete(agentId);
+        shownAt.set(agentId, steps.at);
+    }
+
+    return steps;
+}
+
+// A run with its steps: their tokens added up, the latest context and model.
+function withSteps(run: Run, steps: Steps | undefined): Run
+{
+    if (!steps) {
+        return run;
+    }
+
+    return {
         ...run,
         model: steps.model,
         effort: steps.effort ?? run.effort,
@@ -1061,13 +1411,22 @@ async function showSteps($: EngineInterface, agentId: string): Promise<void>
         contextMax: contextWindowOf(steps.model),
         tokens: run.tokens + steps.tokens,
         steppedAt: steps.at,
-    })));
+    };
 }
 
+// A colleague's effort written in their profile, so their next task runs at it; the panel reads the team again.
 async function setEffort($: EngineInterface, id: string, level: string | undefined): Promise<void>
 {
-    const path = `${await projectRoot($)}/.claude/agents/${id}.md`;
-    await $.fs.write(path, withEffort(await $.fs.read(path), level));
+    await writeProfile($, id, profile => withEffort(profile, level));
+}
+
+// A colleague's profile changed by the panel, then read again with the rest of their files.
+async function writeProfile($: EngineInterface, id: string, change: (profile: string) => string): Promise<void>
+{
+    const root = await projectRoot($);
+    const path = `${root}/.claude/agents/${id}.md`;
+    await $.fs.write(path, change(await $.fs.read(path)));
+    forgetFiles(root, id);
     await safeRefresh($);
     await readCard($, id);
 }
@@ -1077,7 +1436,12 @@ async function readCard($: EngineInterface, id: string): Promise<void>
     const root = await projectRoot($);
     const text = async (path: string) => ((await $.fs.exists(path)) ? await $.fs.read(path) : "");
     const loaded = cardFrom(id, await text(`${root}/.claude/agents/${id}.md`), await text(`${root}/.claude/agent-memory/${id}/todo.md`), await text(`${root}/.claude/agent-memory/${id}/MEMORY.md`));
-    await update($, card, () => loaded);
+    // The round reports are named by their date first: the newest is the latest date's last written, a copy (-2) after its first.
+    const notes = `${root}/.claude/agent-memory/${id}/notes`;
+    const reports = (await $.fs.exists(notes)) ? (await $.fs.list(notes)).filter(entry => entry.kind === "file" && /^\d{4}-\d{2}-\d{2}-.*\.md$/.test(entry.name)) : [];
+    const order = (entry: { name: string; mtimeMs: number }) => [entry.name.slice(0, 10), String(entry.mtimeMs).padStart(16, "0"), entry.name.slice(0, -".md".length)].join("|");
+    const latestReport = reports.sort((first, second) => (order(first) < order(second) ? -1 : 1)).at(-1)?.name;
+    await update($, card, () => (latestReport ? { ...loaded, latestReport } : loaded));
 }
 
 // The effort a task needs as four marks, low to max; a level it does not know, as written.
@@ -1124,17 +1488,26 @@ async function busyReason($: EngineInterface, colleague: Colleague): Promise<str
     const working = (await read($, runs)).find(run => run.colleague === colleague.id && run.status === "running");
 
     if (working) {
-        return `${colleague.name} is already at work on "${working.task}", and a colleague takes one task at a time. Wait until it ends (the Crew panel shows it), or ask the user what to do.`;
+        await countWeek($, colleague.id, "refusals");
+        return atWork(colleague, working.task);
     }
 
     await refreshMeeting($);
 
     if ((await read($, meeting)).members.includes(colleague.id)) {
+        await countWeek($, colleague.id, "refusals");
         return `${colleague.name} is in the meeting with the user and takes no other task: what the user asks during the meeting, ${colleague.name} does there, in the chat. `
             + `To give them this task, ask the user whether to let them leave the meeting (/crew:leave ${colleague.name}) or to close it (/crew:end).`;
     }
 
     return undefined;
+}
+
+// Why a colleague at work takes no other task, and where the task can go instead.
+function atWork(colleague: Colleague, task: string): string
+{
+    return `${colleague.name} is already at work on "${task}", and a colleague takes one task at a time. Give this one to them when that task's result comes back, `
+        + "to another colleague of the field, or do it yourself; ask the user if it matters which.";
 }
 
 // The colleagues plugin's hook keeps who is in the conversation in the system's temp folder, by session.
@@ -1169,8 +1542,14 @@ function sameMembers(one: string[], other: string[]): boolean
     return one.length === other.length && one.every(id => other.includes(id));
 }
 
-// Where Node's os.tmpdir() points, which is where the hook writes.
+// Where Node's os.tmpdir() points, which is where the hook writes; read once a load.
 async function tempFolder($: EngineInterface): Promise<string>
+{
+    temporaryFolder ??= await systemTemp($);
+    return temporaryFolder;
+}
+
+async function systemTemp($: EngineInterface): Promise<string>
 {
     const isWindows = (await $.env.get("OS")) === "Windows_NT";
     const temp = await $.env.get("TEMP");

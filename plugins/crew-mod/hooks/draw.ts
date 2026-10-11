@@ -1,7 +1,7 @@
 // The only drawings the panel makes: a colleague's portrait in a circle and a progress bar, each at a fixed size, so the window's
 // width never shrinks them; the text around them is the surface's own. The light and dark colors follow savvy-progress by
 // johnnyvizz (MIT).
-import type { Colleague } from "../types";
+import type { Speaker } from "../types";
 
 const font = "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif";
 const theme = `<style>
@@ -12,7 +12,7 @@ const theme = `<style>
 </style>`;
 
 /** The portrait in a circle, or the initials on the colleague's color; a ring in their color, and a pulsing dot while they work. */
-export function avatarSvg(colleague: Colleague, uri: string | undefined, size: number, isRinged = false, isWorking = false): string
+export function avatarSvg(colleague: Speaker, uri: string | undefined, size: number, isRinged = false, isWorking = false): string
 {
     const inset = isRinged ? 3 : 0;
     const radius = size / 2 - inset;
@@ -79,6 +79,12 @@ export function captionSvg(text: string, size: number, below = 0): { source: str
     const style = "<style>.c{fill:#6b6b67}@media (prefers-color-scheme: dark){.c{fill:#a3a39e}}</style>";
     const line = `<text class="c" x="0" y="${Math.round(size * 1.02)}" font-family="${font}" font-size="${size}">${xml(text)}</text>`;
     return { source: `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${style}${line}</svg>`, width, height };
+}
+
+/** A picture fitted whole in a box of the given size, as a thumbnail. */
+export function thumbnailSvg(uri: string, width: number, height: number): string
+{
+    return svg(width, height, `<image href="${uri}" x="0" y="0" width="${width}" height="${height}" preserveAspectRatio="xMidYMid meet"/>`, false);
 }
 
 /** Empty room of a given size, to keep a column where a portrait would be. */

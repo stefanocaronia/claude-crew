@@ -13,7 +13,26 @@ if (!output) {
 }
 
 const t = { ...defaults, ...JSON.parse(json ?? "{}") };
-const shade = (color, amount) => `#${color.replace("#", "").match(/../g).map(part => Math.max(0, Math.min(255, Math.round(parseInt(part, 16) * amount))).toString(16).padStart(2, "0")).join("")}`;
+// A color as six hex digits: #abc and the plain names a profile uses become #aabbcc; anything else is refused, with what works.
+const names = { red: "C0453A", blue: "2F6FDB", green: "2E9E5B", yellow: "D9A21B", purple: "8B5CF6", orange: "D9773A", pink: "D9599A", cyan: "1FA3B8", black: "222222", white: "F4F4F1", gray: "888780", grey: "888780", brown: "7A5230" };
+const hex = color => {
+    const plain = String(color).trim().replace(/^#/, "").toLowerCase();
+    const full = /^[0-9a-f]{6}$/.test(plain) ? plain : /^[0-9a-f]{3}$/.test(plain) ? plain.replace(/./g, digit => digit + digit) : names[plain]?.toLowerCase();
+
+    if (!full) {
+        process.stderr.write(`Unknown color "${color}": give #rrggbb, #rgb or one of ${Object.keys(names).join(", ")}.
+`);
+        process.exit(1);
+    }
+
+    return full;
+};
+// Every color trait checked once, so a color the script does not know never reaches the drawing raw.
+for (const key of ["background", "skin", "hair", "clothes"]) {
+    t[key] = `#${hex(t[key])}`;
+}
+
+const shade = (color, amount) => `#${hex(color).match(/../g).map(part => Math.max(0, Math.min(255, Math.round(parseInt(part, 16) * amount))).toString(16).padStart(2, "0")).join("")}`;
 const ink = "#2B2421";
 const parts = [
     `<rect width="128" height="128" fill="${t.background}"/>`,

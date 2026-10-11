@@ -29,7 +29,7 @@ export function colleagueFrom(id: string, profile: string, todo: string, avatarS
         color: (color && colors[color.toLowerCase()]) ?? (color?.startsWith("#") ? color : gray),
         model: field(text, "model"),
         effort: field(text, "effort"),
-        permissions: permissionsOf(field(text, "tools")),
+        permissions: permissionsOf(listField(text, "tools")),
         openTasks: openTasks(todo).length,
         avatarStamp,
     };
@@ -81,7 +81,8 @@ export function withEffort(profile: string, level: string | undefined): string
     return lines.join(newline);
 }
 
-/** The permissions a tools line gives; no line means every tool, so every permission. */
+/** The permissions a tools line gives; no line means every tool, so every permission. Running commands can change any file, so
+ * Bash gives writing too. */
 export function permissionsOf(tools: string | undefined): Permissions
 {
     if (tools === undefined) {
@@ -91,7 +92,7 @@ export function permissionsOf(tools: string | undefined): Permissions
     const names = toolsOf(tools);
     return {
         read: names.includes("Grep") || names.includes("Glob"),
-        write: names.includes("Edit") || names.includes("Write"),
+        write: names.includes("Edit") || names.includes("Write") || names.includes("Bash"),
         test: names.includes("Bash"),
         web: names.includes("WebSearch") || names.includes("WebFetch"),
     };
@@ -108,8 +109,11 @@ export function withPermissions(profile: string, permissions: Permissions): stri
         return profile;
     }
 
-    const at = lines.findIndex((line, index) => index > 0 && index < end && /^tools\s*:/.test(line));
-    const others = at >= 0 ? toolsOf(lines[at]?.replace(/^tools\s*:/, "") ?? "").filter(name => !managedTools.includes(name)) : [stepTool];
+    const at = lines.findIndex((line, index) => index > 0 && index < end && /^tools[ \t]*:/.test(line));
+    // A tools list written as YAML items under the key becomes one comma line, and its items go.
+    const items = at >= 0 ? listItems(lines, at + 1, end) : [];
+    const written = [lines[at]?.replace(/^tools[ \t]*:/, "") ?? "", ...items].join(",");
+    const others = at >= 0 ? toolsOf(written).filter(name => !managedTools.includes(name)) : [stepTool];
     const tools = [
         "Read",
         ...(permissions.read ? ["Grep", "Glob"] : []),
@@ -120,12 +124,18 @@ export function withPermissions(profile: string, permissions: Permissions): stri
     ];
 
     if (at >= 0) {
-        lines[at] = `tools: ${tools.join(", ")}`;
+        lines.splice(at, 1 + items.length, `tools: ${tools.join(", ")}`);
     } else {
         lines.splice(end, 0, `tools: ${tools.join(", ")}`);
     }
 
     return lines.join(newline);
+}
+
+/** The open tasks that ask to try something again: those starting with Riprova, Retest, Re-test or Check again. */
+export function retestsOf(tasks: string[]): string[]
+{
+    return tasks.filter(task => /^(?:riprov|re-?test|check again)/i.test(task.replace(/^[\s*_`]+/, "")));
 }
 
 /** Up to `limit` open tasks, each colleague's next one in turn; a task ending in "(effort: high)" names the effort it needs. */
@@ -163,8 +173,51 @@ function toolsOf(line: string): string[]
     return line.replace(/["'\[\]]/g, "").split(",").map(name => name.trim()).filter(Boolean);
 }
 
+// A key's value on its own line: never the next line's, for a key left empty.
 function field(text: string, key: string): string | undefined
 {
-    const frontmatter = /^---\n([\s\S]*?)\n---/.exec(text)?.[1] ?? "";
-    return new RegExp(`^${key}:\\s*["']?(.+?)["']?\\s*$`, "m").exec(frontmatter)?.[1];
+    return new RegExp(`^${key}:[ \\t]*["']?(.+?)["']?[ \\t]*$`, "m").exec(frontmatterOf(text))?.[1];
+}
+
+// A key's value on its line, or its YAML items on the lines under it, as one comma line; undefined without the key or a value.
+function listField(text: string, key: string): string | undefined
+{
+    const lines = frontmatterOf(text).split("\n");
+    const at = lines.findIndex(line => new RegExp(`^${key}[ \\t]*:`).test(line));
+
+    if (at < 0) {
+        return undefined;
+    }
+
+    const inline = (lines[at] ?? "").slice((lines[at] ?? "").indexOf(":") + 1).trim();
+
+    if (inline) {
+        return inline;
+    }
+
+    const items = listItems(lines, at + 1, lines.length);
+    return items.length ? items.join(", ") : undefined;
+}
+
+// The YAML items from `start` on, up to the first line that is not one or `end`.
+function listItems(lines: string[], start: number, end: number): string[]
+{
+    const items: string[] = [];
+
+    for (let index = start; index < end; index++) {
+        const item = /^[ \t]*-[ \t]+(.+?)[ \t]*$/.exec(lines[index] ?? "");
+
+        if (!item) {
+            break;
+        }
+
+        items.push(item[1] ?? "");
+    }
+
+    return items;
+}
+
+function frontmatterOf(text: string): string
+{
+    return /^---\n([\s\S]*?)\n---/.exec(text)?.[1] ?? "";
 }

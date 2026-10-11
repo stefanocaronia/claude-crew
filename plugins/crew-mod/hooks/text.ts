@@ -67,6 +67,12 @@ export const words = {
         opened: "Crew panel opened.",
         closed: "Crew panel closed.",
         failed: "stopped",
+        doneIn: (time: string) => `done in ${time}`,
+        markFree: "Mark as free",
+        latestReport: (file: string) => `Latest report: notes/${file}`,
+        retest: (count: number) => `Retry (${count})`,
+        retestPrompt: (name: string) => `give ${name} the retests waiting in their todo`,
+        thisWeek: (tasks: number, refusals: number) => `This week: ${tasks} ${tasks === 1 ? "task" : "tasks"}, ${refusals} ${refusals === 1 ? "refusal" : "refusals"}`,
         stepDone: "ok",
         stepIgnored: "ignored: only a colleague at work reports steps",
     },
@@ -130,6 +136,12 @@ export const words = {
         opened: "Pannello Crew aperto.",
         closed: "Pannello Crew chiuso.",
         failed: "interrotto",
+        doneIn: (time: string) => `fatto in ${time}`,
+        markFree: "Segna come libero",
+        latestReport: (file: string) => `Ultimo rapporto: notes/${file}`,
+        retest: (count: number) => `Riprova (${count})`,
+        retestPrompt: (name: string) => `affida a ${name} le riprove in sospeso della sua todo`,
+        thisWeek: (tasks: number, refusals: number) => `Questa settimana: ${tasks} ${tasks === 1 ? "compito" : "compiti"}, ${refusals} ${refusals === 1 ? "rifiuto" : "rifiuti"}`,
         stepDone: "ok",
         stepIgnored: "ignorato: i passi li segna solo un collega al lavoro",
     },
@@ -160,6 +172,31 @@ export function formatTime(milliseconds: number): string
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     return hours ? `${hours} h ${String(minutes).padStart(2, "0")} min` : minutes ? `${minutes} min ${seconds % 60} s` : `${seconds} s`;
+}
+
+/** The ISO week of a moment, in local time: "2026-W41". */
+export function isoWeek(at: number): string
+{
+    const local = new Date(at);
+    // The week's Thursday names its year.
+    const day = new Date(Date.UTC(local.getFullYear(), local.getMonth(), local.getDate()));
+    day.setUTCDate(day.getUTCDate() + 4 - (day.getUTCDay() || 7));
+    const week = Math.ceil(((day.getTime() - Date.UTC(day.getUTCFullYear(), 0, 1)) / 86_400_000 + 1) / 7);
+    return `${day.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
+}
+
+/** A task as a file name's part: lowercase ASCII and hyphens, at most `length` characters. */
+export function slugOf(text: string, length = 50): string
+{
+    const slug = text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    return slug.slice(0, length).replace(/-+$/, "") || "report";
+}
+
+/** A moment's local date: "2026-10-11". */
+export function dateOf(at: number): string
+{
+    const local = new Date(at);
+    return `${local.getFullYear()}-${String(local.getMonth() + 1).padStart(2, "0")}-${String(local.getDate()).padStart(2, "0")}`;
 }
 
 /** "Matteo, Giulia e Sara". */

@@ -3,8 +3,10 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { segmentsOf, speakersOf } from "./meeting.ts";
-import { backlogOf, cardFrom, colleagueFrom, colleagueOf, openTasks, permissionsOf, withEffort, withPermissions } from "./team.ts";
-import { formatUntil, languageOf, listNames, modelName } from "./text.ts";
+import { imagePathsIn, isInside, isOwnMemory, resolvedPath } from "./paths.ts";
+import { withCount } from "./progress.ts";
+import { backlogOf, cardFrom, colleagueFrom, colleagueOf, openTasks, permissionsOf, retestsOf, withEffort, withPermissions } from "./team.ts";
+import { dateOf, formatUntil, isoWeek, languageOf, listNames, modelName, slugOf } from "./text.ts";
 
 const profile = "---\r\nname: matteo-conti\r\ndescription: \"Matteo Conti, architetto TypeScript. Usalo per le revisioni.\"\r\ntools: Read\r\nmemory: project\r\neffort: high\r\ncolor: red\r\n---\r\n\r\n# Matteo Conti, architetto TypeScript\r\n\r\nChi sei.";
 const matteo = colleagueFrom("matteo-conti", profile, "# todo\n- [ ] uno\n- [x] fatto\n- [ ] due\n", 7);
@@ -38,10 +40,19 @@ describe("colleagues from their files", () => {
         assert.deepEqual(segmentsOf("**[Matteo]:** regge.", [matteo]).map(segment => segment.text), ["regge."]);
     });
 
-    it("reads the permissions from the tools line, every one without a line", () => {
-        assert.deepEqual(permissionsOf("Read, Grep, Glob, Bash, mcp__crew-mod__step"), { read: true, write: false, test: true, web: false });
+    it("reads the permissions from the tools line, every one without a line; running commands writes too", () => {
+        assert.deepEqual(permissionsOf("Read, Grep, Glob, Bash, mcp__crew-mod__step"), { read: true, write: true, test: true, web: false });
         assert.deepEqual(permissionsOf("[Read, Edit, WebFetch]"), { read: false, write: true, test: false, web: true });
+        assert.deepEqual(permissionsOf("Read, Grep"), { read: true, write: false, test: false, web: false });
         assert.deepEqual(permissionsOf(undefined), { read: true, write: true, test: true, web: true });
+    });
+
+    it("reads a tools list written as YAML items, and an empty key never takes the next line", () => {
+        const listed = colleagueFrom("sara", "---\nname: sara\ntools:\n  - Read\n  - Grep\n- WebFetch\nmodel:\neffort: high\n---\n# Sara Lombardi, design\n", "", 0);
+        assert.deepEqual(listed.permissions, { read: true, write: false, test: false, web: true });
+        assert.equal(listed.model, undefined);
+        assert.equal(listed.effort, "high");
+        assert.deepEqual(colleagueFrom("sara", "---\ntools:\nmodel: opus\n---\n# Sara\n", "", 0).permissions, { read: true, write: true, test: true, web: true });
     });
 
     it("writes the tools line from the permissions, keeping Read and the other tools", () => {
@@ -49,6 +60,15 @@ describe("colleagues from their files", () => {
         assert.equal(withPermissions(profile, { read: false, write: false, test: false, web: true }), "---\r\nname: sara\r\ntools: Read, WebSearch, WebFetch, mcp__crew-mod__step\r\n---\r\n# Sara\r\n");
         assert.equal(withPermissions("---\nname: sara\n---\n# Sara\n", { read: true, write: true, test: true, web: false }), "---\nname: sara\ntools: Read, Grep, Glob, Edit, Write, Bash, mcp__crew-mod__step\n---\n# Sara\n");
         assert.equal(withPermissions("# Sara, no frontmatter\n", { read: true, write: false, test: false, web: false }), "# Sara, no frontmatter\n");
+    });
+
+    it("rewrites a tools list of YAML items as one comma line, its items gone", () => {
+        const profile = "---\nname: sara\ntools:\n  - Read\n  - Grep\n  - mcp__crew-mod__step\nmodel: opus\n---\n# Sara\n";
+        assert.equal(withPermissions(profile, { read: true, write: true, test: false, web: false }), "---\nname: sara\ntools: Read, Grep, Glob, Edit, Write, mcp__crew-mod__step\nmodel: opus\n---\n# Sara\n");
+    });
+
+    it("finds the open tasks that ask to try again", () => {
+        assert.deepEqual(retestsOf(["Riprova il parser", "**Retest** the map", "re-test modes", "Check again the dice", "riprovare", "test the parser", "Rivedi"]), ["Riprova il parser", "**Retest** the map", "re-test modes", "Check again the dice", "riprovare"]);
     });
 
     it("sets a colleague's effort in the profile, adds it, or takes it out", () => {
@@ -110,5 +130,52 @@ describe("words", () => {
     it("writes models and the time to a reset", () => {
         assert.equal(modelName("claude-opus-5-5"), "Opus 5.5");
         assert.equal(formatUntil(new Date(Date.UTC(2026, 9, 12, 5, 0)).toISOString(), Date.UTC(2026, 9, 10, 0, 0)), "2d 5h");
+    });
+});
+
+describe("paths", () => {
+    it("resolves a path against the root: . and .., backslashes, a drive", () => {
+        assert.equal(resolvedPath("/p/.claude/agent-memory/sara/../../agents/sara.md", "/p"), "/p/.claude/agents/sara.md");
+        assert.equal(resolvedPath(".claude\\agent-memory\\sara\\.\\todo.md", "F:\\work\\game"), "F:/work/game/.claude/agent-memory/sara/todo.md");
+        assert.equal(resolvedPath("../../../../x", "/p"), "/x");
+        assert.equal(resolvedPath("C:\\a\\..\\b", "/p"), "C:/b");
+        assert.equal(resolvedPath(".claude/agent-memory/sara/**/../../x", "/p"), undefined);
+    });
+
+    it("tells a colleague's own memory folder, at any depth under the root, whatever the case", () => {
+        assert.equal(isOwnMemory("/p/.claude/agent-memory/sara/todo.md", "/p", "sara"), true);
+        assert.equal(isOwnMemory("/p/private/.claude/agent-memory/sara", "/p", "sara"), true);
+        assert.equal(isOwnMemory("F:/Work/.Claude/Agent-Memory/SARA/notes/x.md", "f:/work", "Sara"), true);
+        assert.equal(isOwnMemory("/p/.claude/agent-memory/sara-lombardi/x", "/p", "sara"), false);
+        assert.equal(isOwnMemory("/q/.claude/agent-memory/sara/todo.md", "/p", "sara"), false);
+        assert.equal(isInside("/pq/x", "/p"), false);
+    });
+
+    it("finds the pictures a text names, each once", () => {
+        assert.deepEqual(imagePathsIn("See `shots/a.png`, ![map](F:\\maps\\b.JPG) and shots/a.png. Not a.pngx, nor c.gif; d.webp."), ["shots/a.png", "F:\\maps\\b.JPG", "d.webp"]);
+    });
+});
+
+describe("the week's counts", () => {
+    it("names the ISO week and the local date", () => {
+        assert.equal(isoWeek(new Date(2026, 9, 11, 12).getTime()), "2026-W41");
+        assert.equal(isoWeek(new Date(2027, 0, 1, 12).getTime()), "2026-W53");
+        assert.equal(isoWeek(new Date(2025, 11, 29, 12).getTime()), "2026-W01");
+        assert.equal(dateOf(new Date(2026, 9, 1, 12).getTime()), "2026-10-01");
+    });
+
+    it("adds a task or a refusal, keeping only the last weeks", () => {
+        const counts = Object.fromEntries(Array.from({ length: 8 }, (_, index) => [`2026-W${String(30 + index).padStart(2, "0")}`, { sara: { tasks: 1, refusals: 0 } }]));
+        const next = withCount(counts, "2026-W41", "sara", "refusals", 8);
+        assert.deepEqual(Object.keys(next), ["2026-W31", "2026-W32", "2026-W33", "2026-W34", "2026-W35", "2026-W36", "2026-W37", "2026-W41"]);
+        assert.deepEqual(next["2026-W41"], { sara: { tasks: 0, refusals: 1 } });
+        assert.deepEqual(withCount(next, "2026-W41", "sara", "tasks", 8)["2026-W41"], { sara: { tasks: 1, refusals: 1 } });
+    });
+
+    it("makes a file name of a task", () => {
+        assert.equal(slugOf("Rivedi la città: è già fatto?"), "rivedi-la-citta-e-gia-fatto");
+        assert.equal(slugOf("a".repeat(48) + " bcd"), `${"a".repeat(48)}-b`);
+        assert.equal(slugOf("a".repeat(49) + " bcd"), "a".repeat(49));
+        assert.equal(slugOf("!!!"), "report");
     });
 });

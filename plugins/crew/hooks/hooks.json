@@ -1,5 +1,5 @@
 {
-  "description": "Reminds at every prompt which colleagues are speaking, and brings them back after a compaction or a resume.",
+  "description": "Reminds at every prompt which colleagues are speaking, brings them back after a compaction or a resume, and after a commit names the colleagues whose watched files it touches.",
   "hooks": {
     "UserPromptSubmit": [
       {
@@ -19,6 +19,30 @@
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/conversation.mjs\"",
             "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/conversation.mjs\"",
+            "timeout": 10,
+            "if": "Bash(git *)"
+          }
+        ]
+      },
+      {
+        "matcher": "PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/conversation.mjs\"",
+            "timeout": 10,
+            "if": "PowerShell(git *)"
           }
         ]
       }

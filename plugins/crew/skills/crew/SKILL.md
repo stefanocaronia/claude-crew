@@ -1,6 +1,6 @@
 ---
 name: crew
-description: A standing team of expert colleagues for a project, each a subagent with a profile, a memory and a todo. Use it when a step of the work is done (a feature, a fix, a playtest), to run a review round with the colleagues it touches; before handing a colleague a task in their field (a check, research, a test, a change, within their permissions); and when the user asks to set the team up, hire, fire, change or portray a colleague, or see the team. Conversations and meetings go through the plugin's commands talk, invite, leave and end, which Claude invokes when the user asks in any words.
+description: A standing team of expert colleagues for a project, each a subagent with a profile, a memory and a todo. Use it when a step of the work is done (a feature, a fix, a playtest), to run a review round with the colleagues it touches; before handing a colleague a task in their field (a check, research, a test, a change, within their permissions); and when the user asks to set the team up, hire, fire, change or portray a colleague, or see the team. The command init sets the team up; conversations and meetings go through the plugin's commands talk, invite, leave and end, which Claude invokes when the user asks in any words.
 ---
 
 # Crew
@@ -26,7 +26,7 @@ A colleague is an agent of `.claude/agents/` with a `todo.md` in its memory fold
 
 | The user asks | Read first |
 |---|---|
-| to set the team up in a project | [references/adopt.md](references/adopt.md) |
+| to set the team up in a project (`/crew:init`, or the empty panel's button) | [references/adopt.md](references/adopt.md) |
 | to hire a colleague | [references/hire.md](references/hire.md) |
 | to fire one | [references/fire.md](references/fire.md) |
 | to change one: field, tools, character, name | [references/edit.md](references/edit.md) |

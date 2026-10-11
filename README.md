@@ -11,8 +11,8 @@ A standing team of expert colleagues for your projects, in Claude Code. Each col
 
 Two plugins: the skill works on its own, and the panel installs the skill with it.
 
-- **crew**: the skill (hiring and firing, portraits, review rounds, conversations and meetings) and the hook that hands the chat over to the colleagues and back.
-- **crew-mod**: the Crew panel and a group chat. The panel shows each colleague in one of four sections: in the meeting, at work (with the steps they report, their context, tokens and time), finished, on a coffee break. Their card holds their open tasks, latest memory and settings: effort and permissions. Under the team, the buttons for a review, a meeting, hiring and new portraits, and the backlog of open tasks. In a meeting, each colleague's turn is drawn under their portrait, name and role, and a card above the prompt holds the participants, an invite menu and the button that closes it.
+- **crew**: the skill (setting the team up, hiring and firing, portraits, review rounds, tasks, conversations and meetings), its commands (`/crew:init`, `/crew:talk`, `/crew:invite`, `/crew:leave`, `/crew:end`) and the hook that hands the chat over to the colleagues and back.
+- **crew-mod**: the Crew panel and a group chat. The panel shows each colleague in one of four sections: in the meeting, at work (with the steps they report, their context, tokens and time), finished, on a coffee break. Their card holds their open tasks, latest memory and settings: effort and permissions. Under the team, the buttons for a review, a meeting, hiring and new portraits, and the backlog of open tasks; in a project without colleagues, a button that sets the team up. In a meeting, each colleague's turn is drawn under their portrait, name and role, and a card above the prompt holds the participants, an invite menu and the button that closes it.
 
 ## Requirements
 
@@ -43,7 +43,7 @@ Ask Claude in your own words; the `crew` skill knows the operations:
 | Ask | What happens |
 |---|---|
 | `/crew:init`, or "set up a team of colleagues for this project" | Claude reads the project, proposes three to eight roles, you pick, they are hired |
-| "hire a colleague for security" / "assumi un collega per la sicurezza" | a profile, a memory folder, a todo and a portrait |
+| "hire a colleague for security" / "assumi un collega per la sicurezza" | a profile (who they are, where they grew up and studied, how they work and how they talk), a memory folder, a todo, sensible permissions and a portrait |
 | "fire Sara" / "licenzia Sara" | their open tasks are reassigned or closed, profile and memory archived |
 | "change Matteo's tools" | the profile changes, the memory notes why |
 | "a portrait for each colleague" | an image connector, the Codex CLI, or Claude drawing SVG, in one style for the team |
@@ -51,7 +51,7 @@ Ask Claude in your own words; the `crew` skill knows the operations:
 | any work Claude does | Claude hands a colleague a check, a test or a change in their field whenever it helps, within the permissions you set in their card: Read, Write, Testing, Web |
 | "voglio parlare con Matteo", "I want to talk to Matteo and Giulia", or `/crew:talk Matteo Giulia` | they answer in the chat, each message starting with their name, until you close it ("back to Claude", `/crew:end`) |
 
-Conversations go through four commands, `/crew:talk Matteo Giulia`, `/crew:invite Sara`, `/crew:leave Sara` and `/crew:end`. You can type them, press the panel's buttons, or just ask in your own words in any language: Claude invokes them. Nothing starts from a phrase that only mentions a colleague.
+`/crew:init` sets the team up in the current project; if it already has colleagues, Claude says who they are and asks whether to add someone. Conversations go through four commands, `/crew:talk Matteo Giulia`, `/crew:invite Sara`, `/crew:leave Sara` and `/crew:end`. You can type them, press the panel's buttons, or just ask in your own words in any language: Claude invokes them. Nothing starts from a phrase that only mentions a colleague.
 
 The panel opens by itself at the start of a session in a project with colleagues; `/crew-panel` shows or hides it.
 

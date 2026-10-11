@@ -216,7 +216,7 @@ test("under the team: the backlog, each task with who holds it and its effort; a
         expect((await ui.find({ key: "act-meeting" }))?.props.label).toBe("☰ Meeting with Sara and Matteo");
         expect(await ui.find({ key: "act-hire" })).toBeUndefined();
         await ui.press({ key: "act-round" });
-        expect(submitted.at(-1)).toBe("run a review round with Sara and Matteo");
+        expect(submitted.at(-1)).toBe("run a review round with Sara and Matteo: ask me what to review");
         expect(await ui.find({ type: "Text", text: "✕ Fire Sara and Matteo" })).toBeDefined();
         await ui.press({ key: "act-fire" });
         expect(submitted.at(-1)).toBe("fire Sara and Matteo");
@@ -705,7 +705,7 @@ test("from a colleague's card, a review asks Claude what to review, and a talk s
     const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: { title: "Crew", isFocused: false, bodyColumns: 50, placement: "dock" } as never });
     await ui.press({ key: "open-giulia-ferri" });
     await ui.press({ key: "card-round" });
-    expect(submitted.at(-1)).toBe("run a review round with Giulia");
+    expect(submitted.at(-1)).toBe("run a review round with Giulia: ask me what to review");
     await ui.press({ key: "talk" });
     expect(sent.at(-1)).toBe("/crew:talk Giulia");
     await ui.unmount();

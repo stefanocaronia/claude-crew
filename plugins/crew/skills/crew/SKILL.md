@@ -32,9 +32,9 @@ A colleague is an agent of `.claude/agents/` with a `todo.md` in its memory fold
 | to change one: field, tools, character, name | [references/edit.md](references/edit.md) |
 | to set the permissions, of the team or of one, sensibly | [references/edit.md](references/edit.md), "Permissions" |
 | a portrait, for one colleague or the whole team | [references/portrait.md](references/portrait.md) |
-| a review round, or a milestone is reached | [references/round.md](references/round.md) |
+| a review round, or a milestone is reached; when the request asks what to review (the panel's buttons do), ask that first with the choice form, as round.md says | [references/round.md](references/round.md) |
 | a task for a colleague, or Claude finds one useful: a check, research, a test, a change in their field | [references/task.md](references/task.md) |
-| to talk with one or more of them | [references/conversation.md](references/conversation.md) |
+| to talk with one or more of them; when the request asks for the topic (the panel's meeting button does), ask that first with the choice form, as conversation.md says | [references/conversation.md](references/conversation.md) |
 | who is on the team | the team table and each `todo.md`: name, field, open tasks |
 
 ## Always

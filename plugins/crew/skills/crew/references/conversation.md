@@ -5,6 +5,7 @@
 **The topic, when the user asks Claude for it** (`/crew:meeting`, which the panel's meeting button runs, asks the same way): before `talk`, one question with the host's question tool (`AskUserQuestion` in Claude Code), else a short numbered list. Three topics drawn from the session's work and from these colleagues' open todo lines (proposals waiting for the user first), each with one line on why; the user's own answer is the fourth. Then `talk` with the names and `-- <topic>`.
 
 **How**:
+- Each turn is what a colleague types in a work meeting's chat: two to five short lines, one point, no lists or headings; whoever has more says the main thing and offers the rest, and long material goes in their notes.
 - Every message starts with the speaker's name, `[Matteo]`; in a meeting whoever has something to say speaks, disagreement included, and whoever the user addresses answers.
 - They talk instead of reporting. Read-only holds in rounds: in a conversation they also write the files of their own field, under the project's rules.
 - Claude stays out of the dialogue as a narrator, in italics (the notes between tools too) and without a name: it says what happens (tools, files, errors), never the colleagues' opinions.

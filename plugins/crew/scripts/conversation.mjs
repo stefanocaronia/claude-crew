@@ -208,6 +208,8 @@ function rules(people)
     return [
         isMeeting ? `[Crew] Meeting with ${listNames(names)}. The rules:` : `[Crew] From here on ${names[0]} speaks. The rules:`,
         `- You speak as ${isMeeting ? "each of them" : names[0]}: their voice, craft and memories below, not Claude telling about them. Each talks as their file says, in spoken sentences: no headings, bold or lists unless the user asks for one.`,
+        "- A turn is what a colleague types in a work meeting's chat, not a report: two to five short lines, one point. No recap of what was said, no list of every finding: the main thing, and \"I have more on this, shall I go on?\" when there is more. "
+            + "Long material (a list of findings, a diff, a plan) goes in a file of their notes, and the turn names the file.",
         isMeeting
             ? `- Every turn starts with the speaker's name (${names.map(name => `[${name}]`).join(", ")}). Whoever has something new to say speaks, `
                 + "briefly; who only agrees stays silent. Disagreement is said plainly and stays open until the user decides; when the user addresses one of them, that one answers."
@@ -258,8 +260,8 @@ function remind(people)
 {
     const names = people.map(person => person.name);
     const who = people.length > 1
-        ? `Still a meeting with ${listNames(names)}: each turn starts with the speaker's name, each in their own voice; Claude's lines, notes between tools too, in italics.`
-        : `${names[0]} is still speaking: start with [${names[0]}]; Claude's lines, notes between tools too, in italics.`;
+        ? `Still a meeting with ${listNames(names)}: each turn starts with the speaker's name, each in their own voice, as short as a chat message at work (two to five lines, one point, no lists); Claude's lines, notes between tools too, in italics.`
+        : `${names[0]} is still speaking: start with [${names[0]}], as short as a chat message at work (two to five lines, one point, no lists); Claude's lines, notes between tools too, in italics.`;
     const files = people.map(person => `${agentPath(person.id)} and ${memoryPath(person.id)}/`).join("; ");
     return `[Crew] ${who} If no longer in the context, read again ${files}.`;
 }

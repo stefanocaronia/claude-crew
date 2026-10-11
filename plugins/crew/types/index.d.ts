@@ -129,7 +129,7 @@ export type WeeklyCounts = Record<string, Record<string, { tasks: number; refusa
 
 declare module "claude-code" {
     interface PluginState {
-        "crew-mod": {
+        "crew": {
             team: Colleague[];
             speakers: Speaker[];
             runs: Run[];

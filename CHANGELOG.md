@@ -2,6 +2,11 @@
 
 What changes for whoever uses Crew, version by version. Plugins update in a new chat: `/plugin`, Marketplaces, claude-crew, Update marketplace, or turn its auto-update on there.
 
+## 0.7.0
+
+- One plugin: the panel is now inside `crew`. Remove the old `crew-mod` with `/plugin uninstall crew-mod@claude-crew`, then update `crew`.
+- The colleagues' step tool is now `mcp__crew__step`: in each profile's `tools:`, `mcp__crew-mod__step` becomes `mcp__crew__step` (ask Claude to do it).
+
 ## 0.6.0
 
 - The panel in eleven languages: English, Italian, Spanish, French, German, Portuguese, Japanese, Chinese, Korean, Arabic and Russian. It follows Claude Code's language, then the system's; everything Claude writes in the chat was already in yours.

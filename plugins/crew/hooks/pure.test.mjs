@@ -1,4 +1,4 @@
-// The mod's pure functions under Node: node --test plugins/crew-mod/hooks/pure.test.mjs
+// The mod's pure functions under Node: node --test plugins/crew/hooks/pure.test.mjs
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
@@ -41,7 +41,7 @@ describe("colleagues from their files", () => {
     });
 
     it("reads the permissions from the tools line, every one without a line; running commands writes too", () => {
-        assert.deepEqual(permissionsOf("Read, Grep, Glob, Bash, mcp__crew-mod__step"), { read: true, write: true, test: true, web: false });
+        assert.deepEqual(permissionsOf("Read, Grep, Glob, Bash, mcp__crew__step"), { read: true, write: true, test: true, web: false });
         assert.deepEqual(permissionsOf("[Read, Edit, WebFetch]"), { read: false, write: true, test: false, web: true });
         assert.deepEqual(permissionsOf("Read, Grep"), { read: true, write: false, test: false, web: false });
         assert.deepEqual(permissionsOf(undefined), { read: true, write: true, test: true, web: true });
@@ -56,15 +56,17 @@ describe("colleagues from their files", () => {
     });
 
     it("writes the tools line from the permissions, keeping Read and the other tools", () => {
-        const profile = "---\r\nname: sara\r\ntools: Read, Grep, Glob, WebSearch, WebFetch, mcp__crew-mod__step\r\n---\r\n# Sara\r\n";
-        assert.equal(withPermissions(profile, { read: false, write: false, test: false, web: true }), "---\r\nname: sara\r\ntools: Read, WebSearch, WebFetch, mcp__crew-mod__step\r\n---\r\n# Sara\r\n");
-        assert.equal(withPermissions("---\nname: sara\n---\n# Sara\n", { read: true, write: true, test: true, web: false }), "---\nname: sara\ntools: Read, Grep, Glob, Edit, Write, Bash, mcp__crew-mod__step\n---\n# Sara\n");
+        const profile = "---\r\nname: sara\r\ntools: Read, Grep, Glob, WebSearch, WebFetch, mcp__crew__step\r\n---\r\n# Sara\r\n";
+        assert.equal(withPermissions(profile, { read: false, write: false, test: false, web: true }), "---\r\nname: sara\r\ntools: Read, WebSearch, WebFetch, mcp__crew__step\r\n---\r\n# Sara\r\n");
+        assert.equal(withPermissions("---\nname: sara\n---\n# Sara\n", { read: true, write: true, test: true, web: false }), "---\nname: sara\ntools: Read, Grep, Glob, Edit, Write, Bash, mcp__crew__step\n---\n# Sara\n");
         assert.equal(withPermissions("# Sara, no frontmatter\n", { read: true, write: false, test: false, web: false }), "# Sara, no frontmatter\n");
+        // The step tool's old name, from when the panel was its own plugin, is written with the new one.
+        assert.equal(withPermissions("---\nname: sara\ntools: Read, mcp__crew-mod__step\n---\n", { read: true, write: false, test: false, web: false }), "---\nname: sara\ntools: Read, Grep, Glob, mcp__crew__step\n---\n");
     });
 
     it("rewrites a tools list of YAML items as one comma line, its items gone", () => {
-        const profile = "---\nname: sara\ntools:\n  - Read\n  - Grep\n  - mcp__crew-mod__step\nmodel: opus\n---\n# Sara\n";
-        assert.equal(withPermissions(profile, { read: true, write: true, test: false, web: false }), "---\nname: sara\ntools: Read, Grep, Glob, Edit, Write, mcp__crew-mod__step\nmodel: opus\n---\n# Sara\n");
+        const profile = "---\nname: sara\ntools:\n  - Read\n  - Grep\n  - mcp__crew__step\nmodel: opus\n---\n# Sara\n";
+        assert.equal(withPermissions(profile, { read: true, write: true, test: false, web: false }), "---\nname: sara\ntools: Read, Grep, Glob, Edit, Write, mcp__crew__step\nmodel: opus\n---\n# Sara\n");
     });
 
     it("finds the open tasks that ask to try again", () => {

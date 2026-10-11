@@ -11,16 +11,9 @@
     {
       "name": "crew",
       "source": "./plugins/crew",
-      "description": "Skill and hook: set up a team of expert colleagues, hire, fire and portray them, run review rounds, talk with them one-to-one or in meetings.",
-      "version": "0.6.0",
+      "description": "Crew: set up a team of expert colleagues, hire, fire and portray them, run review rounds, talk with them one-to-one or in meetings; the Crew panel shows the team, their work, their reports and the meetings.",
+      "version": "0.7.0",
       "category": "skill"
-    },
-    {
-      "name": "crew-mod",
-      "source": "./plugins/crew-mod",
-      "description": "Mod: the Crew panel, the colleagues with portraits, who is at work and the steps they report, the week's budget; meetings drawn as a group chat, with controls to invite, let go and close.",
-      "version": "0.6.0",
-      "category": "mod"
     }
   ]
 }

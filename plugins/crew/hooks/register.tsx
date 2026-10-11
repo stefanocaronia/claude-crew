@@ -15,19 +15,19 @@ import { contextWindowOf, dateOf, formatTime, formatTokens, formatUntil, isoWeek
 import type { Language, Words } from "./text.ts";
 
 const pane = "crew";
-const stepTool = "mcp__crew-mod__step";
-const panelTool = "mcp__crew-mod__panel";
-const team = atom({ plugin: "crew-mod", key: "team" } as const, []);
-const speakers = atom({ plugin: "crew-mod", key: "speakers" } as const, []);
-const runs = atom({ plugin: "crew-mod", key: "runs" } as const, []);
-const meeting = atom({ plugin: "crew-mod", key: "meeting" } as const, { members: [] });
-const budget = atom({ plugin: "crew-mod", key: "budget" } as const, []);
-const view = atom({ plugin: "crew-mod", key: "view" } as const, { isFinishedCollapsed: false, autoOpened: false });
-const card = atom({ plugin: "crew-mod", key: "card" } as const, null);
-const report = atom({ plugin: "crew-mod", key: "report" } as const, null);
-const preferences = atom({ plugin: "crew-mod", key: "preferences" } as const, { language: "auto", autoOpen: true });
-const gallery = atom({ plugin: "crew-mod", key: "gallery" } as const, 0);
-const board = atom({ plugin: "crew-mod", key: "board" } as const, { tasks: [], checkedAt: 0, hasCommands: true });
+const stepTool = "mcp__crew__step";
+const panelTool = "mcp__crew__panel";
+const team = atom({ plugin: "crew", key: "team" } as const, []);
+const speakers = atom({ plugin: "crew", key: "speakers" } as const, []);
+const runs = atom({ plugin: "crew", key: "runs" } as const, []);
+const meeting = atom({ plugin: "crew", key: "meeting" } as const, { members: [] });
+const budget = atom({ plugin: "crew", key: "budget" } as const, []);
+const view = atom({ plugin: "crew", key: "view" } as const, { isFinishedCollapsed: false, autoOpened: false });
+const card = atom({ plugin: "crew", key: "card" } as const, null);
+const report = atom({ plugin: "crew", key: "report" } as const, null);
+const preferences = atom({ plugin: "crew", key: "preferences" } as const, { language: "auto", autoOpen: true });
+const gallery = atom({ plugin: "crew", key: "gallery" } as const, 0);
+const board = atom({ plugin: "crew", key: "board" } as const, { tasks: [], checkedAt: 0, hasCommands: true });
 
 // Module scope, set again at every load: the portraits as data URIs (too large for the state, whose `gallery` says when they
 // changed), and the panel's language.
@@ -1663,7 +1663,7 @@ async function settingsLanguage($: EngineInterface): Promise<string | undefined>
 {
     try {
         const settings = (await $.settings.read()) as { language?: unknown; pluginConfigs?: Record<string, { options?: { language?: unknown } }> };
-        const own = settings.pluginConfigs?.["crew-mod@claude-crew"]?.options?.language;
+        const own = settings.pluginConfigs?.["crew@claude-crew"]?.options?.language;
         const usable = [own, settings.language].filter(hint => typeof hint === "string" && hint !== "auto");
         return usable[0] as string | undefined;
     } catch {

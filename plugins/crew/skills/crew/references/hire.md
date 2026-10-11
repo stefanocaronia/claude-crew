@@ -11,7 +11,7 @@
    - first and last name, plausible in the project's language and culture, the first name unique in the team; age, where they grew up and where they live, what they studied, and a career that makes them credible; a made-up person: never a real one, nor real employers or works as theirs;
    - character: standards, what they cannot stand, how they disagree; and how they talk (sentence length, register, a habit of speech; their roots only in an occasional saying, as people write at work, never dialect), so each sounds like themselves in a meeting;
    - `watches:`, the files of their field as globs (`src/mcp/**, docs/tools.md`): a commit that touches them reminds Claude of them;
-   - their permissions, chosen by Claude from their field as [edit.md](edit.md) says ("Permissions") and written as `tools:`, one line in the proposal with why; their memory and todo they always write. Without Read or Write the panel refuses their reading or writing outside their memory folder. With the crew-mod installed, `mcp__crew-mod__step` is among their tools too, to report their steps to the panel;
+   - their permissions, chosen by Claude from their field as [edit.md](edit.md) says ("Permissions") and written as `tools:`, one line in the proposal with why; their memory and todo they always write. Without Read or Write the panel refuses their reading or writing outside their memory folder. `mcp__crew__step` is among their tools too, to report their steps to the panel;
    - a color among `red, blue, green, yellow, purple, orange, pink, cyan` that no colleague has;
    - `model` and `effort` only when the user asks: otherwise they inherit the session's.
 

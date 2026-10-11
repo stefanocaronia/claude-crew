@@ -1,7 +1,7 @@
 {
   "name": "crew",
-  "version": "0.6.0",
-  "description": "A standing team of expert colleagues for a project: subagents with a profile, a memory and a todo, who review the work at milestones and talk with you one-to-one or in meetings.",
+  "version": "0.7.0",
+  "description": "A standing team of expert colleagues for a project: subagents with a profile, a memory and a todo, who review the work at milestones and talk with you one-to-one or in meetings; with the Crew panel: the team with portraits, who is at work and the steps they report, the reports, and meetings drawn as a group chat.",
   "author": {
     "name": "Stefano Caronia",
     "url": "https://github.com/stefanocaronia"
@@ -15,6 +15,30 @@
     "team",
     "personas",
     "memory",
-    "meetings"
-  ]
+    "meetings",
+    "panel"
+  ],
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "language": {
+      "type": "string",
+      "title": "Panel language",
+      "description": "auto follows Claude Code's language setting, then the system locale; the panel's own settings page overrides it",
+      "default": "auto",
+      "options": [
+        "auto",
+        "en",
+        "it",
+        "es",
+        "fr",
+        "de",
+        "pt",
+        "ja",
+        "zh",
+        "ko",
+        "ar",
+        "ru"
+      ]
+    }
+  }
 }

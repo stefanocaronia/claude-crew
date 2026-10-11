@@ -113,7 +113,8 @@ export function withPermissions(profile: string, permissions: Permissions): stri
     // A tools list written as YAML items under the key becomes one comma line, and its items go.
     const items = at >= 0 ? listItems(lines, at + 1, end) : [];
     const written = [lines[at]?.replace(/^tools[ \t]*:/, "") ?? "", ...items].join(",");
-    const others = at >= 0 ? toolsOf(written).filter(name => !managedTools.includes(name)) : [stepTool];
+    // The step tool kept its old name while the panel was its own plugin, crew-mod.
+    const others = at >= 0 ? toolsOf(written).filter(name => !managedTools.includes(name)).map(name => (name === "mcp__crew-mod__step" ? stepTool : name)) : [stepTool];
     const tools = [
         "Read",
         ...(permissions.read ? ["Grep", "Glob"] : []),
@@ -166,7 +167,7 @@ function taskOf(colleague: string, line: string): { colleague: string; text: str
 
 // The tools the permissions stand for; the panel's own tool goes with every colleague it draws.
 const managedTools = ["Read", "Grep", "Glob", "Edit", "Write", "Bash", "WebSearch", "WebFetch"];
-const stepTool = "mcp__crew-mod__step";
+const stepTool = "mcp__crew__step";
 
 function toolsOf(line: string): string[]
 {

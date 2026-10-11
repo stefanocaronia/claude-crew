@@ -9,10 +9,10 @@ A standing team of expert colleagues for your projects, in Claude Code. Each col
 > riunione finita
 ```
 
-Two plugins: the skill works on its own, and the panel installs the skill with it.
+One plugin, `crew`:
 
-- **crew**: the skill (setting the team up, hiring and firing, portraits, review rounds, tasks, conversations and meetings), its commands (`/crew:init`, `/crew:review`, `/crew:meeting`, `/crew:talk`, `/crew:invite`, `/crew:leave`, `/crew:end`, `/crew:hire`, `/crew:fire`, `/crew:portraits`) and the hook that hands the chat over to the colleagues and back.
-- **crew-mod**: the Crew panel and a group chat. The panel shows each colleague in one of four sections: in the meeting, at work (with the steps they report, their context, tokens and time), finished, on a coffee break. Their card holds their open tasks, latest memory and settings: effort and permissions. Under the team and in a colleague's card, the buttons for a review, a meeting, hiring, firing and new portraits: each runs a command that asks in the chat what it needs (what to review and the meeting's topic, with three proposals from the work and the todos and a box for your own; the new colleague's field; the portraits' style; a yes before a firing). Then the backlog of open tasks; in a project without colleagues, a button that sets the team up. A finished colleague's report opens in the panel, from their row or their card. The panel speaks eleven languages (English, Italian, Spanish, French, German, Portuguese, Japanese, Chinese, Korean, Arabic, Russian), following Claude Code's language or the system's; its own settings page (⚙) picks another and says whether it opens at the start of a session. In a meeting, each colleague's turn is drawn under their portrait, name and role, and a card above the prompt holds the participants, an invite menu and the button that closes it.
+- **The skill** (setting the team up, hiring and firing, portraits, review rounds, tasks, conversations and meetings), its commands (`/crew:init`, `/crew:review`, `/crew:meeting`, `/crew:talk`, `/crew:invite`, `/crew:leave`, `/crew:end`, `/crew:hire`, `/crew:fire`, `/crew:portraits`) and the hook that hands the chat over to the colleagues and back.
+- **The panel** and a group chat. The panel shows each colleague in one of four sections: in the meeting, at work (with the steps they report, their context, tokens and time), finished, on a coffee break. Their card holds their open tasks, latest memory and settings: effort and permissions. Under the team and in a colleague's card, the buttons for a review, a meeting, hiring, firing and new portraits: each runs a command that asks in the chat what it needs (what to review and the meeting's topic, with three proposals from the work and the todos and a box for your own; the new colleague's field; the portraits' style; a yes before a firing). Then the backlog of open tasks; in a project without colleagues, a button that sets the team up. A finished colleague's report opens in the panel, from their row or their card. The panel speaks eleven languages (English, Italian, Spanish, French, German, Portuguese, Japanese, Chinese, Korean, Arabic, Russian), following Claude Code's language or the system's; its own settings page (⚙) picks another and says whether it opens at the start of a session. In a meeting, each colleague's turn is drawn under their portrait, name and role, and a card above the prompt holds the participants, an invite menu and the button that closes it.
 
 ## Requirements
 
@@ -26,13 +26,14 @@ Two plugins: the skill works on its own, and the panel installs the skill with i
 ```
 /plugin marketplace add stefanocaronia/claude-crew
 /plugin install crew@claude-crew
-/plugin install crew-mod@claude-crew
 ```
+
+Until 0.6 the panel was a separate plugin, `crew-mod`: if you have it, remove it with `/plugin uninstall crew-mod@claude-crew`, then update `crew`.
 
 ## First steps
 
 1. Open a terminal in your project's folder and type `claude`.
-2. Paste the three install lines above. The panel brings the skill with it, so the last line alone is enough.
+2. Paste the two install lines above.
 3. Open a new chat (or restart the app): plugins load when a chat starts.
 4. Type `/crew:init`, or ask "set up a team of colleagues for this project". Claude reads the project, proposes a few roles, and you pick.
 
@@ -80,12 +81,12 @@ Everything stays in your project, under `.claude/`:
 ## Development
 
 ```
-node --test plugins/crew/scripts/conversation.test.mjs plugins/crew-mod/hooks/pure.test.mjs
-claude plugin test plugins/crew-mod
+node --test plugins/crew/scripts/conversation.test.mjs plugins/crew/hooks/pure.test.mjs
+claude plugin test plugins/crew
 claude plugin validate .
 ```
 
-Installed from a local folder (`/plugin marketplace add <folder>`), the plugins run from a copy in Claude Code's cache, not from the folder: after a change, raise the version in `.claude-plugin/marketplace.json` and both `plugin.json`, then run `claude plugin marketplace update claude-crew` and `claude plugin update crew@claude-crew` (and `crew-mod@claude-crew`), and start a new session.
+Installed from a local folder (`/plugin marketplace add <folder>`), the plugin runs from a copy in Claude Code's cache, not from the folder: after a change, raise the version in `.claude-plugin/marketplace.json` and in `plugins/crew/.claude-plugin/plugin.json`, then run `claude plugin marketplace update claude-crew` and `claude plugin update crew@claude-crew`, and start a new session.
 
 To see the mod as the desktop gets it, with a project's real colleagues, `node tools/preview.mjs <project> [--meeting matteo-conti,giulia-ferri] [--working elena-galli]` writes an HTML page (by default in the project's `tmp/`): the trees the mod hands over, in the app's dark colors.
 

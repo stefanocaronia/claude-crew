@@ -1,5 +1,8 @@
 {
   "description": "Reminds at every prompt which colleagues are speaking, brings them back after a compaction or a resume, and after a commit names the colleagues whose watched files it touches.",
+  "modules": [
+    "./register.tsx"
+  ],
   "hooks": {
     "UserPromptSubmit": [
       {

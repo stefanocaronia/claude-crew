@@ -1,10 +1,10 @@
 // The mod's drawings and controls on the terminal and the desktop, over a small project of fake files:
-// claude plugin test plugins/crew-mod
+// claude plugin test plugins/crew
 import type { On } from "claude-code";
 import { expect, mock, test } from "claude-code/testing";
 import type { MockClock } from "claude-code/testing";
 
-const plugin = "crew-mod";
+const plugin = "crew";
 const surfaces = ["terminal", "desktop"] as const;
 // How many times the mod asked to open its panel.
 let opens = 0;
@@ -144,7 +144,7 @@ test("Claude opens the panel through its tool when the user asks in words", asyn
     world(on, []);
     await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
     const before = opens;
-    await $.tool.call({ tool: "mcp__crew-mod__panel", tool_use_id: "t1" } as never);
+    await $.tool.call({ tool: "mcp__crew__panel", tool_use_id: "t1" } as never);
     expect(opens).toBe(before + 1);
 });
 
@@ -464,7 +464,7 @@ test("a finished card says how long the task took, not its last step", async ($,
     on("turn.complete", () => ({ text: "" }) as never);
     await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
     await $.agent.spawn({ prompt: "Review the parser.", description: "review the parser", subagentType: "matteo-conti" } as never);
-    await $.tool.call({ tool: "mcp__crew-mod__step", done: 4, total: 4, note: "writing the report", agentId: "a1" } as never);
+    await $.tool.call({ tool: "mcp__crew__step", done: 4, total: 4, note: "writing the report", agentId: "a1" } as never);
     const ui = await $.ui.mount({ plugin, surface: "terminal", component: "Pane", requestId: "crew", props: pane });
     expect(await ui.find({ type: "Text", text: "Review the parser · step 4 of 4: writing the report" })).toBeDefined();
     await clock.advance(3 * 60_000);

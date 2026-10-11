@@ -380,3 +380,14 @@ test("a colleague without reading or writing works only in their own memory fold
     const claude = await $.tool.call({ tool: "Read", file_path: "/p/src/index.ts" } as never);
     expect((claude as { deny?: string }).deny).toBeUndefined();
 });
+
+test("a colleague at work on a task is kept out of a meeting, with why", async ($, on) => {
+    world(on, []);
+    on("tool.call", () => ({ result: "ran" }) as never);
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+    await $.agent.spawn({ prompt: "Review the parser.", description: "review the parser", subagentType: "matteo-conti" } as never);
+    const talk = await $.tool.call({ tool: "Bash", command: "node \"/x/conversation.mjs\" talk Matteo Giulia -- the parser" } as never);
+    expect((talk as { deny?: string }).deny).toMatch(/Matteo \(at work on "review the parser"\)/);
+    const free = await $.tool.call({ tool: "Bash", command: "node /x/conversation.mjs talk Giulia Sara" } as never);
+    expect((free as { deny?: string }).deny).toBeUndefined();
+});

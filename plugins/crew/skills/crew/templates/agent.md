@@ -38,7 +38,7 @@ color: <color>
 
 ## Your memory
 
-Your folder is `.claude/agent-memory/<id>/`: its `MEMORY.md` reaches you at the start of every review, and beside it `todo.md` holds your tasks, one per line (`- [ ] task`). At the start remove the lines ticked last time; at the end tick with `[x]` what you did and add what remains. Memory and todo are edited, never rewritten: other sessions write to them too. In rounds they are **the only files you write**. At the end of every review, and of every conversation with the user, add a few lines:
+Your folder is `.claude/agent-memory/<id>/`: its `MEMORY.md` reaches you at the start of every review, and beside it `todo.md` holds your tasks, one per line (`- [ ] task`). At the start remove the lines ticked last time, check your open lines against the project (its log, its files, the decisions) and tick those already done, saying which in one line; at the end tick with `[x]` what you did and add what remains. Memory and todo are edited, never rewritten: other sessions write to them too. In rounds they are **the only files you write**. At the end of every review, and of every conversation with the user, add a few lines:
 - the date, the scope and your main findings, one line each;
 - what the user decided, if you know, and why;
 - what you understood about the user and the project that will help next time.

@@ -12,7 +12,7 @@ A standing team of expert colleagues for your projects, in Claude Code. Each col
 Two plugins, each working without the other:
 
 - **crew**: the skill (hiring and firing, portraits, review rounds, conversations and meetings) and the hook that hands the chat over to the colleagues and back.
-- **crew-mod**: the Crew panel and a group chat. The panel shows the team with their portraits, roles and open tasks, and who is at work with the steps they report, their context, tokens and time; a click on a name opens their card (profile, open tasks, latest memory). In a meeting, each colleague's turn is drawn under their portrait and name, and above the prompt sit the participants with buttons to let one go, invite another, or close the meeting.
+- **crew-mod**: the Crew panel and a group chat. The panel shows each colleague in one of four sections: in the meeting, at work (with the steps they report, their context, tokens and time), finished, on a coffee break. Their card holds their open tasks, latest memory and settings: effort and permissions. Under the team, the buttons for a review, a meeting, hiring and new portraits, and the backlog of open tasks. In a meeting, each colleague's turn is drawn under their portrait, name and role, and a card above the prompt holds the participants, an invite menu and the button that closes it.
 
 ## Requirements
 
@@ -47,6 +47,12 @@ Ask Claude in your own words; the `crew` skill knows the operations:
 Conversations go through four commands, `/crew:talk Matteo Giulia`, `/crew:invite Sara`, `/crew:leave Sara` and `/crew:end`. You can type them, press the panel's buttons, or just ask in your own words in any language: Claude invokes them. Nothing starts from a phrase that only mentions a colleague.
 
 The panel opens by itself at the start of a session in a project with colleagues; `/crew-panel` shows or hides it.
+
+## Permissions and tasks
+
+Each colleague has four permissions, set in their card or by Claude at hiring: **Read** the project, **Write** its files, **Testing** (run commands), **Web**. Without Read or Write, the panel refuses their reading or writing outside their own memory. Claude hands a colleague a check, a test or a change in their field whenever it helps, within those permissions; a colleague at work or in a meeting takes no other task.
+
+A meeting can open on a topic: `/crew:talk Matteo Giulia -- the parser`, or in words.
 
 ## Files
 

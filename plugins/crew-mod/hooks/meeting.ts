@@ -17,7 +17,7 @@ export function segmentsOf(text: string, team: Colleague[]): Segment[] | undefin
     }
 
     const names = team.map(colleague => escapeRegExp(colleague.name)).join("|");
-    const markers = [...text.matchAll(new RegExp(`^[ \\t]*(?:\\*\\*)?\\[(${names})\\](?:\\*\\*)?:?[ \\t]*`, "gim"))];
+    const markers = [...text.matchAll(new RegExp(`^[ \\t]*(?:\\*\\*)?\\[(${names})\\](?:\\*\\*)?:?(?:\\*\\*)?[ \\t]*`, "gim"))];
 
     if (!markers.length) {
         return undefined;

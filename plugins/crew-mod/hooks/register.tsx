@@ -169,7 +169,8 @@ export const register: Register = (on, options) => {
 
     // A colleague without reading or writing works only in their own memory folder: the panel refuses the rest.
     on("tool.call", async ($, e, next) => {
-        const reason = e.agentId ? await refusalFor($, e.tool, e.agentId, e as unknown as Record<string, unknown>) : undefined;
+        const args = e as unknown as Record<string, unknown>;
+        const reason = e.agentId ? await refusalFor($, e.tool, e.agentId, args) : e.tool === "Bash" ? await meetingRefusal($, String(args.command ?? "")) : undefined;
         return reason ? { deny: reason } : next(e);
     });
 
@@ -1009,6 +1010,27 @@ async function refusalFor($: EngineInterface, tool: string, agentId: string, arg
     return kind === "read"
         ? `${colleague.name} reads only their own memory and todo (${folder}/): the user gave them no reading of the project's files. Work from what the brief says, and name what you would need to read.`
         : `${colleague.name} changes only their own memory and todo (${folder}/): the user gave them no writing of the project's files. Propose the change in your answer instead.`;
+}
+
+// Why a meeting cannot take someone now: the conversation script's talk or invite names a colleague at work on a task.
+async function meetingRefusal($: EngineInterface, command: string): Promise<string | undefined>
+{
+    const call = /conversation\.mjs["']?\s+(?:talk|invite)\s+([^\n]*)/.exec(command);
+
+    if (!call) {
+        return undefined;
+    }
+
+    const words = (call[1] ?? "").split(/\s+--(?:\s|$)/)[0]?.split(/[\s,]+/).map(word => word.toLowerCase()) ?? [];
+    const working = (await read($, runs)).filter(run => run.status === "running");
+    const busy = (await read($, team)).flatMap(colleague => {
+        const run = working.find(each => each.colleague === colleague.id);
+        return run && (words.includes(colleague.name.toLowerCase()) || words.includes(colleague.id)) ? [`${colleague.name} (at work on "${run.task}")`] : [];
+    });
+
+    return busy.length
+        ? `${busy.join(", ")}: a colleague at work on a task joins no meeting until it ends. Ask the user whether to wait, or to meet without them.`
+        : undefined;
 }
 
 async function setEffort($: EngineInterface, id: string, level: string | undefined): Promise<void>

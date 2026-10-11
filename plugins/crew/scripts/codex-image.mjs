@@ -29,13 +29,16 @@ console.log(`saved ${output}`);
 
 function checkLogin()
 {
+    // Whether codex is there at all, by the exit code: the shell's own message changes with the system's language.
+    const found = spawnSync(process.platform === "win32" ? "where codex" : "command -v codex", { shell: true, encoding: "utf8", timeout: 15_000, windowsHide: true });
+
+    if (found.status !== 0) {
+        fail("Codex is not installed on this computer: try another way to make the portrait.");
+    }
+
     // One line for the shell, which finds codex as npm installed it, a script on Windows.
     const status = spawnSync("codex login status", { shell: true, encoding: "utf8", timeout: 15_000, windowsHide: true });
     const said = `${status.stdout ?? ""}${status.stderr ?? ""}`;
-
-    if (status.error !== undefined || /not recognized|not found/i.test(said)) {
-        fail("Codex is not installed on this computer: try another way to make the portrait.");
-    }
 
     if (status.status !== 0 || /not logged in/i.test(said)) {
         fail("Codex is not logged in: the user logs in with `codex login`, with ChatGPT.");
@@ -57,7 +60,7 @@ function makePicture(text)
         const child = spawn(line, { shell: true, windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
         let events = "";
         let errors = "";
-        const timer = setTimeout(() => child.kill(), longest);
+        const timer = setTimeout(() => stop(child), longest);
         child.stdout.on("data", chunk => (events += chunk.toString()));
         child.stderr.on("data", chunk => (errors += chunk.toString()));
         child.on("error", () => undefined);
@@ -90,10 +93,20 @@ function makePicture(text)
             const failed = parsed.find(event => event.type === "turn.failed")?.error?.message;
             clean();
             fail(/moderation_blocked/.test(errors) ? "The generator's safety check refused the brief: describe it differently."
-                : failed ? `Codex failed: ${failed}` : said ? `Codex said: ${said}` : "No picture came in three minutes.");
+                : failed ? `Codex failed: ${failed}` : said ? `Codex said: ${said}` : `No picture came in ${longest / 60_000} minutes.`);
         });
         child.stdin.end(prompt);
     });
+}
+
+// On Windows the shell runs codex as a child of its own: the whole tree goes, or codex keeps running.
+function stop(child)
+{
+    if (process.platform === "win32" && child.pid) {
+        spawnSync("taskkill", ["/pid", String(child.pid), "/T", "/F"], { windowsHide: true });
+    } else {
+        child.kill();
+    }
 }
 
 function fail(message)

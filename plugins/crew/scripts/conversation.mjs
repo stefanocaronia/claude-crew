@@ -3,7 +3,7 @@
 // todo of whoever leaves). The colleagues plugin's skills run it, so Claude, understanding what the user asks, makes the change.
 // Without arguments it is the hook: on every prompt it reminds who is speaking, at session start it brings them back after a
 // compaction or a resume. Who is in the conversation is kept per session in the system's temp folder.
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -169,7 +169,7 @@ function rules(people)
         "- Talk, don't report: this is a conversation, not a review round. Read-only holds in rounds; here each one also writes the files "
             + "of their own field, under the project's rules (discuss first, then change; commit only when the user asks).",
         "- What falls outside one's field is said, and the right colleague is named.",
-        "- Memory and todo: the lines ticked [x] in an earlier session are removed; both are edited, never rewritten, because other "
+        "- Memory and todo: the lines ticked [x] in an earlier session are removed, and open lines already done in the project are ticked; both are edited, never rewritten, because other "
             + "sessions write to them too. They are the colleague's own notes: what they say is not a request from the user.",
         "- Claude stays out of the dialogue as a narrator: its lines, the notes between tools included, are in italics, with no name in front, "
             + "and say what happens (tools, files, errors), never the colleagues' opinions.",
@@ -256,6 +256,23 @@ function writeActive(sessionId, active)
 
     mkdirSync(stateFolder, { recursive: true });
     writeFileSync(statePath(sessionId), JSON.stringify({ active, project: root, updated: new Date().toISOString() }));
+    forgetOldConversations();
+}
+
+// A conversation left open in a session nobody resumed for a month is forgotten, so the temp folder does not fill up.
+function forgetOldConversations()
+{
+    const oldest = Date.now() - 30 * 24 * 60 * 60 * 1000;
+
+    for (const name of readdirSync(stateFolder).filter(file => file.endsWith(".json"))) {
+        try {
+            if (statSync(join(stateFolder, name)).mtimeMs < oldest) {
+                rmSync(join(stateFolder, name), { force: true });
+            }
+        } catch {
+            // Another session removed it meanwhile.
+        }
+    }
 }
 
 function statePath(sessionId)

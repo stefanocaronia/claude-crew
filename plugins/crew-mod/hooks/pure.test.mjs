@@ -34,6 +34,10 @@ describe("colleagues from their files", () => {
         assert.deepEqual(backlogOf([], 10), []);
     });
 
+    it("takes a bold name with its colon whole, leaving no stars", () => {
+        assert.deepEqual(segmentsOf("**[Matteo]:** regge.", [matteo]).map(segment => segment.text), ["regge."]);
+    });
+
     it("reads the permissions from the tools line, every one without a line", () => {
         assert.deepEqual(permissionsOf("Read, Grep, Glob, Bash, mcp__crew-mod__step"), { read: true, write: false, test: true, web: false });
         assert.deepEqual(permissionsOf("[Read, Edit, WebFetch]"), { read: false, write: true, test: false, web: true });

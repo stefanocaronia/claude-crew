@@ -798,7 +798,7 @@ export const register: Register = (on, options) => {
             const teamRow = (colleague: Colleague, canPick = true) => colleagueCard(`idle-${colleague.id}`, [
                 face(colleague, 40, true),
                 <Box key={`lines-${colleague.id}`} flexDirection="column" flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
-                    {nameRow(`open-${colleague.id}`, colleague, [effortButton(`effort-${colleague.id}`, colleague), writeMark(colleague), opener(`open-${colleague.id}`, colleague)])}
+                    {nameRow(`open-${colleague.id}`, colleague, [writeMark(colleague), effortButton(`effort-${colleague.id}`, colleague), opener(`open-${colleague.id}`, colleague)])}
                     <Text key={`role-${colleague.id}`} dimColor wrap="truncate-end">{roleOf(colleague)}</Text>
                     <Box key={`about-${colleague.id}`} flexDirection="row" flexWrap="nowrap" alignItems="center" columnGap={1} minWidth={0} overflow="hidden">
                         <Box flexShrink={1} minWidth={0} overflow="hidden">

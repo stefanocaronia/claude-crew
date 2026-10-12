@@ -491,7 +491,7 @@ export const register: Register = (on, options) => {
                 }
 
                 return isDesktop
-                    ? tip(`write-${colleague.id}`, capitalized(say.canWrite), <ui.Svg key={`write-${colleague.id}`} source={iconSvg("pencil", 14)} alt={say.canWrite} width={14} height={14} />, { isAbove: true, isFromLeft: true })
+                    ? tip(`write-${colleague.id}`, capitalized(say.canWrite), <ui.Svg key={`write-${colleague.id}`} source={iconSvg("pencil", 14, 5)} alt={say.canWrite} width={14} height={19} />, { isAbove: true, isFromLeft: true })
                     : <Text key={`write-${colleague.id}`} dimColor>✎</Text>;
             };
             const portrait = (key: string, colleague: Colleague, isWorking = false) => (

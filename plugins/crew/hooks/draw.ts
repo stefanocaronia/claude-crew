@@ -45,7 +45,7 @@ export function barSvg(share: number, color: string | undefined, width: number):
 }
 
 /** A small line icon for the usage cards: a clock for the five hours, a calendar for the week, a bolt for the colleagues' work. */
-export function iconSvg(name: "clock" | "calendar" | "bolt" | "pencil" | "memory", size: number): string
+export function iconSvg(name: "clock" | "calendar" | "bolt" | "pencil" | "memory", size: number, top = 0): string
 {
     const stroke = `fill="none" stroke="#8a8a86" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"`;
     const shapes = {
@@ -55,7 +55,9 @@ export function iconSvg(name: "clock" | "calendar" | "bolt" | "pencil" | "memory
         pencil: `<path d="M4 20h4L19 9l-4-4L4 16z" ${stroke}/><path d="M13.5 6.5l4 4" ${stroke}/>`,
         memory: `<rect x="6" y="6" width="12" height="12" rx="2" ${stroke}/><path d="M10 2.5v3.5M14 2.5v3.5M10 18v3.5M14 18v3.5M2.5 10h3.5M2.5 14h3.5M18 10h3.5M18 14h3.5" ${stroke}/>`,
     };
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24">${shapes[name]}</svg>`;
+    // `top` pixels of room above the icon, drawn into the picture: the surface's margins come in whole rows.
+    const room = (top * 24) / size;
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size + top}" viewBox="0 ${-room} 24 ${24 + room}">${shapes[name]}</svg>`;
 }
 
 // The style block only where a drawing uses it: every character is carried in the panel's drawing, once per picture.

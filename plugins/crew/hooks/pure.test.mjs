@@ -92,6 +92,15 @@ describe("colleagues from their files", () => {
         assert.deepEqual(card.openTasks, ["uno"]);
         assert.equal(card.memory, "## 9 ottobre\n- nuovo");
     });
+
+    it("cuts a profile in sections: each bold-led paragraph of its opening, then each heading, without frontmatter or title", () => {
+        const text = "---\r\nname: matteo-conti\r\n---\r\n\r\n# Matteo Conti, architetto\r\n\r\n**Chi sei.** Un architetto.\r\n\r\nE anche altro.\r\n\r\n**Come parli:** Breve.\r\n\r\n## Come lavori\r\n\r\n- Con calma.\r\n";
+        assert.deepEqual(cardFrom("matteo-conti", text, "", "").profile, [
+            { title: "Chi sei", text: "Un architetto.\n\nE anche altro." },
+            { title: "Come parli", text: "Breve." },
+            { title: "Come lavori", text: "- Con calma." },
+        ]);
+    });
 });
 
 describe("meetings in the chat", () => {

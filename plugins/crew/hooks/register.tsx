@@ -538,6 +538,44 @@ export const register: Register = (on, options) => {
                 ];
             };
 
+            // What a task costs: on the desktop the model and its effort meter at the left, memory, tokens and while at work the time
+            // at the right, each behind its sign with its words in a hint; the terminal says them in words.
+            const costsOf = (key: string, run: Run) => {
+                const isRunning = run.status === "running";
+                const memory = say.memoryUsed(Math.round(contextShare(run) * 100));
+                const tokens = say.tokens(formatTokens(run.tokens, say.units));
+                const elapsed = isRunning ? formatTime((run.steppedAt ?? at) - run.startedAt) : "";
+
+                if (!isDesktop || !("Svg" in ui)) {
+                    return <Text key={`stats-${key}`} dimColor wrap="truncate-end">{[modelName(run.model), run.effort ? say.effort(run.effort) : "", memory, tokens, elapsed].filter(Boolean).join(" · ")}</Text>;
+                }
+
+                const effortMeter = run.effort ? effortSvg(run.effort) : undefined;
+                const figure = (icon: "memory" | "bolt" | "clock", value: string, hint?: string) => {
+                    const drawn = (
+                        <Box key={`${icon}-${key}`} flexDirection="row" alignItems="center" columnGap={1} flexShrink={0}>
+                            <ui.Svg source={iconSvg(icon, 12)} alt={hint ?? value} width={12} height={12} />
+                            <Text dimColor>{value}</Text>
+                        </Box>
+                    );
+                    return hint ? tip(`${icon}-${key}`, hint, drawn, { isAbove: true }) : drawn;
+                };
+                return (
+                    <Box key={`stats-${key}`} flexDirection="row" flexWrap="wrap" alignItems="center" justifyContent="space-between" columnGap={2} minWidth={0}>
+                        <Box flexDirection="row" alignItems="center" columnGap={1} flexShrink={0}>
+                            <Text dimColor>{modelName(run.model)}</Text>
+                            {run.effort && effortMeter ? tip(`effort-of-${key}`, say.effort(run.effort), <ui.Svg key="meter" source={effortMeter} alt={say.effort(run.effort)} width={16} height={12} />, { isAbove: true }) : null}
+                            {run.effort && !effortMeter ? <Text dimColor>{say.effort(run.effort)}</Text> : null}
+                        </Box>
+                        <Box flexDirection="row" alignItems="center" columnGap={2} flexShrink={0}>
+                            {figure("memory", `${Math.round(contextShare(run) * 100)}%`, memory)}
+                            {figure("bolt", formatTokens(run.tokens, say.units), tokens)}
+                            {elapsed ? figure("clock", elapsed) : null}
+                        </Box>
+                    </Box>
+                );
+            };
+
             const chosen = await read($, preferences);
             // The panel's settings: a gear beside the team's actions, its name written out in the empty panel.
             const openSettings = () => update($, view, current => ({ ...current, isSettingsOpen: true }));
@@ -614,7 +652,7 @@ export const register: Register = (on, options) => {
                             {face(selected, 72, Boolean(presence(selected)))}
                             <Box flexDirection="column" flexShrink={1}>
                                 {name("card-name", selected, cardNameSize)}
-                                <Text>{roleOf(selected)}</Text>
+                                <Text dimColor>{roleOf(selected)}</Text>
                                 <Box flexDirection="row" flexWrap="wrap" alignItems="center">
                                     <Text dimColor>{[presence(selected), say.toDo(selected.openTasks), selected.model ? modelName(selected.model) : ""].filter(Boolean).join(" · ")}</Text>
                                 </Box>
@@ -629,6 +667,7 @@ export const register: Register = (on, options) => {
                                     {outlined("card-work-box", [
                                         ...workLines("work", current, selected),
                                         <Box key="work-bar" marginTop={1}>{wideBar(ui, e.surface, progressOf(current) ?? contextShare(current), progressOf(current) === undefined ? undefined : selected.color)}</Box>,
+                                        costsOf("work", current),
                                     ])}
                                 </Box>
                             )
@@ -661,7 +700,6 @@ export const register: Register = (on, options) => {
                                 </Box>,
                             ])}
                         </Box>
-                        {details?.description ? <Text key="description" dimColor>{details.description}</Text> : null}
                         {details
                             ? (
                                 <Box key="card-tasks" flexDirection="column">
@@ -678,6 +716,24 @@ export const register: Register = (on, options) => {
                                 </Box>
                             )
                             : null}
+                        {details?.profile.length
+                            ? (
+                                <Box key="card-profile" flexDirection="column">
+                                    <Text bold>{say.profile}</Text>
+                                    {outlined("card-profile-list", details.profile.map((section, index) => {
+                                        const sectionKey = `${selected.id}:${index}`;
+                                        const isOpen = (panel.openProfile ?? []).includes(sectionKey);
+                                        const toggle = () => update($, view, current => ({ ...current, openProfile: isOpen ? (current.openProfile ?? []).filter(key => key !== sectionKey) : [...(current.openProfile ?? []), sectionKey] }));
+                                        return (
+                                            <Box key={`profile-${index}`} flexDirection="column">
+                                                <Button key={`profile-toggle-${index}`} label={`${isOpen ? "▾" : "▸"} ${section.title || say.profile}`} plain onPress={toggle} />
+                                                {isOpen ? <Box key={`profile-text-${index}`} paddingLeft={2} marginBottom={1}><Markdown text={section.text} /></Box> : null}
+                                            </Box>
+                                        );
+                                    }))}
+                                </Box>
+                            )
+                            : null}
                     </Box>
                 );
             }
@@ -691,37 +747,6 @@ export const register: Register = (on, options) => {
 
                 const progress = progressOf(run);
                 const isRunning = run.status === "running";
-                // What the task costs, under its bar: the model and effort, memory and tokens, and while at work the time so far.
-                const memory = say.memoryUsed(Math.round(contextShare(run) * 100));
-                const tokens = say.tokens(formatTokens(run.tokens, say.units));
-                const elapsed = isRunning ? formatTime((run.steppedAt ?? at) - run.startedAt) : "";
-                const effortMeter = run.effort ? effortSvg(run.effort) : undefined;
-                // On the desktop the model and its effort meter at the left, the figures at the right, each behind its sign.
-                const figure = (icon: "memory" | "bolt" | "clock", value: string, hint?: string) => {
-                    const drawn = (
-                        <Box key={`${icon}-${run.agentId}`} flexDirection="row" alignItems="center" columnGap={1} flexShrink={0}>
-                            {"Svg" in ui ? <ui.Svg source={iconSvg(icon, 12)} alt={hint ?? value} width={12} height={12} /> : null}
-                            <Text dimColor>{value}</Text>
-                        </Box>
-                    );
-                    return hint ? tip(`${icon}-${run.agentId}`, hint, drawn, { isAbove: true }) : drawn;
-                };
-                const costs = isDesktop
-                    ? (
-                        <Box key={`stats-${run.agentId}`} flexDirection="row" flexWrap="wrap" alignItems="center" justifyContent="space-between" columnGap={2} minWidth={0}>
-                            <Box flexDirection="row" alignItems="center" columnGap={1} flexShrink={0}>
-                                <Text dimColor>{modelName(run.model)}</Text>
-                                {run.effort && effortMeter ? tip(`effort-of-${run.agentId}`, say.effort(run.effort), <ui.Svg key="meter" source={effortMeter} alt={say.effort(run.effort)} width={16} height={12} />, { isAbove: true }) : null}
-                                {run.effort && !effortMeter ? <Text dimColor>{say.effort(run.effort)}</Text> : null}
-                            </Box>
-                            <Box flexDirection="row" alignItems="center" columnGap={2} flexShrink={0}>
-                                {figure("memory", `${Math.round(contextShare(run) * 100)}%`, memory)}
-                                {figure("bolt", formatTokens(run.tokens, say.units), tokens)}
-                                {elapsed ? figure("clock", elapsed) : null}
-                            </Box>
-                        </Box>
-                    )
-                    : <Text key={`stats-${run.agentId}`} dimColor wrap="truncate-end">{[modelName(run.model), run.effort ? say.effort(run.effort) : "", memory, tokens, elapsed].filter(Boolean).join(" · ")}</Text>;
                 const mark = isRunning ? "●" : run.status === "done" ? "✓" : "✗";
                 return colleagueCard(run.agentId, [
                     portrait(run.agentId, colleague, isRunning),
@@ -738,7 +763,7 @@ export const register: Register = (on, options) => {
                         <Box key={`progress-${run.agentId}`} marginTop={1}>
                             {wideBar(ui, e.surface, progress ?? contextShare(run), progress === undefined ? undefined : colleague.color)}
                         </Box>
-                        {costs}
+                        {costsOf(run.agentId, run)}
                     </Box>,
                 ]);
             };

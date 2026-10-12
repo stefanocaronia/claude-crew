@@ -1,7 +1,7 @@
 // A preview of the Crew panel as the desktop gets it: the mod draws the panel, the meeting band and a group-chat reply from a
 // project's real colleagues, inside `claude plugin test`; the trees it hands over become an HTML page in the app's dark colors.
 // Not the app's own paint, but its layout, portraits and wrapping. Usage:
-//   node tools/preview.mjs <project> [--out page.html] [--meeting id,id] [--working id] [--language it|en]
+//   node tools/preview.mjs <project> [--out page.html] [--meeting id,id] [--working id] [--card id] [--language it|en]
 // CLAUDE_BIN names the claude to run, when the one on the PATH is not the build the mod is made for.
 import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -16,6 +16,7 @@ const project = resolve(args.find(arg => !arg.startsWith("--") && !args[args.ind
 const out = resolve(option("out", join(project, "tmp", "crew-preview.html")));
 const meeting = option("meeting", "").split(",").filter(Boolean);
 const working = option("working", "");
+const card = option("card", "");
 const language = option("language", "it");
 // The portraits the page defines once, and a count that keeps each drawing's ids apart.
 const symbols = new Map();
@@ -129,6 +130,7 @@ test("preview", { options: { language: "${language}" }, timeoutMs: 20000 }, asyn
     await $.tool.call({ tool: "Read", file_path: "/p/private/project/DECISIONI.md", agentId: "preview-run", tool_use_id: "r1" } as never);
     await $.tool.call({ tool: "mcp__crew__step", done: 1, total: 5, note: "leggo todo, istruzioni e decisioni", agentId: "preview-run", tool_use_id: "s1" } as never);` : ""}
     const pane = await $.ui.mount({ plugin: "crew", surface: "desktop", component: "Pane", requestId: "crew", props: { title: "Crew", isFocused: false, bodyColumns: 50, placement: "dock" } as never });
+    ${card ? `await pane.press({ key: "open-${card}" });` : ""}
     console.log("PREVIEW pane " + JSON.stringify(await pane.find({})));
     ${speakers.length ? `const band = await $.ui.mount({ plugin: "crew", surface: "desktop", component: "AbovePrompt", props: { hasSurvey: false, isWorking: false, maxRows: 8, bodyColumns: 100 } as never });
     console.log("PREVIEW band " + JSON.stringify(await band.find({})));` : ""}

@@ -45,7 +45,39 @@ export function cardFrom(id: string, profile: string, todo: string, memory: stri
         description: field(profile.replace(/\r\n/g, "\n"), "description") ?? "",
         openTasks: openTasks(todo),
         memory: (sections.at(-1) ?? text.split("\n").slice(-12).join("\n")).trim(),
+        profile: profileSections(profile),
     };
+}
+
+/** A profile's body in sections: each paragraph of its opening led by a bold title ("**Who you are.** …"), then each "## " section;
+ * the frontmatter and the heading left out. */
+export function profileSections(profile: string): Card["profile"]
+{
+    const body = profile.replace(/\r\n/g, "\n").replace(/^\uFEFF?---\n[\s\S]*?\n---\n/, "").replace(/^\s*# [^\n]*\n/, "");
+    const sections: Card["profile"] = [];
+
+    for (const part of body.split(/^(?=## )/m)) {
+        if (part.startsWith("## ")) {
+            const [heading = "", ...lines] = part.split("\n");
+            sections.push({ title: heading.replace(/^##\s*/, "").trim(), text: lines.join("\n").trim() });
+            continue;
+        }
+
+        for (const paragraph of part.split(/\n\s*\n/).map(text => text.trim()).filter(Boolean)) {
+            const lead = /^\*\*([^*]+?)\*\*\s*/.exec(paragraph);
+            const last = sections.at(-1);
+
+            if (lead) {
+                sections.push({ title: (lead[1] ?? "").trim().replace(/[.:]$/, ""), text: paragraph.slice(lead[0].length).trim() });
+            } else if (last) {
+                last.text = `${last.text}\n\n${paragraph}`;
+            } else {
+                sections.push({ title: "", text: paragraph });
+            }
+        }
+    }
+
+    return sections.filter(section => section.text);
 }
 
 /** The colleague behind an agent type: "matteo-conti", or "plugin:matteo-conti" for an agent a plugin ships. */

@@ -106,6 +106,8 @@ export type PanelView = {
     isSettingsOpen?: boolean;
     /** The report the panel shows instead of the team or the card: whose, and its file in their notes. */
     reading?: { colleague: string; file: string };
+    /** The sections of a colleague's profile open on their card, as "id:index". */
+    openProfile?: string[];
 };
 
 /** A colleague's card: what their profile says of them, their open tasks and the latest lines of their memory. */
@@ -114,6 +116,8 @@ export type Card = {
     description: string;
     openTasks: string[];
     memory: string;
+    /** Their profile in sections, as their card shows them folded: each bold-led paragraph of its opening, then each "## " section. */
+    profile: { title: string; text: string }[];
     /** The newest round report in their notes folder, by name: "2026-10-11-review-the-parser.md". */
     latestReport?: string;
 };

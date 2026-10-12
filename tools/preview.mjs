@@ -167,7 +167,7 @@ button.plain{background:none;border:none;padding:0;color:#ececec;font-weight:600
 button.plain:hover{text-decoration:underline}
 select{font:inherit;background:#2c2c2b;color:#ececec;border:1px solid #3a3a38;border-radius:6px}
 .md p{margin:0 0 4px}.md ul{margin:0;padding-left:18px}.md code{background:#2c2c2b;border-radius:4px;padding:0 3px}
-.svg{display:inline-block;flex-shrink:0;line-height:0}
+.svg{display:inline-block;flex-shrink:0;line-height:0}.svg>svg{width:100%;height:100%}
 </style>${sections.join("")}${symbolDefinitions()}`;
 }
 
@@ -195,7 +195,8 @@ function element(node, isInline)
         case "Button":
             return `<button class="${props.plain ? "plain" : ""}">${escape(String(props.label ?? node.text ?? ""))}</button>`;
         case "Svg":
-            return `<span class="svg" style="width:${props.width}px;height:${props.height}px">${inlineSvg(String(props.source ?? ""))}</span>`;
+            // Without a width, the drawing takes the room it is given, as the app's image does.
+            return `<span class="svg" style="${props.width ? `width:${props.width}px` : "display:block;flex:1 1 auto;min-width:0"};height:${props.height}px">${inlineSvg(String(props.source ?? ""))}</span>`;
         case "Markdown":
             return `<div class="md${props.dimColor ? " dim" : ""}">${markdown(String(props.text ?? ""))}</div>`;
         case "Select":

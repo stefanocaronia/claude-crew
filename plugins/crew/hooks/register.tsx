@@ -6,7 +6,7 @@ import type { EngineInterface, Register } from "claude-code";
 
 import type { Activity, Colleague, Meeting, Permissions, Preferences, Run, Speaker, WeeklyCounts } from "../types";
 
-import { avatarSvg, barSvg, blankSvg, captionSvg, claudeSvg, effortSvg, iconSvg, nameSvg, thumbnailSvg, wideBarSvg } from "./draw.ts";
+import { avatarSvg, barEndSvg, barSvg, blankSvg, captionSvg, claudeSvg, effortSvg, iconSvg, nameSvg, thumbnailSvg, wideBarSvg } from "./draw.ts";
 import { claudeId, segmentsOf, speakersOf } from "./meeting.ts";
 import { imagePathsIn, imageTypeOf, isInside, isOwnMemory, resolvedPath } from "./paths.ts";
 import { contextShare, progressOf, totalTime, withCount } from "./progress.ts";
@@ -405,12 +405,12 @@ export const register: Register = (on, options) => {
             };
             const isDesktop = e.surface !== "terminal" && "Svg" in ui;
             // A hint under the pointer, for the controls that are only a sign: the desktop shows it on hover, the terminal draws none.
-            // Below the control, or above it at the foot of a card, which cuts what overflows it.
-            const tip = (key: string, hint: string, control: JSX.Element, isAbove = false) => (isDesktop
+            // Below the control, or above it at the foot of a card, which cuts what overflows it; from the control's left at a card's left.
+            const tip = (key: string, hint: string, control: JSX.Element, place: { isAbove?: boolean; isFromLeft?: boolean } = {}) => (isDesktop
                 ? (
                     <Box key={`tip-${key}`} flexShrink={0}>
                         {control}
-                        <Box position="absolute" {...(isAbove ? { bottom: 1 } : { top: 1 })} right={0} display="none" hover={{ display: "flex" }} backgroundColor={tooltipBackground} borderStyle="round" borderColor={outline} paddingX={1}>
+                        <Box position="absolute" {...(place.isAbove ? { bottom: 1 } : { top: 1 })} {...(place.isFromLeft ? { left: 0 } : { right: 0 })} display="none" hover={{ display: "flex" }} backgroundColor={tooltipBackground} borderStyle="round" borderColor={outline} paddingX={1}>
                             <Text color={tooltipText} wrap="truncate-end">{hint}</Text>
                         </Box>
                     </Box>
@@ -482,16 +482,23 @@ export const register: Register = (on, options) => {
             };
             // The button that opens a colleague's card.
             const opener = (key: string, colleague: Colleague, onPress = open(colleague), hint = say.openCard) => tip(key, hint, <Button key={key} label="❯" plain onPress={onPress} />);
-            // A pencil left of the opener, only for a colleague who may change the project's files.
+            // A pencil under the portrait, only for a colleague who may change the project's files: a mark, not a control, so away from the
+            // opener; its meaning in a hint.
             const writeMark = (colleague: Colleague) => {
                 if (!colleague.permissions.write) {
                     return null;
                 }
 
                 return isDesktop
-                    ? <ui.Svg key={`write-${colleague.id}`} source={iconSvg("pencil", 14)} alt={say.canWrite} width={14} height={14} />
+                    ? tip(`write-${colleague.id}`, capitalized(say.canWrite), <ui.Svg key={`write-${colleague.id}`} source={iconSvg("pencil", 14)} alt={say.canWrite} width={14} height={14} />, { isAbove: true, isFromLeft: true })
                     : <Text key={`write-${colleague.id}`} dimColor>✎</Text>;
             };
+            const portrait = (key: string, colleague: Colleague, isWorking = false) => (
+                <Box key={`portrait-${key}`} flexDirection="column" alignItems="center" flexShrink={0}>
+                    {face(colleague, 40, true, isWorking)}
+                    {writeMark(colleague)}
+                </Box>
+            );
             const about = (colleague: Colleague) => say.toDo(colleague.openTasks);
             // Each colleague in an outlined card, the portrait at its top left; the cards make a grid that takes a second column when the
             // pane is wide.
@@ -697,14 +704,14 @@ export const register: Register = (on, options) => {
                             <Text dimColor>{value}</Text>
                         </Box>
                     );
-                    return hint ? tip(`${icon}-${run.agentId}`, hint, drawn, true) : drawn;
+                    return hint ? tip(`${icon}-${run.agentId}`, hint, drawn, { isAbove: true }) : drawn;
                 };
                 const costs = isDesktop
                     ? (
                         <Box key={`stats-${run.agentId}`} flexDirection="row" flexWrap="wrap" alignItems="center" justifyContent="space-between" columnGap={2} minWidth={0}>
                             <Box flexDirection="row" alignItems="center" columnGap={1} flexShrink={0}>
                                 <Text dimColor>{modelName(run.model)}</Text>
-                                {run.effort && effortMeter ? tip(`effort-of-${run.agentId}`, say.effort(run.effort), <ui.Svg key="meter" source={effortMeter} alt={say.effort(run.effort)} width={16} height={12} />, true) : null}
+                                {run.effort && effortMeter ? tip(`effort-of-${run.agentId}`, say.effort(run.effort), <ui.Svg key="meter" source={effortMeter} alt={say.effort(run.effort)} width={16} height={12} />, { isAbove: true }) : null}
                                 {run.effort && !effortMeter ? <Text dimColor>{say.effort(run.effort)}</Text> : null}
                             </Box>
                             <Box flexDirection="row" alignItems="center" columnGap={2} flexShrink={0}>
@@ -717,13 +724,12 @@ export const register: Register = (on, options) => {
                     : <Text key={`stats-${run.agentId}`} dimColor wrap="truncate-end">{[modelName(run.model), run.effort ? say.effort(run.effort) : "", memory, tokens, elapsed].filter(Boolean).join(" · ")}</Text>;
                 const mark = isRunning ? "●" : run.status === "done" ? "✓" : "✗";
                 return colleagueCard(run.agentId, [
-                    face(colleague, 40, true, isRunning),
+                    portrait(run.agentId, colleague, isRunning),
                     <Box key={`lines-${run.agentId}`} flexDirection="column" flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
                         {nameRow(isRunning ? `open-${colleague.id}` : `open-run-${run.agentId}`, colleague, [
                             isRunning
                                 ? <Text key={`mark-${run.agentId}`} color={colleague.color}>{mark}</Text>
                                 : tip(`back-${run.agentId}`, say.sendBack, <Button key={`back-${run.agentId}`} label={mark} plain onPress={() => sendBack([colleague.id])} />),
-                            writeMark(colleague),
                             // Once finished, the opener shows what they answered.
                             isRunning || !run.report ? opener(isRunning ? `open-${colleague.id}` : `open-run-${run.agentId}`, colleague) : opener(`open-run-${run.agentId}`, colleague, () => openReport($, colleague.id, run.report ?? ""), say.readReport),
                         ])}
@@ -737,9 +743,9 @@ export const register: Register = (on, options) => {
                 ]);
             };
             const teamRow = (colleague: Colleague, canPick = true) => colleagueCard(`idle-${colleague.id}`, [
-                face(colleague, 40, true),
+                portrait(colleague.id, colleague),
                 <Box key={`lines-${colleague.id}`} flexDirection="column" flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
-                    {nameRow(`open-${colleague.id}`, colleague, [writeMark(colleague), opener(`open-${colleague.id}`, colleague)])}
+                    {nameRow(`open-${colleague.id}`, colleague, [opener(`open-${colleague.id}`, colleague)])}
                     <Text key={`role-${colleague.id}`} dimColor wrap="truncate-end">{roleOf(colleague)}</Text>
                     <Box key={`about-${colleague.id}`} flexDirection="row" flexWrap="nowrap" alignItems="center" minWidth={0} overflow="hidden">
                         <Box flexShrink={1} minWidth={0} overflow="hidden">
@@ -1012,17 +1018,26 @@ function faceOf(ui: Table, surface: string, colleague: Speaker, size: number, st
     return <ui.Svg key={`face-${colleague.id}-${stamp}`} source={avatarSvg(colleague, picture === "initials" ? undefined : (picture === "small" ? smallPortraits : portraits).get(colleague.id), size, isRinged, isWorking)} alt={colleague.fullName} width={size} height={size} />;
 }
 
-// A progress bar as wide as the card: the markup stretches to the room the surface gives it.
+// A progress bar as wide as the card: its square middle stretches to the room the surface gives it, between two rounded ends of
+// a fixed size, which stretching would flatten.
 function wideBar(ui: Table, surface: string, share: number, color: string | undefined)
 {
-    const { Text } = ui;
+    const { Box, Text } = ui;
 
     if (surface === "terminal" || !("Svg" in ui)) {
         const filled = Math.round(24 * Math.max(0, Math.min(1, share)));
         return <Text key="bar" color={color} dimColor={!color}>{"█".repeat(filled) + "░".repeat(24 - filled)}</Text>;
     }
 
-    return <ui.Svg key="bar" source={wideBarSvg(share, color)} alt={`${Math.round(share * 100)}%`} height={6} />;
+    return (
+        <Box key="bar" flexDirection="row" flexWrap="nowrap" flexGrow={1} minWidth={0}>
+            <ui.Svg key="bar-start" source={barEndSvg("start", color, share > 0)} alt="" width={3} height={6} />
+            <Box key="bar-middle" flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
+                <ui.Svg key="bar-fill" source={wideBarSvg(share, color)} alt={`${Math.round(share * 100)}%`} height={6} />
+            </Box>
+            <ui.Svg key="bar-end" source={barEndSvg("end", color, share >= 1)} alt="" width={3} height={6} />
+        </Box>
+    );
 }
 
 function bar(ui: Table, surface: string, share: number, color: string | undefined)

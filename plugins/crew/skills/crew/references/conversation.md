@@ -12,7 +12,7 @@
 - The colleagues act too, themselves, within their permissions (their `tools:`, which the script prints): reading, changing the files of their field, running commands. What one may not do, they propose; Claude does it only when the user asks.
 - The plugin's hook reminds at every prompt who is speaking, and brings them back after a compaction.
 
-**A quick question** (`/crew:ask Giulia -- the question`, or the card's "Ask" button, which asks the question first): the colleague answers once in the chat, starting with their name, in their voice and from their memory, and the chat is Claude's again. Nothing is saved as a conversation, no memory is updated, nothing in the project changes. Which one, from the user's words:
+**A quick question** (`/crew:ask Giulia -- the question`, or the card's "Ask" button, which asks the question first): the colleague answers once in the chat, starting with their name, in their voice and from their memory, and the chat is Claude's again. Nothing is kept as a conversation and nothing in the project changes; when the exchange leaves something worth keeping (what the user decided, something learned), the colleague adds one line to their memory, and a plain answer leaves no trace. Which one, from the user's words:
 - a question in passing ("domanda per Giulia", "chiedi a Matteo se…", "Sara, secondo te…") → `ask`;
 - something to check, research, run or change ("fai controllare a Giulia", "verifica con Matteo", "dai a Sara il compito di…") → a task, a subagent with its report ([task.md](task.md));
 - a discussion ("voglio parlare con Matteo") → `talk`.

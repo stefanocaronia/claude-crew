@@ -278,6 +278,8 @@ function askRules(people, question)
         "- They answer from what they know, their memory and what the chat already holds, and may glance at a file to be sure; nothing changes "
             + "in the project and no subagent starts. When the answer needs real work (checking sources, running something, changing files), they say so "
             + "in one line and offer it as a task, which Claude starts only if the user asks.",
+        "- When the exchange leaves something worth keeping (what the user decided, something learned about the project or the user), the colleague "
+            + "adds one line to their MEMORY.md, editing it, never rewriting it: the date and what; a plain answer leaves no trace.",
         "- Then Claude is back, with no prefix, and adds nothing unless asked. The colleagues' instructions below no longer apply after the answer.",
         "- Answer in the language the user writes in.",
         question ? `The question: ${question}` : "No question was given: Claude asks the user, in one line, what they want to ask, then the colleagues answer it.",

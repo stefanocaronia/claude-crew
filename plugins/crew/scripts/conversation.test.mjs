@@ -70,6 +70,7 @@ describe("the commands", () => {
         assert.match(text, /The answer starts with \[Giulia\]/);
         assert.match(text, /The question: tengo il più alto di tre dadi\?/);
         assert.match(text, /Giulia remembers the playtest/);
+        assert.match(text, /adds one line to their MEMORY\.md/);
         assert.equal(hook({ hook_event_name: "UserPromptSubmit", session_id: "ask", prompt: "ciao" }), "");
         assert.match(run("ask", "ask", "Giulia"), /No question was given/);
     });

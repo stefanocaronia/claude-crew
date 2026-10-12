@@ -2,7 +2,7 @@
 
 What changes for whoever uses Crew, version by version. Plugins update in a new chat: `/plugin`, Marketplaces, claude-crew, Update marketplace, or turn its auto-update on there.
 
-## 0.7.1 – 0.8.7
+## 0.7.1 – 0.8.8
 
 - A colleague's card at work has one thing a line: the task, the step in progress with its number in their color, what they are doing now with its sign (📄 reading, ✎ editing, 🔎 searching, ▶ a command, told by the command's own description), then the bar and what the task costs: the model with its effort meter at the left, memory, tokens and time at the right behind their signs. The role is dimmed; the pencil of a colleague who may change files sits under their portrait, with a hint. The bar keeps its rounded ends at any width. Their card in the panel shows the same while they work.
 - Finished, a card says how long the task took and has a Report button that opens what they answered.

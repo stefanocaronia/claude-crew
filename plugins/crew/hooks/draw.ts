@@ -31,8 +31,10 @@ export function avatarSvg(colleague: Speaker, uri: string | undefined, size: num
 export function claudeSvg(size: number): string
 {
     const rows = [".X........X.", "..X......X..", "..XXXXXXXX..", ".XXXXXXXXXX.", ".XXEEXXEEXX.", "XXXEEXXEEXXX", "XXXXXXXXXXXX", ".XXXXXXXXXX.", "..X.X..X.X..", "..X.X..X.X.."];
-    const cells = rows.flatMap((row, y) => [...row].flatMap((cell, x) => (cell === "." ? [] : [`<rect x="${x + 2}" y="${y + 3}" width="1" height="1" fill="${cell === "E" ? "#2B1D17" : "#D97757"}"/>`])));
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="${size}" height="${size}" shape-rendering="crispEdges"><circle cx="8" cy="8" r="8" fill="#F3E6DC"/>${cells.join("")}</svg>`;
+    // Each run of one color on a row is one rectangle, so no seam shows between pixels.
+    const runs = rows.flatMap((row, y) => [...row.matchAll(/X+|E+/g)].map(run => `<rect x="${(run.index ?? 0) + 2}" y="${y + 3}" width="${run[0].length}" height="1" fill="${run[0][0] === "E" ? "#2B1D17" : "#D97757"}"/>`));
+    // A smooth circle; only the critter inside is drawn in pixels.
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="${size}" height="${size}"><circle cx="8" cy="8" r="8" fill="#F3E6DC"/><g shape-rendering="crispEdges">${runs.join("")}</g></svg>`;
 }
 
 export function barSvg(share: number, color: string | undefined, width: number): string

@@ -432,9 +432,10 @@ export const register: Register = (on, options) => {
             const pick = (colleague: Colleague) => {
                 const isPicked = picked.includes(colleague.id);
                 const box = isDesktop
-                    ? <Button key={`pick-${colleague.id}`} label={isPicked ? "✓" : "\u2002"} {...(isPicked ? { variant: "primary" as const } : {})} onPress={() => togglePick(colleague)} />
+                    ? <Button key={`pick-${colleague.id}`} label={isPicked ? "✓" : "\u2009"} {...(isPicked ? { variant: "primary" as const } : {})} onPress={() => togglePick(colleague)} />
                     : <Button key={`pick-${colleague.id}`} label={isPicked ? "☑\uFE0E" : "☐"} plain onPress={() => togglePick(colleague)} />;
-                return tip(`pick-${colleague.id}`, say.pickTip, box);
+                // Above it: the box sits on the card's last row, and the card cuts what overflows it.
+                return tip(`pick-${colleague.id}`, say.pickTip, box, { isAbove: true });
             };
 
             const pickedTeam = picked.flatMap(id => byId.get(id) ?? []);
@@ -446,8 +447,25 @@ export const register: Register = (on, options) => {
                 void $.prompt.submit({ text, asUser: true });
             };
             // A click on a colleague's effort moves it to the next level, round to the session's own.
+            // On the desktop the effort's meter, as on a card at work, its words in a hint; the terminal says the words.
             const effortButton = (key: string, colleague: Colleague) => {
-                return <Button key={key} label={colleague.effort ? say.effort(colleague.effort) : say.sessionEffort} plain dimColor onPress={() => setEffort($, colleague.id, nextEffort(colleague.effort))} />;
+                const words = colleague.effort ? say.effort(colleague.effort) : say.sessionEffort;
+                const onPress = () => setEffort($, colleague.id, nextEffort(colleague.effort));
+                const meter = effortSvg(colleague.effort ?? "");
+
+                if (!isDesktop || !meter || !("Svg" in ui)) {
+                    return <Button key={key} label={words} plain dimColor onPress={onPress} />;
+                }
+
+                // A Button holds only text: the meter is drawn, and a clear button of its size laid over it takes the press.
+                return tip(key, words, (
+                    <Box key={`${key}-meter`} flexShrink={0} alignItems="center">
+                        <ui.Svg source={meter} alt={words} width={16} height={12} />
+                        <Box position="absolute" top={0} left={0}>
+                            <Button key={key} label={"\u2003\u2003"} plain onPress={onPress} />
+                        </Box>
+                    </Box>
+                ), { isAbove: true });
             };
             // The panel's actions are the crew plugin's commands, which ask in the chat what the request leaves open: what to review, the
             // meeting's topic, the new colleague's field, the portraits' style, a yes before a firing. The picks are used up.
@@ -778,9 +796,9 @@ export const register: Register = (on, options) => {
                 <Box key={`lines-${colleague.id}`} flexDirection="column" flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
                     {nameRow(`open-${colleague.id}`, colleague, [opener(`open-${colleague.id}`, colleague)])}
                     <Text key={`role-${colleague.id}`} dimColor wrap="truncate-end">{roleOf(colleague)}</Text>
-                    <Box key={`about-${colleague.id}`} flexDirection="row" flexWrap="nowrap" alignItems="center" minWidth={0} overflow="hidden">
+                    <Box key={`about-${colleague.id}`} flexDirection="row" flexWrap="nowrap" alignItems="center" columnGap={1} minWidth={0} overflow="hidden">
                         <Box flexShrink={1} minWidth={0} overflow="hidden">
-                            <Text dimColor wrap="truncate-end">{`${about(colleague)} · `}</Text>
+                            <Text dimColor wrap="truncate-end">{`${about(colleague)} ·`}</Text>
                         </Box>
                         {effortButton(`effort-${colleague.id}`, colleague)}
                         <Box flexGrow={1} />

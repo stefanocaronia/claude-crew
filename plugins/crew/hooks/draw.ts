@@ -116,9 +116,10 @@ export function blankSvg(width: number, height: number): string
 /** The effort a task needs as four gray bars, low to max; undefined for a level it does not know. */
 export function effortSvg(level: string): string | undefined
 {
-    const filled = ({ low: 1, medium: 2, high: 3, xhigh: 4, max: 4 } as Record<string, number>)[level.toLowerCase()];
+    // No level is the session's own effort: the four bars, none filled.
+    const filled = level ? ({ low: 1, medium: 2, high: 3, xhigh: 4, max: 4 } as Record<string, number>)[level.toLowerCase()] : 0;
 
-    if (!filled) {
+    if (filled === undefined) {
         return undefined;
     }
 

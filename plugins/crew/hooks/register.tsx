@@ -473,7 +473,7 @@ export const register: Register = (on, options) => {
                             <Button key={key} label={"\u2003\u2003"} plain onPress={onPress} />
                         </Box>
                     </Box>
-                ), { isAbove: true });
+                ));
             };
             // The panel's actions are the crew plugin's commands, which ask in the chat what the request leaves open: what to review, the
             // meeting's topic, the new colleague's field, the portraits' style, a yes before a firing. The picks are used up.
@@ -511,23 +511,16 @@ export const register: Register = (on, options) => {
             };
             // The button that opens a colleague's card.
             const opener = (key: string, colleague: Colleague, onPress = open(colleague), hint = say.openCard) => tip(key, hint, <Button key={key} label="❯" plain onPress={onPress} />);
-            // A pencil under the portrait, only for a colleague who may change the project's files: a mark, not a control, so away from the
-            // opener; its meaning in a hint.
+            // A pencil beside the opener, only for a colleague who may change the project's files; its meaning in a hint.
             const writeMark = (colleague: Colleague) => {
                 if (!colleague.permissions.write) {
                     return null;
                 }
 
                 return isDesktop
-                    ? tip(`write-${colleague.id}`, capitalized(say.canWrite), <ui.Svg key={`write-${colleague.id}`} source={iconSvg("pencil", 14, 5)} alt={say.canWrite} width={14} height={19} />, { isAbove: true, isFromLeft: true })
+                    ? tip(`write-${colleague.id}`, capitalized(say.canWrite), <ui.Svg key={`write-${colleague.id}`} source={iconSvg("pencil", 14)} alt={say.canWrite} width={14} height={14} />)
                     : <Text key={`write-${colleague.id}`} dimColor>✎</Text>;
             };
-            const portrait = (key: string, colleague: Colleague, isWorking = false) => (
-                <Box key={`portrait-${key}`} flexDirection="column" alignItems="center" flexShrink={0}>
-                    {face(colleague, 40, true, isWorking)}
-                    {writeMark(colleague)}
-                </Box>
-            );
             const about = (colleague: Colleague) => say.toDo(colleague.openTasks);
             // Each colleague in an outlined card, the portrait at its top left; the cards make a grid that takes a second column when the
             // pane is wide.
@@ -780,12 +773,13 @@ export const register: Register = (on, options) => {
                 const isRunning = run.status === "running";
                 const mark = isRunning ? "●" : run.status === "done" ? "✓" : "✗";
                 return colleagueCard(run.agentId, [
-                    portrait(run.agentId, colleague, isRunning),
+                    face(colleague, 40, true, isRunning),
                     <Box key={`lines-${run.agentId}`} flexDirection="column" flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
                         {nameRow(isRunning ? `open-${colleague.id}` : `open-run-${run.agentId}`, colleague, [
                             isRunning
                                 ? <Text key={`mark-${run.agentId}`} color={colleague.color}>{mark}</Text>
                                 : tip(`back-${run.agentId}`, say.sendBack, <Button key={`back-${run.agentId}`} label={mark} plain onPress={() => sendBack([colleague.id])} />),
+                            writeMark(colleague),
                             // Once finished, the opener shows what they answered.
                             isRunning || !run.report ? opener(isRunning ? `open-${colleague.id}` : `open-run-${run.agentId}`, colleague) : opener(`open-run-${run.agentId}`, colleague, () => openReport($, colleague.id, run.report ?? ""), say.readReport),
                         ])}
@@ -800,15 +794,14 @@ export const register: Register = (on, options) => {
             };
             // A free colleague's card, tinted in their color once picked.
             const teamRow = (colleague: Colleague, canPick = true) => colleagueCard(`idle-${colleague.id}`, [
-                portrait(colleague.id, colleague),
+                face(colleague, 40, true),
                 <Box key={`lines-${colleague.id}`} flexDirection="column" flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
-                    {nameRow(`open-${colleague.id}`, colleague, [opener(`open-${colleague.id}`, colleague)])}
+                    {nameRow(`open-${colleague.id}`, colleague, [effortButton(`effort-${colleague.id}`, colleague), writeMark(colleague), opener(`open-${colleague.id}`, colleague)])}
                     <Text key={`role-${colleague.id}`} dimColor wrap="truncate-end">{roleOf(colleague)}</Text>
                     <Box key={`about-${colleague.id}`} flexDirection="row" flexWrap="nowrap" alignItems="center" columnGap={1} minWidth={0} overflow="hidden">
                         <Box flexShrink={1} minWidth={0} overflow="hidden">
                             <Text dimColor wrap="truncate-end">{about(colleague)}</Text>
                         </Box>
-                        {effortButton(`effort-${colleague.id}`, colleague)}
                         <Box flexGrow={1} />
                         {canPick ? pick(colleague) : null}
                     </Box>

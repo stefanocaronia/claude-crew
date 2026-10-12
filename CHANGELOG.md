@@ -2,11 +2,11 @@
 
 What changes for whoever uses Crew, version by version. Plugins update in a new chat: `/plugin`, Marketplaces, claude-crew, Update marketplace, or turn its auto-update on there.
 
-## 0.9.0 – 0.9.5
+## 0.9.0 – 0.9.6
 
 - A quick question to a colleague: `/crew:ask Giulia -- the question`, "domanda per Giulia: …", or the Ask button on their card. They answer at once in the chat, in their own voice, and the chat is Claude's again: no task, no report, no meeting; what the exchange leaves worth keeping (your decision, something learned) becomes one line of their memory. A second question to the same colleague within ten minutes opens a conversation with them; a question that needs real work becomes a task at once. Something to check or change is still a task with its report; when in doubt Claude asks quickly.
 
-- On a free colleague's card the effort is its meter, as on a card at work, pressed to change it, its words in a hint; the box that picks is a small square, ticked in the colleague's color, its hint above it.
+- On a free colleague's card the effort is its meter, as on a card at work, beside the pencil and the opener on the name's row, pressed to change it, its words in a hint; the box that picks is a small square, ticked in the colleague's color, its hint above it.
 
 ## 0.7.1 – 0.8.12
 

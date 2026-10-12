@@ -14,7 +14,7 @@ const stateFolder = join(tmpdir(), "claude-crew");
 // Claude Code moves an additionalContext above 10,000 characters to a file: what does not fit is left to Read.
 const contextBudget = 9800;
 // A question to a colleague asked again within this time is a follow-up: the conversation opens.
-const followUpWindow = 20 * 60 * 1000;
+const followUpWindow = 10 * 60 * 1000;
 // Sections of a colleague's file that only serve the review rounds: in a conversation the rules below take their place.
 const roundOnlySections = /^## (?:What you return|Your memory|Cosa restituisci|La tua memoria)\b[^\n]*\n[\s\S]*?(?=^## |(?![\s\S]))/gm;
 const commands = "To bring someone in, let someone go or close the conversation, Claude runs /crew:invite, /crew:leave or "

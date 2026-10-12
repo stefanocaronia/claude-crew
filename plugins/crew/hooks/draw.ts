@@ -71,6 +71,13 @@ const tints: Record<string, [string, string]> = {
     cyan: ["#0e7490", "#22d3ee"],
 };
 
+/** A colleague's color as a faint background, for a card that is picked: its light tint at a tenth, readable in either theme. */
+export function pickedTint(color: string): string
+{
+    const tint = tints[color.toLowerCase()]?.[1] ?? (/^#[0-9a-f]{6}$/i.test(color) ? color : "#808080");
+    return `${tint}1f`;
+}
+
 /** A colleague's name drawn in bold at `size` px, in their color as the theme reads best; its width estimated from the letters. */
 export function nameSvg(name: string, color: string, size: number): { source: string; width: number; height: number }
 {

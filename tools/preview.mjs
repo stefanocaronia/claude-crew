@@ -1,7 +1,7 @@
 // A preview of the Crew panel as the desktop gets it: the mod draws the panel, the meeting band and a group-chat reply from a
 // project's real colleagues, inside `claude plugin test`; the trees it hands over become an HTML page in the app's dark colors.
 // Not the app's own paint, but its layout, portraits and wrapping. Usage:
-//   node tools/preview.mjs <project> [--out page.html] [--meeting id,id] [--working id] [--card id] [--language it|en]
+//   node tools/preview.mjs <project> [--out page.html] [--meeting id,id] [--working id] [--card id] [--pick id] [--language it|en]
 // CLAUDE_BIN names the claude to run, when the one on the PATH is not the build the mod is made for.
 import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -17,6 +17,7 @@ const out = resolve(option("out", join(project, "tmp", "crew-preview.html")));
 const meeting = option("meeting", "").split(",").filter(Boolean);
 const working = option("working", "");
 const card = option("card", "");
+const pick = option("pick", "");
 const language = option("language", "it");
 // The portraits the page defines once, and a count that keeps each drawing's ids apart.
 const symbols = new Map();
@@ -131,6 +132,7 @@ test("preview", { options: { language: "${language}" }, timeoutMs: 20000 }, asyn
     await $.tool.call({ tool: "mcp__crew__step", done: 1, total: 5, note: "leggo todo, istruzioni e decisioni", agentId: "preview-run", tool_use_id: "s1" } as never);` : ""}
     const pane = await $.ui.mount({ plugin: "crew", surface: "desktop", component: "Pane", requestId: "crew", props: { title: "Crew", isFocused: false, bodyColumns: 50, placement: "dock" } as never });
     ${card ? `await pane.press({ key: "open-${card}" });` : ""}
+    ${pick ? `await pane.press({ key: "pick-${pick}" });` : ""}
     console.log("PREVIEW pane " + JSON.stringify(await pane.find({})));
     ${speakers.length ? `const band = await $.ui.mount({ plugin: "crew", surface: "desktop", component: "AbovePrompt", props: { hasSurvey: false, isWorking: false, maxRows: 8, bodyColumns: 100 } as never });
     console.log("PREVIEW band " + JSON.stringify(await band.find({})));` : ""}
@@ -195,7 +197,8 @@ function element(node, isInline)
             return `<span class="${classes.filter(Boolean).join(" ")}" style="${color}">${children.join("")}</span>`;
         }
         case "Button":
-            return `<button class="${props.plain ? "plain" : ""}">${escape(String(props.label ?? node.text ?? ""))}</button>`;
+            // Children of text are drawn in the label's place, as the app does; the label then only names the control.
+            return `<button class="${props.plain ? "plain" : ""}">${node.children?.length ? node.children.map(child => (typeof child === "string" ? escape(child).replace(/\n/g, "<br>") : element(child, true))).join("") : escape(String(props.label ?? node.text ?? ""))}</button>`;
         case "Svg":
             // Without a width, the drawing takes the room it is given, as the app's image does.
             return `<span class="svg" style="${props.width ? `width:${props.width}px` : "display:block;flex:1 1 auto;min-width:0"};height:${props.height}px">${inlineSvg(String(props.source ?? ""))}</span>`;
@@ -244,6 +247,7 @@ function boxStyle(props)
         props.rowGap !== undefined ? `row-gap:${cell(props.rowGap)}` : "",
         props.paddingLeft !== undefined ? `padding-left:${cell(props.paddingLeft)}` : "",
         props.marginBottom !== undefined ? `margin-bottom:${cell(props.marginBottom)}` : "",
+        props.backgroundColor ? `background:${props.backgroundColor}` : "",
         props.marginTop !== undefined ? `margin-top:${cell(props.marginTop)}` : "",
         props.overflow === "hidden" ? "overflow:hidden" : "",
         // A box shown only under the pointer, as the hints are, stays hidden here.

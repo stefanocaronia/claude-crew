@@ -6,7 +6,7 @@ import type { EngineInterface, Register } from "claude-code";
 
 import type { Activity, Colleague, Meeting, Permissions, Preferences, Run, Speaker, WeeklyCounts } from "../types";
 
-import { avatarSvg, barEndSvg, barSvg, blankSvg, captionSvg, claudeSvg, effortSvg, iconSvg, nameSvg, thumbnailSvg, wideBarSvg } from "./draw.ts";
+import { avatarSvg, barEndSvg, barSvg, blankSvg, pickedTint, captionSvg, claudeSvg, effortSvg, iconSvg, nameSvg, thumbnailSvg, wideBarSvg } from "./draw.ts";
 import { claudeId, segmentsOf, speakersOf } from "./meeting.ts";
 import { imagePathsIn, imageTypeOf, isInside, isOwnMemory, resolvedPath } from "./paths.ts";
 import { contextShare, progressOf, totalTime, withCount } from "./progress.ts";
@@ -427,14 +427,8 @@ export const register: Register = (on, options) => {
             // Only who is free can be picked: a colleague at work or in the meeting takes no other task.
             const picked = (panel.picked ?? []).filter(id => byId.has(id) && !busy.has(id) && !inMeeting.has(id));
             // A small square box in the text's color: an outline, checked when picked; a background only under the pointer.
-            const pick = (colleague: Colleague) => tip(`pick-${colleague.id}`, say.pickTip, (
-                <Button
-                    key={`pick-${colleague.id}`}
-                    label={picked.includes(colleague.id) ? "☑\uFE0E" : "☐"}
-                    plain
-                    onPress={() => update($, view, current => ({ ...current, picked: (current.picked ?? []).includes(colleague.id) ? (current.picked ?? []).filter(id => id !== colleague.id) : [...(current.picked ?? []), colleague.id] }))}
-                />
-            ));
+            const togglePick = (colleague: Colleague) => update($, view, current => ({ ...current, picked: (current.picked ?? []).includes(colleague.id) ? (current.picked ?? []).filter(id => id !== colleague.id) : [...(current.picked ?? []), colleague.id] }));
+            const pick = (colleague: Colleague) => tip(`pick-${colleague.id}`, say.pickTip, <Button key={`pick-${colleague.id}`} label={picked.includes(colleague.id) ? "☑\uFE0E" : "☐"} plain onPress={() => togglePick(colleague)} />);
 
             const pickedTeam = picked.flatMap(id => byId.get(id) ?? []);
             const pickedNames = pickedTeam.length ? listNames(pickedTeam.map(colleague => colleague.name), say.and, say.comma) : "";
@@ -502,8 +496,9 @@ export const register: Register = (on, options) => {
             const about = (colleague: Colleague) => say.toDo(colleague.openTasks);
             // Each colleague in an outlined card, the portrait at its top left; the cards make a grid that takes a second column when the
             // pane is wide.
-            const colleagueCard = (key: string, children: (JSX.Element | null)[]) => (
-                <Box key={key} flexDirection="row" flexWrap="nowrap" gap={1} alignItems="flex-start" flexGrow={1} flexShrink={1} width={cardWidth} overflow="hidden" borderStyle="round" {...border} paddingX={1} {...(isDesktop ? { hover: { backgroundColor: stateLayer } } : {})}>
+            // A picked card is tinted in the colleague's color, under the pointer too.
+            const colleagueCard = (key: string, children: (JSX.Element | null)[], tint?: string) => (
+                <Box key={key} flexDirection="row" flexWrap="nowrap" gap={1} alignItems="flex-start" flexGrow={1} flexShrink={1} width={cardWidth} overflow="hidden" borderStyle="round" {...border} paddingX={1} {...(tint ? { backgroundColor: tint } : {})} {...(isDesktop ? { hover: { backgroundColor: tint ?? stateLayer } } : {})}>
                     {children}
                 </Box>
             );
@@ -767,7 +762,22 @@ export const register: Register = (on, options) => {
                     </Box>,
                 ]);
             };
-            const teamRow = (colleague: Colleague, canPick = true) => colleagueCard(`idle-${colleague.id}`, [
+            // On the desktop a press on a free colleague's lines picks them: the whole text is one control, the card tinted once picked;
+            // their effort changes on their own card. The terminal keeps the box that picks and the effort that cycles.
+            const teamRow = (colleague: Colleague, canPick = true) => (isDesktop && canPick
+                ? colleagueCard(`idle-${colleague.id}`, [
+                    portrait(colleague.id, colleague),
+                    <Box key={`lines-${colleague.id}`} flexDirection="column" flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
+                        {nameRow(`open-${colleague.id}`, colleague, [opener(`open-${colleague.id}`, colleague)])}
+                        <Button key={`pick-${colleague.id}`} label={say.pickTip} plain onPress={() => togglePick(colleague)}>
+                            <Text dimColor>{roleOf(colleague)}</Text>
+                            {"\n"}
+                            <Text dimColor>{[about(colleague), colleague.effort ? say.effort(colleague.effort) : say.sessionEffort].join(" · ")}</Text>
+                        </Button>
+                    </Box>,
+                ], picked.includes(colleague.id) ? pickedTint(colleague.color) : undefined)
+                : idleRow(colleague, canPick));
+            const idleRow = (colleague: Colleague, canPick: boolean) => colleagueCard(`idle-${colleague.id}`, [
                 portrait(colleague.id, colleague),
                 <Box key={`lines-${colleague.id}`} flexDirection="column" flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
                     {nameRow(`open-${colleague.id}`, colleague, [opener(`open-${colleague.id}`, colleague)])}

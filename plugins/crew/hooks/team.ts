@@ -49,17 +49,26 @@ export function cardFrom(id: string, profile: string, todo: string, memory: stri
     };
 }
 
-/** A profile's body in sections: each paragraph of its opening led by a bold title ("**Who you are.** …"), then each "## " section;
- * the frontmatter and the heading left out. */
+// The template's headed sections a card shows, by place: what they know (first) and how they work (third).
+const shownHeadings = [0, 2];
+
+/** A profile's body in sections: each paragraph of its opening led by a bold title ("**Who you are.** …"), then the template's first
+ * and third "## " sections, what they know and how they work; the project, what they return and their memory are instructions, left
+ * out with the frontmatter and the heading. */
 export function profileSections(profile: string): Card["profile"]
 {
     const body = profile.replace(/\r\n/g, "\n").replace(/^\uFEFF?---\n[\s\S]*?\n---\n/, "").replace(/^\s*# [^\n]*\n/, "");
     const sections: Card["profile"] = [];
+    let headed = 0;
 
     for (const part of body.split(/^(?=## )/m)) {
         if (part.startsWith("## ")) {
             const [heading = "", ...lines] = part.split("\n");
-            sections.push({ title: heading.replace(/^##\s*/, "").trim(), text: lines.join("\n").trim() });
+
+            if (shownHeadings.includes(headed++)) {
+                sections.push({ title: heading.replace(/^##\s*/, "").trim(), text: lines.join("\n").trim() });
+            }
+
             continue;
         }
 

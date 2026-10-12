@@ -852,6 +852,25 @@ test("a colleague who had finished and is resumed by a message is at work again,
     await ui.unmount();
 });
 
+test("a colleague at work in another chat of the project shows at work here, and goes when that chat stops sharing", async ($, on) => {
+    const { files, clock } = world(on, []);
+    const at = Date.UTC(2026, 9, 10, 9, 0);
+    const sara = { agentId: "x1", colleague: "sara-lombardi", task: "Translate the menus", model: "claude-opus-5-5", status: "running", startedAt: at, contextTokens: 0, contextMax: 200000, tokens: 0 };
+    files["/tmp/claude-crew/work-other.json"] = JSON.stringify({ root: "/p", at, runs: [sara] });
+    // Another project's chat is not this one's.
+    files["/tmp/claude-crew/work-elsewhere.json"] = JSON.stringify({ root: "/q", at, runs: [{ ...sara, agentId: "x2", colleague: "matteo-conti" }] });
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+    await clock.advance(15_000);
+    const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
+    expect(await ui.find({ type: "Text", text: "Game design · in another chat" })).toBeDefined();
+    expect(await ui.find({ type: "Text", text: "Translate the menus" })).toBeDefined();
+    expect(await ui.find({ type: "Text", text: /Code review · in another chat/ })).toBeUndefined();
+    // This chat shares its own.
+    expect(JSON.parse(files["/tmp/claude-crew/work-s1.json"] ?? "{}").root).toBe("/p");
+    await clock.advance(60_000);
+    expect(await ui.find({ type: "Text", text: "Game design · in another chat" })).toBeUndefined();
+});
+
 test("a colleague at work whom the panel never saw start is found among the session's agents and shown at work", async ($, on) => {
     world(on, []);
     on("tool.call", { tool: "Read" }, () => ({ result: "" }) as never);

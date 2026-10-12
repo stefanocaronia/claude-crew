@@ -31,6 +31,8 @@ export type RunStatus = "running" | "done" | "failed";
 
 /** One subagent run of a colleague in this session. */
 export type Run = {
+    /** At work in another chat of the project, shown here as its panel shares it. */
+    isElsewhere?: boolean;
     agentId: string;
     colleague: string;
     task: string;
@@ -146,6 +148,8 @@ declare module "claude-code" {
             team: Colleague[];
             speakers: Speaker[];
             runs: Run[];
+            /** The colleagues at work in the project's other chats, as their panels share them. */
+            elsewhere: Run[];
             meeting: Meeting;
             budget: Budget[];
             view: PanelView;

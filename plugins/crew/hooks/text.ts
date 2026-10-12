@@ -20,6 +20,7 @@ const levelsOf: Record<"es" | "fr" | "de" | "pt" | "ja" | "zh" | "ko" | "ar" | "
 const en = {
     pane: "👥 Crew",
     working: "Working",
+    elsewhere: "in another chat",
     finished: "Finished",
     allBack: "All on a break",
     resting: "On a coffee break",
@@ -113,6 +114,7 @@ export const words: Record<Language, Words> = {
     it: {
         pane: "👥 Crew",
         working: "Al lavoro",
+        elsewhere: "in un'altra chat",
         finished: "Hanno finito",
         allBack: "Tutti in pausa",
         resting: "In pausa caffè",
@@ -201,6 +203,7 @@ export const words: Record<Language, Words> = {
     es: {
         pane: "👥 Crew",
         working: "Trabajando",
+        elsewhere: "en otro chat",
         finished: "Han terminado",
         allBack: "Todos al descanso",
         resting: "En la pausa del café",
@@ -289,6 +292,7 @@ export const words: Record<Language, Words> = {
     fr: {
         pane: "👥 Crew",
         working: "Au travail",
+        elsewhere: "dans une autre discussion",
         finished: "Ont terminé",
         allBack: "Tous en pause",
         resting: "En pause café",
@@ -377,6 +381,7 @@ export const words: Record<Language, Words> = {
     de: {
         pane: "👥 Crew",
         working: "Bei der Arbeit",
+        elsewhere: "in einem anderen Chat",
         finished: "Fertig",
         allBack: "Alle in die Pause",
         resting: "In der Kaffeepause",
@@ -465,6 +470,7 @@ export const words: Record<Language, Words> = {
     pt: {
         pane: "👥 Crew",
         working: "Trabalhando",
+        elsewhere: "em outro chat",
         finished: "Terminaram",
         allBack: "Todos na pausa",
         resting: "Na pausa do café",
@@ -553,6 +559,7 @@ export const words: Record<Language, Words> = {
     ja: {
         pane: "👥 Crew",
         working: "作業中",
+        elsewhere: "別のチャットで",
         finished: "完了",
         allBack: "全員を休憩へ",
         resting: "コーヒー休憩中",
@@ -641,6 +648,7 @@ export const words: Record<Language, Words> = {
     zh: {
         pane: "👥 Crew",
         working: "工作中",
+        elsewhere: "在另一个对话中",
         finished: "已完成",
         allBack: "全部去休息",
         resting: "咖啡休息中",
@@ -729,6 +737,7 @@ export const words: Record<Language, Words> = {
     ko: {
         pane: "👥 Crew",
         working: "작업 중",
+        elsewhere: "다른 채팅에서",
         finished: "완료",
         allBack: "모두 휴식으로",
         resting: "커피 휴식 중",
@@ -817,6 +826,7 @@ export const words: Record<Language, Words> = {
     ar: {
         pane: "👥 Crew",
         working: "يعملون",
+        elsewhere: "في محادثة أخرى",
         finished: "انتهوا",
         allBack: "الجميع إلى الاستراحة",
         resting: "في استراحة القهوة",
@@ -905,6 +915,7 @@ export const words: Record<Language, Words> = {
     ru: {
         pane: "👥 Crew",
         working: "В работе",
+        elsewhere: "в другом чате",
         finished: "Закончили",
         allBack: "Все на перерыв",
         resting: "На кофе-брейке",

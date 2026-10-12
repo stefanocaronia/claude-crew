@@ -18,10 +18,13 @@ const pane = "crew";
 // Claude's name and face in a meeting's chat.
 const claudeOrange = "#D97757";
 const stepTool = "mcp__crew__step";
+// How often a panel shares who works in its chat, and reads who works in the others.
+const shareEvery = 15_000;
 const panelTool = "mcp__crew__panel";
 const team = atom({ plugin: "crew", key: "team" } as const, []);
 const speakers = atom({ plugin: "crew", key: "speakers" } as const, []);
 const runs = atom({ plugin: "crew", key: "runs" } as const, []);
+const elsewhere = atom({ plugin: "crew", key: "elsewhere" } as const, []);
 const meeting = atom({ plugin: "crew", key: "meeting" } as const, { members: [] });
 const budget = atom({ plugin: "crew", key: "budget" } as const, []);
 const view = atom({ plugin: "crew", key: "view" } as const, { isFinishedCollapsed: false, autoOpened: false });
@@ -165,6 +168,12 @@ export const register: Register = (on, options) => {
                 }
             })();
         });
+
+        // Who works in the project's other chats: shared through the temp folder every 15 s, as a session's state is its own.
+        $.clock.every(shareEvery, () => {
+            void shareWork($).catch(() => undefined);
+        });
+        void shareWork($).catch(() => undefined);
 
         // The team is there to be seen from the start: the panel opens once, where the surface docks it beside the chat.
         if ((await read($, team)).length) {
@@ -389,7 +398,9 @@ export const register: Register = (on, options) => {
             const byId = new Map(colleagues.map(colleague => [colleague.id, colleague]));
             // Each colleague in one section: in the meeting; at work while a task runs; finished, with their latest task, until the user
             // sends them back or something new starts; on a coffee break otherwise.
-            const running = list.filter(run => run.status === "running").reverse();
+            // At work here, then in the project's other chats.
+            const shared = (await read($, elsewhere)).filter(run => !list.some(own => own.agentId === run.agentId));
+            const running = [...list.filter(run => run.status === "running").reverse(), ...shared];
             const busy = new Set(running.map(run => run.colleague));
             const meetingMembers = talk.members.flatMap(id => (busy.has(id) ? [] : byId.get(id) ?? []));
             const inMeeting = new Set(meetingMembers.map(colleague => colleague.id));
@@ -662,7 +673,7 @@ export const register: Register = (on, options) => {
                 // A run left at work by an event that never came keeps the colleague busy: the user can free them.
                 const stuck = list.filter(run => run.colleague === selected.id && run.status === "running").map(run => run.agentId);
                 const isBusy = busy.has(selected.id) || talk.members.includes(selected.id);
-                const current = list.find(run => run.colleague === selected.id && run.status === "running");
+                const current = running.find(run => run.colleague === selected.id);
                 const retests = details ? retestsOf(details.openTasks).length : 0;
                 const week = (await weeklyCounts($))[isoWeek(at)]?.[selected.id];
                 const markFree = async () => {
@@ -785,7 +796,7 @@ export const register: Register = (on, options) => {
                             // Once finished, the opener shows what they answered.
                             isRunning || !run.report ? opener(isRunning ? `open-${colleague.id}` : `open-run-${run.agentId}`, colleague) : opener(`open-run-${run.agentId}`, colleague, () => openReport($, colleague.id, run.report ?? ""), say.readReport),
                         ])}
-                        <Text key={`role-${run.agentId}`} dimColor wrap="truncate-end">{roleOf(colleague)}</Text>
+                        <Text key={`role-${run.agentId}`} dimColor wrap="truncate-end">{run.isElsewhere ? `${roleOf(colleague)} · ${say.elsewhere}` : roleOf(colleague)}</Text>
                         {workLines(run.agentId, run, colleague)}
                         <Box key={`progress-${run.agentId}`} marginTop={1}>
                             {wideBar(ui, e.surface, progress ?? contextShare(run), progress === undefined ? undefined : colleague.color)}
@@ -1789,6 +1800,36 @@ function capitalized(text: string): string
 function plainText(markdown: string): string
 {
     return markdown.replace(/[`*_]/g, "").replace(/\s+/g, " ").trim();
+}
+
+// This session's colleagues at work, written for the project's other chats; theirs, read back when fresh, for this panel. The panel
+// is redrawn only when what the others share changed.
+async function shareWork($: EngineInterface): Promise<void>
+{
+    const folder = `${await tempFolder($)}/claude-crew`;
+    const session = (await $.session.id()).replace(/[^\w-]/g, "_");
+    const root = await projectRoot($);
+    const at = await $.clock.now();
+    const mine = (await read($, runs)).filter(run => run.status === "running" && !run.isElsewhere);
+    await $.fs.write(`${folder}/work-${session}.json`, JSON.stringify({ root, at, runs: mine }));
+    const others: Run[] = [];
+
+    for (const entry of await $.fs.list(folder)) {
+        if (entry.kind !== "file" || !/^work-.+\.json$/.test(entry.name) || entry.name === `work-${session}.json`) {
+            continue;
+        }
+
+        const shared = JSON.parse(await $.fs.read(`${folder}/${entry.name}`).catch(() => "{}")) as { root?: string; at?: number; runs?: Run[] };
+
+        // A chat that no longer writes has closed: what it left is not shown.
+        if (shared.root === root && typeof shared.at === "number" && at - shared.at < shareEvery * 4) {
+            others.push(...(shared.runs ?? []).map(run => ({ ...run, isElsewhere: true })));
+        }
+    }
+
+    if (JSON.stringify(others) !== JSON.stringify(await read($, elsewhere))) {
+        await update($, elsewhere, () => others);
+    }
 }
 
 async function projectRoot($: EngineInterface): Promise<string>

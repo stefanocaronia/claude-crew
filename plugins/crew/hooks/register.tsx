@@ -1095,13 +1095,35 @@ function wideBar(ui: Table, surface: string, share: number, color: string | unde
         return <Text key="bar" color={color} dimColor={!color}>{"█".repeat(filled) + "░".repeat(24 - filled)}</Text>;
     }
 
+    // The filled part a pill of its share of the width, at least its two ends; the track the rest, a pill whose start the filled part covers.
+    const part = Math.max(0, Math.min(1, share));
+    const alt = `${Math.round(part * 100)}%`;
+    const end = (key: string, side: "start" | "end", isFilled: boolean, isOverTrack = false) => <ui.Svg key={key} source={barEndSvg(side, color, isFilled, isOverTrack)} alt={alt} width={3} height={6} />;
+    const middle = (key: string, isFilled: boolean) => (
+        <Box key={key} flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
+            <ui.Svg key={`${key}-drawn`} source={wideBarSvg(color, isFilled)} alt={alt} height={6} />
+        </Box>
+    );
     return (
         <Box key="bar" flexDirection="row" flexWrap="nowrap" flexGrow={1} minWidth={0}>
-            <ui.Svg key="bar-start" source={barEndSvg("start", color, share > 0)} alt="" width={3} height={6} />
-            <Box key="bar-middle" flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
-                <ui.Svg key="bar-fill" source={wideBarSvg(share, color)} alt={`${Math.round(share * 100)}%`} height={6} />
-            </Box>
-            <ui.Svg key="bar-end" source={barEndSvg("end", color, share >= 1)} alt="" width={3} height={6} />
+            {part > 0
+                ? (
+                    <Box key="bar-filled" flexDirection="row" flexWrap="nowrap" flexShrink={0} width={part < 1 ? `${Math.max(3, Math.round(part * 100))}%` : "100%"}>
+                        {end("bar-filled-start", "start", true)}
+                        {middle("bar-filled-middle", true)}
+                        {end("bar-filled-end", "end", true, part < 1)}
+                    </Box>
+                )
+                : null}
+            {part < 1
+                ? (
+                    <Box key="bar-track" flexDirection="row" flexWrap="nowrap" flexGrow={1} flexShrink={1} minWidth={0}>
+                        {part > 0 ? null : end("bar-track-start", "start", false)}
+                        {middle("bar-track-middle", false)}
+                        {end("bar-track-end", "end", false)}
+                    </Box>
+                )
+                : null}
         </Box>
     );
 }

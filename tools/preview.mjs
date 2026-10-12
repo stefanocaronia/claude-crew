@@ -240,6 +240,8 @@ function boxStyle(props)
         props.flexWrap ? `flex-wrap:${props.flexWrap}` : "",
         props.alignItems ? `align-items:${props.alignItems}` : "",
         props.justifyContent ? `justify-content:${props.justifyContent}` : "",
+        // A width in percent, as the bar's filled part has; the cells of a numeric one are left to the flex layout.
+        typeof props.width === "string" ? `width:${props.width}` : "",
         props.flexGrow !== undefined ? `flex-grow:${props.flexGrow}` : "",
         props.flexShrink !== undefined ? `flex-shrink:${props.flexShrink}` : "",
         props.gap !== undefined ? `gap:${cell(props.gap)}` : "",

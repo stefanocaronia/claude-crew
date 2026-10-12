@@ -137,18 +137,20 @@ export function effortSvg(level: string): string | undefined
     return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="12" viewBox="0 0 16 12">${bars}</svg>`;
 }
 
-/** The bar across a card: drawn 300 wide and stretched to the room it is given, its ends still round at the usual widths. */
-export function wideBarSvg(share: number, color: string | undefined): string
+/** A wide bar's square middle, filled or the track, stretched to the room it is given: its rounded ends are `barEndSvg`. */
+export function wideBarSvg(color: string | undefined, isFilled: boolean): string
 {
-    const fill = Math.round(300 * Math.max(0, Math.min(1, share)));
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="6" viewBox="0 0 300 6" preserveAspectRatio="none">${theme}<rect class="k" width="300" height="6"/><rect width="${fill}" height="6" fill="${color ?? "#8a8a86"}"/></svg>`;
+    const paint = isFilled ? `fill="${color ?? "#8a8a86"}"` : `class="k"`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="6" viewBox="0 0 300 6" preserveAspectRatio="none">${theme}<rect ${paint} width="300" height="6"/></svg>`;
 }
 
-/** A rounded end of a wide bar, 3 px wide and never stretched: in the bar's color where it is filled, else the track's. */
-export function barEndSvg(side: "start" | "end", color: string | undefined, isFilled: boolean): string
+/** A rounded end of a wide bar, 3 px wide and never stretched: in the bar's color where it is filled, else the track's; the filled
+ * part's end over the track, where the track goes on after it. */
+export function barEndSvg(side: "start" | "end", color: string | undefined, isFilled: boolean, isOverTrack = false): string
 {
     const half = side === "start" ? "M3 0A3 3 0 0 0 3 6Z" : "M0 0A3 3 0 0 1 0 6Z";
-    return svg(3, 6, isFilled ? `<path d="${half}" fill="${color ?? "#8a8a86"}"/>` : `<path class="k" d="${half}"/>`);
+    const track = isOverTrack ? `<rect class="k" width="3" height="6"/>` : "";
+    return svg(3, 6, track + (isFilled ? `<path d="${half}" fill="${color ?? "#8a8a86"}"/>` : `<path class="k" d="${half}"/>`));
 }
 
 function svg(width: number, height: number, body: string, isThemed = true): string

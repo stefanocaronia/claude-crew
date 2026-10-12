@@ -428,7 +428,14 @@ export const register: Register = (on, options) => {
             const picked = (panel.picked ?? []).filter(id => byId.has(id) && !busy.has(id) && !inMeeting.has(id));
             // A small square box in the text's color: an outline, checked when picked; a background only under the pointer.
             const togglePick = (colleague: Colleague) => update($, view, current => ({ ...current, picked: (current.picked ?? []).includes(colleague.id) ? (current.picked ?? []).filter(id => id !== colleague.id) : [...(current.picked ?? []), colleague.id] }));
-            const pick = (colleague: Colleague) => tip(`pick-${colleague.id}`, say.pickTip, <Button key={`pick-${colleague.id}`} label={picked.includes(colleague.id) ? "☑\uFE0E" : "☐"} plain onPress={() => togglePick(colleague)} />);
+            // On the desktop a small bordered button, empty or with a check, the surface's own checkbox look; on the terminal a box glyph.
+            const pick = (colleague: Colleague) => {
+                const isPicked = picked.includes(colleague.id);
+                const box = isDesktop
+                    ? <Button key={`pick-${colleague.id}`} label={isPicked ? "✓" : "\u2002"} {...(isPicked ? { variant: "primary" as const } : {})} onPress={() => togglePick(colleague)} />
+                    : <Button key={`pick-${colleague.id}`} label={isPicked ? "☑\uFE0E" : "☐"} plain onPress={() => togglePick(colleague)} />;
+                return tip(`pick-${colleague.id}`, say.pickTip, box);
+            };
 
             const pickedTeam = picked.flatMap(id => byId.get(id) ?? []);
             const pickedNames = pickedTeam.length ? listNames(pickedTeam.map(colleague => colleague.name), say.and, say.comma) : "";
@@ -762,22 +769,8 @@ export const register: Register = (on, options) => {
                     </Box>,
                 ]);
             };
-            // On the desktop a press on a free colleague's lines picks them: the whole text is one control, the card tinted once picked;
-            // their effort changes on their own card. The terminal keeps the box that picks and the effort that cycles.
-            const teamRow = (colleague: Colleague, canPick = true) => (isDesktop && canPick
-                ? colleagueCard(`idle-${colleague.id}`, [
-                    portrait(colleague.id, colleague),
-                    <Box key={`lines-${colleague.id}`} flexDirection="column" flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
-                        {nameRow(`open-${colleague.id}`, colleague, [opener(`open-${colleague.id}`, colleague)])}
-                        <Button key={`pick-${colleague.id}`} label={say.pickTip} plain onPress={() => togglePick(colleague)}>
-                            <Text dimColor>{roleOf(colleague)}</Text>
-                            {"\n"}
-                            <Text dimColor>{[about(colleague), colleague.effort ? say.effort(colleague.effort) : say.sessionEffort].join(" · ")}</Text>
-                        </Button>
-                    </Box>,
-                ], picked.includes(colleague.id) ? pickedTint(colleague.color) : undefined)
-                : idleRow(colleague, canPick));
-            const idleRow = (colleague: Colleague, canPick: boolean) => colleagueCard(`idle-${colleague.id}`, [
+            // A free colleague's card, tinted in their color once picked.
+            const teamRow = (colleague: Colleague, canPick = true) => colleagueCard(`idle-${colleague.id}`, [
                 portrait(colleague.id, colleague),
                 <Box key={`lines-${colleague.id}`} flexDirection="column" flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
                     {nameRow(`open-${colleague.id}`, colleague, [opener(`open-${colleague.id}`, colleague)])}
@@ -791,7 +784,7 @@ export const register: Register = (on, options) => {
                         {canPick ? pick(colleague) : null}
                     </Box>
                 </Box>,
-            ]);
+            ], canPick && isDesktop && picked.includes(colleague.id) ? pickedTint(colleague.color) : undefined);
             // A section that folds: who is at work, who has finished, the rest of the team; each opens and closes by its title.
             const fold = (key: string, icon: string, title: string, items: (JSX.Element | null)[], isClosed: boolean, toggle: (current: typeof panel) => typeof panel, extra: JSX.Element | null = null) => (items.length
                 ? (

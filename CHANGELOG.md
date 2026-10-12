@@ -2,6 +2,14 @@
 
 What changes for whoever uses Crew, version by version. Plugins update in a new chat: `/plugin`, Marketplaces, claude-crew, Update marketplace, or turn its auto-update on there.
 
+## 0.7.1 – 0.8.4
+
+- A colleague's card at work has one thing a line: the task, the step in progress with its number in their color, what they are doing now with its sign (📄 reading, ✎ editing, 🔎 searching, ▶ a command, told by the command's own description), then the bar and what the task costs. Their card in the panel shows the same while they work.
+- Finished, a card says how long the task took and has a Report button that opens what they answered.
+- A colleague resumed by a message, or started before the panel saw them, shows at work.
+- In a meeting, turns are short work-chat messages; Claude speaks as itself, with its own portrait; colleagues act within their permissions, and the narrator's italic lines name who acts.
+- Hints under the pointer on the controls that are only a sign; the settings open from a gear beside the team's actions.
+
 ## 0.7.0
 
 - One plugin: the panel is now inside `crew`. Remove the old `crew-mod` with `/plugin uninstall crew-mod@claude-crew`, then update `crew`.

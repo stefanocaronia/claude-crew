@@ -68,6 +68,8 @@ type Steps = { model: string; effort?: string; contextTokens: number; tokens: nu
 const unshown = new Map<string, Steps>();
 // What each colleague at work did last, shown with their next steps.
 const activities = new Map<string, Activity>();
+// The sign in front of what a colleague is doing, by its kind.
+const activitySigns: Record<Activity["kind"], string> = { do: "▶", run: "▶", read: "📄", edit: "✎", search: "🔎", web: "🌐", tool: "⚙" };
 // The agents at work that are no colleague of the team.
 const strangers = new Set<string>();
 const shownAt = new Map<string, number>();
@@ -497,6 +499,36 @@ export const register: Register = (on, options) => {
                     {children}
                 </Box>
             );
+            // What a colleague is on, one thing a line: the task; at work, the step of their plan, its number in their color, and what
+            // they are doing now, its sign first; finished, how long it took or that it stopped, and their report.
+            const workLines = (key: string, run: Run, colleague: Colleague) => {
+                const row = (rowKey: string, children: (JSX.Element | null)[]) => (
+                    <Box key={rowKey} flexDirection="row" flexWrap="nowrap" alignItems="center" columnGap={1} minWidth={0} overflow="hidden">
+                        {children}
+                    </Box>
+                );
+
+                if (run.status !== "running") {
+                    return [
+                        <Text key={`task-${key}`} bold wrap="truncate-end">{taskOf(run.task, colleague)}</Text>,
+                        row(`end-${key}`, [
+                            <Text key="end" dimColor>{capitalized(run.status === "done" ? say.doneIn(formatTime((run.endedAt ?? at) - run.startedAt)) : say.failed)}</Text>,
+                            run.report ? <Button key={`report-${run.agentId}`} label={`${say.report} ❯`} plain dimColor onPress={() => openReport($, colleague.id, run.report ?? "")} /> : null,
+                        ]),
+                    ];
+                }
+
+                return [
+                    <Text key={`task-${key}`} bold wrap="truncate-end">{taskOf(run.task, colleague)}</Text>,
+                    run.stepTotal
+                        ? row(`step-${key}`, [
+                            <Box key="count" flexShrink={0}><Text color={colleague.color}>{capitalized(say.step(stepNow(run), run.stepTotal))}</Text></Box>,
+                            run.stepNote ? <Box key="note" flexShrink={1} minWidth={0} overflow="hidden"><Text dimColor wrap="truncate-end">{run.stepNote}</Text></Box> : null,
+                        ])
+                        : null,
+                    run.activity ? <Text key={`activity-${key}`} dimColor italic wrap="truncate-end">{activityText(say, run.activity)}</Text> : null,
+                ];
+            };
 
             const chosen = await read($, preferences);
             // The panel's settings: a gear beside the team's actions, its name written out in the empty panel.
@@ -587,8 +619,7 @@ export const register: Register = (on, options) => {
                                 <Box key="card-work" flexDirection="column">
                                     <Text bold>{say.working}</Text>
                                     {outlined("card-work-box", [
-                                        <Text key="work-task" wrap="truncate-end">{[taskOf(current.task, selected), current.stepTotal ? say.step(current.stepDone ?? 0, current.stepTotal, current.stepNote) : ""].filter(Boolean).join(" · ")}</Text>,
-                                        current.activity ? <Text key="work-activity" dimColor italic wrap="truncate-end">{activityText(say, current.activity)}</Text> : null,
+                                        ...workLines("work", current, selected),
                                         <Box key="work-bar" marginTop={1}>{wideBar(ui, e.surface, progressOf(current) ?? contextShare(current), progressOf(current) === undefined ? undefined : selected.color)}</Box>,
                                     ])}
                                 </Box>
@@ -651,13 +682,16 @@ export const register: Register = (on, options) => {
                 }
 
                 const progress = progressOf(run);
-                // While at work, the step in progress; once finished, how long it took, or that it stopped.
-                const steps = run.status === "running"
-                    ? (run.stepTotal ? say.step(run.stepDone ?? 0, run.stepTotal, run.stepNote) : "")
-                    : run.status === "done" ? say.doneIn(formatTime((run.endedAt ?? at) - run.startedAt)) : say.failed;
-                const stats = [say.memoryUsed(Math.round(contextShare(run) * 100)), say.tokens(formatTokens(run.tokens, say.units)), formatTime((run.endedAt ?? run.steppedAt ?? at) - run.startedAt)].join(" · ");
-                const mark = run.status === "running" ? "●" : run.status === "done" ? "✓" : "✗";
                 const isRunning = run.status === "running";
+                // What the task costs, under its bar: the model and effort, memory and tokens, and while at work the time so far.
+                const stats = [
+                    modelName(run.model),
+                    run.effort ? say.effort(run.effort) : "",
+                    say.memoryUsed(Math.round(contextShare(run) * 100)),
+                    say.tokens(formatTokens(run.tokens, say.units)),
+                    isRunning ? formatTime((run.steppedAt ?? at) - run.startedAt) : "",
+                ].filter(Boolean).join(" · ");
+                const mark = isRunning ? "●" : run.status === "done" ? "✓" : "✗";
                 return colleagueCard(run.agentId, [
                     face(colleague, 40, true, isRunning),
                     <Box key={`lines-${run.agentId}`} flexDirection="column" flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
@@ -670,17 +704,11 @@ export const register: Register = (on, options) => {
                             isRunning || !run.report ? opener(isRunning ? `open-${colleague.id}` : `open-run-${run.agentId}`, colleague) : opener(`open-run-${run.agentId}`, colleague, () => openReport($, colleague.id, run.report ?? ""), say.readReport),
                         ])}
                         <Text key={`role-${run.agentId}`} wrap="truncate-end">{roleOf(colleague)}</Text>
-                        <Text key={`task-${run.agentId}`} dimColor wrap="truncate-end">{[taskOf(run.task, colleague), steps].filter(Boolean).join(" · ")}</Text>
-                        {isRunning && run.activity ? <Text key={`activity-${run.agentId}`} dimColor italic wrap="truncate-end">{activityText(say, run.activity)}</Text> : null}
-                        {!isRunning && run.report ? <Button key={`report-${run.agentId}`} label={`${say.report} ❯`} plain dimColor onPress={() => openReport($, colleague.id, run.report ?? "")} /> : null}
-                        <Box key={`model-${run.agentId}`} flexDirection="row" flexWrap="nowrap" alignItems="center" minWidth={0} overflow="hidden">
-                            <Box flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
-                                <Text dimColor wrap="truncate-end">{[modelName(run.model), run.effort ? say.effort(run.effort) : "", stats].filter(Boolean).join(" · ")}</Text>
-                            </Box>
-                        </Box>
+                        {workLines(run.agentId, run, colleague)}
                         <Box key={`progress-${run.agentId}`} marginTop={1}>
                             {wideBar(ui, e.surface, progress ?? contextShare(run), progress === undefined ? undefined : colleague.color)}
                         </Box>
+                        <Text key={`stats-${run.agentId}`} dimColor wrap="truncate-end">{stats}</Text>
                     </Box>,
                 ]);
             };
@@ -1574,7 +1602,13 @@ function activityText(say: Words, activity: Activity | string | undefined): stri
         return activity ?? "";
     }
 
-    return activity.kind === "do" ? activity.what.charAt(0).toLocaleUpperCase() + activity.what.slice(1) : say.doing[activity.kind](activity.what);
+    return `${activitySigns[activity.kind]} ${activity.kind === "do" ? capitalized(activity.what) : say.doing[activity.kind](activity.what)}`;
+}
+
+// The step in progress: the tool counts the steps done and names the next, so "0 of 5" is the first; past the last, the last.
+function stepNow(run: Run): number
+{
+    return Math.min((run.stepDone ?? 0) + 1, run.stepTotal ?? 1);
 }
 
 // The steps of a run not yet on screen, taken to be shown.
@@ -1650,7 +1684,13 @@ function taskOf(task: string, colleague: Colleague): string
 {
     const names = [colleague.fullName, colleague.name].map(name => name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
     const rest = task.replace(new RegExp(`^\\s*(?:${names.join("|")})\\s*[:\\-–—,]?\\s*`, "i"), "").trim() || task;
-    return rest.charAt(0).toLocaleUpperCase() + rest.slice(1);
+    return capitalized(rest);
+}
+
+// A line's first letter in capitals: "done in 3 min" opens a line as "Done in 3 min".
+function capitalized(text: string): string
+{
+    return text.charAt(0).toLocaleUpperCase() + text.slice(1);
 }
 
 // A task as one plain line: markdown marks and line breaks out.

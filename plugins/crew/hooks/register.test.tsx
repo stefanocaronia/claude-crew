@@ -456,7 +456,8 @@ test("a colleague left at work by a lost event is freed from their card, which h
     expect(await ui.find({ key: "talk" })).toBeDefined();
     await ui.press({ key: "back" });
     expect((await ui.find({ key: "finished" }))?.props.label).toBe("▾ ✓ Finished · 1");
-    expect(await ui.find({ type: "Text", text: "Review the parser · stopped" })).toBeDefined();
+    expect(await ui.find({ type: "Text", text: "Review the parser" })).toBeDefined();
+    expect(await ui.find({ type: "Text", text: "Stopped" })).toBeDefined();
 });
 
 test("a finished card says how long the task took, not its last step", async ($, on) => {
@@ -466,10 +467,14 @@ test("a finished card says how long the task took, not its last step", async ($,
     await $.agent.spawn({ prompt: "Review the parser.", description: "review the parser", subagentType: "matteo-conti" } as never);
     await $.tool.call({ tool: "mcp__crew__step", done: 4, total: 4, note: "writing the report", agentId: "a1" } as never);
     const ui = await $.ui.mount({ plugin, surface: "terminal", component: "Pane", requestId: "crew", props: pane });
-    expect(await ui.find({ type: "Text", text: "Review the parser · step 4 of 4: writing the report" })).toBeDefined();
+    // The task, then the step in progress past the last done, and its note.
+    expect(await ui.find({ type: "Text", text: "Review the parser" })).toBeDefined();
+    expect(await ui.find({ type: "Text", text: "Step 4 of 4" })).toBeDefined();
+    expect(await ui.find({ type: "Text", text: "writing the report" })).toBeDefined();
     await clock.advance(3 * 60_000);
     await $.turn.complete({ agentId: "a1", reason: "answer", answer: "", durationMs: 1000, isAborted: false, turnId: "t1" } as never);
-    expect(await ui.find({ type: "Text", text: "Review the parser · done in 3 min 0 s" })).toBeDefined();
+    expect(await ui.find({ type: "Text", text: "Done in 3 min 0 s" })).toBeDefined();
+    expect(await ui.find({ type: "Text", text: "Step 4 of 4" })).toBeUndefined();
 });
 
 test("a colleague's answer is kept in their notes, never over another, and their card names the latest", async ($, on) => {
@@ -793,14 +798,17 @@ test("a colleague at work shows what they are doing now, on their row and in the
     await $.tool.call({ tool: "Read", file_path: "/p/.claude/agent-memory/matteo-conti/MEMORY.md", agentId: "a1", tool_use_id: "r1" } as never);
     await $.tool.call({ tool: "mcp__crew__step", done: 1, total: 3, note: "reading my notes", agentId: "a1", tool_use_id: "s1" } as never);
     const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: { title: "Crew", isFocused: false, bodyColumns: 50, placement: "dock" } as never });
-    expect(await ui.find({ type: "Text", text: "Reading MEMORY.md" })).toBeDefined();
+    expect(await ui.find({ type: "Text", text: "📄 Reading MEMORY.md" })).toBeDefined();
     await ui.press({ key: "open-matteo-conti" });
     expect(await ui.find({ type: "Text", text: "Working" })).toBeDefined();
-    expect(await ui.find({ type: "Text", text: /Review the parser · step 1 of 3: reading my notes/ })).toBeDefined();
-    expect(await ui.find({ type: "Text", text: "Reading MEMORY.md" })).toBeDefined();
+    expect(await ui.find({ type: "Text", text: "Review the parser" })).toBeDefined();
+    // One step done: the second is in progress.
+    expect(await ui.find({ type: "Text", text: "Step 2 of 3" })).toBeDefined();
+    expect(await ui.find({ type: "Text", text: "reading my notes" })).toBeDefined();
+    expect(await ui.find({ type: "Text", text: "📄 Reading MEMORY.md" })).toBeDefined();
     await ui.press({ key: "back" });
     await $.turn.complete({ agentId: "a1", reason: "answer", answer: "The parser holds.", durationMs: 1000, isAborted: false, turnId: "t1" } as never);
-    expect(await ui.find({ type: "Text", text: "Reading MEMORY.md" })).toBeUndefined();
+    expect(await ui.find({ type: "Text", text: "📄 Reading MEMORY.md" })).toBeUndefined();
     await ui.press({ key: "report-a1" });
     expect((await ui.find({ key: "report-text" }))?.text).toMatch(/The parser holds\./);
     await ui.press({ key: "report-back" });
@@ -808,7 +816,7 @@ test("a colleague at work shows what they are doing now, on their row and in the
     await $.agent.spawn({ prompt: "Run the tests.", description: "run the tests", subagentType: "matteo-conti" } as never);
     await $.tool.call({ tool: "Bash", command: "npm test -- --run plugins/crew", description: "run the panel's tests", agentId: "a2", tool_use_id: "b1" } as never);
     await $.tool.call({ tool: "mcp__crew__step", done: 1, total: 2, agentId: "a2", tool_use_id: "s2" } as never);
-    expect(await ui.find({ type: "Text", text: "Run the panel's tests" })).toBeDefined();
+    expect(await ui.find({ type: "Text", text: "▶ Run the panel's tests" })).toBeDefined();
     await ui.unmount();
 });
 

@@ -2,6 +2,7 @@
 // project's real colleagues, inside `claude plugin test`; the trees it hands over become an HTML page in the app's dark colors.
 // Not the app's own paint, but its layout, portraits and wrapping. Usage:
 //   node tools/preview.mjs <project> [--out page.html] [--meeting id,id] [--working id] [--language it|en]
+// CLAUDE_BIN names the claude to run, when the one on the PATH is not the build the mod is made for.
 import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -27,7 +28,7 @@ try {
     cpSync(join(repo, "plugins", "crew"), mod, { recursive: true, filter: source => !/\.test\.|[\\/]\.claude-plugin[\\/]types/.test(source) });
     writeFileSync(join(mod, "hooks", "fixture.ts"), fixture());
     writeFileSync(join(mod, "hooks", "preview.test.tsx"), previewTest());
-    const run = spawnSync(`claude plugin test "${mod}"`, { encoding: "utf8", shell: true, maxBuffer: 64 * 1024 * 1024 });
+    const run = spawnSync(`"${process.env.CLAUDE_BIN ?? "claude"}" plugin test "${mod}"`, { encoding: "utf8", shell: true, maxBuffer: 64 * 1024 * 1024 });
     const output = `${run.stdout}\n${run.stderr}`;
     const trees = Object.fromEntries([...output.matchAll(/^PREVIEW (\w+) (.+)$/gm)].map(match => [match[1], JSON.parse(match[2])]));
 
@@ -99,6 +100,8 @@ function world(on: On): void
     on("tool.register", () => ({ value: {} }) as never);
     on("command.register", () => ({ value: {} }) as never);
     on("ui.open", () => ({ value: {} }) as never);
+    on("command.list", () => ({ value: [{ name: "crew:talk", description: "", source: "plugin", plugin: "crew", isFullscreen: false }] }) as never);
+    mock.store(on);
     on("session.root", () => ({ value: "/p" }));
     on("session.id", () => ({ value: "preview" }));
     on("session.usage", () => ({ value: { startedAt: 0, context: {}, rateLimits: [{ kind: "five_hour", percentUsed: 7, resetsAt: new Date(${Date.now()} + 35 * 60000).toISOString() }, { kind: "seven_day", percentUsed: 8, resetsAt: new Date(${Date.now()} + 6 * 86400000).toISOString() }] } }) as never);
@@ -107,6 +110,7 @@ function world(on: On): void
     on("fs.read", (_, e) => ({ value: e.as === "bytes" ? { base64: bytes[posix(e.path)] ?? "" } : files[posix(e.path)] ?? "" }) as never);
     on("fs.stat", (_, e) => ({ value: { kind: "file", size: 1, mtimeMs: times[posix(e.path)] ?? 1, isLink: false } }) as never);
     on("agent.spawn", () => ({ model: "claude-opus-5-5", agentId: "preview-run" }) as never);
+    on("tool.call", { tool: "Read" }, () => ({ result: "" }) as never);
     on("ui.render", ($, e) => {
         const { Text } = $.ui.resolve(e);
         return <Text key="engine">engine</Text>;
@@ -116,7 +120,9 @@ function world(on: On): void
 test("preview", { options: { language: "${language}" }, timeoutMs: 20000 }, async ($, on) => {
     world(on);
     await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
-    ${working ? `await $.agent.spawn({ prompt: "Review.", description: "revisione del passo 13", subagentType: "${working}" } as never);` : ""}
+    ${working ? `await $.agent.spawn({ prompt: "Review.", description: "revisione del passo 13", subagentType: "${working}" } as never);
+    await $.tool.call({ tool: "Read", file_path: "/p/private/project/DECISIONI.md", agentId: "preview-run", tool_use_id: "r1" } as never);
+    await $.tool.call({ tool: "mcp__crew__step", done: 1, total: 5, note: "leggo todo, istruzioni e decisioni", agentId: "preview-run", tool_use_id: "s1" } as never);` : ""}
     const pane = await $.ui.mount({ plugin: "crew", surface: "desktop", component: "Pane", requestId: "crew", props: { title: "Crew", isFocused: false, bodyColumns: 50, placement: "dock" } as never });
     console.log("PREVIEW pane " + JSON.stringify(await pane.find({})));
     ${speakers.length ? `const band = await $.ui.mount({ plugin: "crew", surface: "desktop", component: "AbovePrompt", props: { hasSurvey: false, isWorking: false, maxRows: 8, bodyColumns: 100 } as never });
@@ -230,6 +236,10 @@ function boxStyle(props)
         props.rowGap !== undefined ? `row-gap:${cell(props.rowGap)}` : "",
         props.paddingLeft !== undefined ? `padding-left:${cell(props.paddingLeft)}` : "",
         props.marginBottom !== undefined ? `margin-bottom:${cell(props.marginBottom)}` : "",
+        props.marginTop !== undefined ? `margin-top:${cell(props.marginTop)}` : "",
+        props.overflow === "hidden" ? "overflow:hidden" : "",
+        // A box shown only under the pointer, as the hints are, stays hidden here.
+        props.display === "none" ? "display:none" : "",
     ];
     return rules.filter(Boolean).join(";");
 }

@@ -163,7 +163,7 @@ h2{font-size:11px;font-weight:600;color:#7d7d79;text-transform:uppercase;letter-
 .surface{background:#1f1f1e;border:1px solid #333331;border-radius:10px;padding:12px}
 .pane .surface{width:var(--pane,380px);resize:horizontal;overflow:auto}
 .band .surface,.chat .surface{width:520px;resize:horizontal;overflow:auto}
-.box{display:flex;min-width:0}
+.box{display:flex;min-width:0;position:relative}
 .text{min-width:0}.text.block{display:block}.dim{color:#9a9a96}.bold{font-weight:600}.italic{font-style:italic}
 .truncate{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 button{font:inherit;color:#ececec;background:#2c2c2b;border:1px solid #3a3a38;border-radius:6px;padding:2px 8px;cursor:pointer}
@@ -248,6 +248,8 @@ function boxStyle(props)
         props.paddingLeft !== undefined ? `padding-left:${cell(props.paddingLeft)}` : "",
         props.marginBottom !== undefined ? `margin-bottom:${cell(props.marginBottom)}` : "",
         props.backgroundColor ? `background:${props.backgroundColor}` : "",
+        // Laid over its neighbours, as the app does: the clear buttons over a drawing take no room.
+        props.position === "absolute" ? `position:absolute;${["top", "left", "right", "bottom"].filter(side => props[side] !== undefined).map(side => `${side}:${cell(props[side])}`).join(";")}` : "",
         props.marginTop !== undefined ? `margin-top:${cell(props.marginTop)}` : "",
         props.overflow === "hidden" ? "overflow:hidden" : "",
         // A box shown only under the pointer, as the hints are, stays hidden here.

@@ -18,8 +18,10 @@ const pane = "crew";
 // Claude's name and face in a meeting's chat.
 const claudeOrange = "#D97757";
 const stepTool = "mcp__crew__step";
-// How often a panel shares who works in its chat, and reads who works in the others.
-const shareEvery = 15_000;
+// How often a panel shares who works in its chat, and reads who works in the others: who starts, stops or changes step shows at once;
+// what they are doing and their tokens, which change at every tool, redraw only as often as a colleague's own steps.
+const shareEvery = 5_000;
+let sharedDrawnAt = 0;
 const panelTool = "mcp__crew__panel";
 const team = atom({ plugin: "crew", key: "team" } as const, []);
 const speakers = atom({ plugin: "crew", key: "speakers" } as const, []);
@@ -1822,12 +1824,19 @@ async function shareWork($: EngineInterface): Promise<void>
         const shared = JSON.parse(await $.fs.read(`${folder}/${entry.name}`).catch(() => "{}")) as { root?: string; at?: number; runs?: Run[] };
 
         // A chat that no longer writes has closed: what it left is not shown.
-        if (shared.root === root && typeof shared.at === "number" && at - shared.at < shareEvery * 4) {
+        if (shared.root === root && typeof shared.at === "number" && at - shared.at < 60_000) {
             others.push(...(shared.runs ?? []).map(run => ({ ...run, isElsewhere: true })));
         }
     }
 
-    if (JSON.stringify(others) !== JSON.stringify(await read($, elsewhere))) {
+    // Every redraw loses the click that lands on the drawing it replaces.
+    const shown = await read($, elsewhere);
+    const outline = (list: Run[]) => JSON.stringify(list.map(run => [run.agentId, run.task, run.stepDone, run.stepTotal, run.stepNote]));
+    const hasMoved = outline(others) !== outline(shown);
+    const hasDetail = JSON.stringify(others) !== JSON.stringify(shown) && at - sharedDrawnAt >= stepRedrawEvery;
+
+    if (hasMoved || hasDetail) {
+        sharedDrawnAt = at;
         await update($, elsewhere, () => others);
     }
 }

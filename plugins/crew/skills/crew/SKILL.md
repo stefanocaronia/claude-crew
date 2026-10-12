@@ -34,6 +34,7 @@ A colleague is an agent of `.claude/agents/` with a `todo.md` in its memory fold
 | a portrait, for one colleague or the whole team (`/crew:portraits` asks the style first) | [references/portrait.md](references/portrait.md) |
 | a review round, or a milestone is reached (`/crew:review` asks first what to review) | [references/round.md](references/round.md) |
 | a task for a colleague, or Claude finds one useful: a check, research, a test, a change in their field | [references/task.md](references/task.md) |
+| a quick question to one or more of them, answered at once in the chat (`/crew:ask`) | [references/conversation.md](references/conversation.md), "A quick question" |
 | to talk with one or more of them (`/crew:meeting` asks the topic first) | [references/conversation.md](references/conversation.md) |
 | who is on the team | the team table and each `todo.md`: name, field, open tasks |
 

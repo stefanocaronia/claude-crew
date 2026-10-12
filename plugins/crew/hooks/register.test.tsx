@@ -709,6 +709,15 @@ test("a project without colleagues: the panel offers to set the team up, with th
     }
 });
 
+test("from a colleague's card, a quick question runs the ask command with their name", async ($, on) => {
+    const sent = world(on, []);
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+    const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
+    await ui.press({ key: "open-matteo-conti" });
+    await ui.press({ key: "card-ask" });
+    expect(sent.at(-1)).toBe("/crew:ask Matteo");
+});
+
 test("from a colleague's card, a review asks Claude what to review, and a talk starts at once", async ($, on) => {
     const sent = world(on, []);
     const submitted: string[] = [];

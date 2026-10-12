@@ -471,6 +471,8 @@ export const register: Register = (on, options) => {
             );
             // A talk with one colleague from their card starts at once, with no topic asked.
             const talkWith = (colleague: Colleague) => $.command.run({ command: "crew:talk", args: colleague.name });
+            // A quick question asks in the chat what to ask, and the colleague answers it at once, even while at work.
+            const askOf = (colleague: Colleague) => $.command.run({ command: "crew:ask", args: colleague.name });
             // The name opens the colleague's card. A button, not a link: on the desktop most clicks on a Markdown link never reach the panel.
             // The name drawn in the colleague's color, larger than the text around it; on the terminal, bold text.
             const name = (key: string, colleague: Colleague, size = nameSize) => {
@@ -676,6 +678,7 @@ export const register: Register = (on, options) => {
                             : null}
                         <Box key="card-actions" flexDirection="row" flexWrap="wrap" gap={1}>
                             {isBusy ? null : <Button key="talk" variant="primary" label={`☰ ${say.talk(selected.name)}`} onPress={() => talkWith(selected)} />}
+                            <Button key="card-ask" label={`? ${say.ask(selected.name)}`} onPress={() => askOf(selected)} />
                             {isBusy ? null : <Button key="card-round" label={`↻ ${say.roundWith(selected.name)}`} onPress={() => runCommand("crew:review", [selected])} />}
                             {retests ? <Button key="card-retest" label={`↻ ${say.retest(retests)}`} onPress={() => send(say.retestPrompt(selected.name))} /> : null}
                             {stuck.length ? <Button key="card-free" label={say.markFree} plain onPress={markFree} /> : null}

@@ -2,6 +2,10 @@
 
 What changes for whoever uses Crew, version by version. Plugins update in a new chat: `/plugin`, Marketplaces, claude-crew, Update marketplace, or turn its auto-update on there.
 
+## 0.9.0
+
+- A quick question to a colleague: `/crew:ask Giulia -- the question`, "domanda per Giulia: …", or the Ask button on their card. They answer at once in the chat, in their own voice, and the chat is Claude's again: no task, no report, no meeting. Something to check or change is still a task with its report; when in doubt Claude asks quickly.
+
 ## 0.7.1 – 0.8.12
 
 - A colleague's card at work has one thing a line: the task, the step in progress with its number in their color, what they are doing now with its sign (📄 reading, ✎ editing, 🔎 searching, ▶ a command, told by the command's own description), then the bar and what the task costs: the model with its effort meter at the left, memory, tokens and time at the right behind their signs. The role is dimmed; the pencil of a colleague who may change files sits under their portrait, with a hint. The bar keeps its rounded ends at any width. Their card in the panel shows the same while they work.

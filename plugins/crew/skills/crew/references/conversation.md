@@ -12,6 +12,12 @@
 - The colleagues act too, themselves, within their permissions (their `tools:`, which the script prints): reading, changing the files of their field, running commands. What one may not do, they propose; Claude does it only when the user asks.
 - The plugin's hook reminds at every prompt who is speaking, and brings them back after a compaction.
 
+**A quick question** (`/crew:ask Giulia -- the question`, or the card's "Ask" button, which asks the question first): the colleague answers once in the chat, starting with their name, in their voice and from their memory, and the chat is Claude's again. Nothing is saved as a conversation, no memory is updated, nothing in the project changes. Which one, from the user's words:
+- a question in passing ("domanda per Giulia", "chiedi a Matteo se…", "Sara, secondo te…") → `ask`;
+- something to check, research, run or change ("fai controllare a Giulia", "verifica con Matteo", "dai a Sara il compito di…") → a task, a subagent with its report ([task.md](task.md));
+- a discussion ("voglio parlare con Matteo") → `talk`.
+When in doubt, `ask`: it costs little, and if the answer is not enough the user can still ask for the task. A colleague at work can be asked too.
+
 **Out**: each one leaving updates their memory and todo in a few lines, in their own voice; when the last one leaves, Claude is back with two or three lines on what was decided and what remains.
 
 **Without Node** (or on a host without the plugin): Claude keeps the conversation by hand. On `talk` or `invite`, read the profile (`.claude/agents/<id>.md`), `MEMORY.md` and `todo.md` of whoever joins; keep the name in front of every message and remember who is in the conversation; on `leave` or `end`, have each one leaving update memory and todo, then Claude is back. Nothing reminds who is speaking at each prompt, and a compaction forgets it: say so to the user. Tell them once that conversations need Node.js 20 or later to be kept reliably, and offer to install it (Windows: `winget install OpenJS.NodeJS.LTS`; macOS: `brew install node`; Linux: the distribution's package or nodejs.org), only if they say yes.

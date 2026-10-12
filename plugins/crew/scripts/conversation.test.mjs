@@ -64,6 +64,16 @@ describe("the commands", () => {
         assert.match(text, /Each line names who acts/);
     });
 
+    it("ask has a colleague answer one question at once, with their files, and leaves the conversation as it was", () => {
+        const text = run("ask", "ask", "Giulia -- tengo il più alto di tre dadi?");
+        assert.match(text, /A quick question for Giulia: not a meeting/);
+        assert.match(text, /The answer starts with \[Giulia\]/);
+        assert.match(text, /The question: tengo il più alto di tre dadi\?/);
+        assert.match(text, /Giulia remembers the playtest/);
+        assert.equal(hook({ hook_event_name: "UserPromptSubmit", session_id: "ask", prompt: "ciao" }), "");
+        assert.match(run("ask", "ask", "Giulia"), /No question was given/);
+    });
+
     it("invite adds a colleague, introducing only the newcomer", () => {
         const text = run("one", "invite", "Giulia");
         assert.match(text, /Meeting with Matteo and Giulia/);

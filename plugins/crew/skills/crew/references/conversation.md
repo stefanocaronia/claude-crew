@@ -16,7 +16,7 @@
 - a question in passing ("domanda per Giulia", "chiedi a Matteo se…", "Sara, secondo te…") → `ask`;
 - something to check, research, run or change ("fai controllare a Giulia", "verifica con Matteo", "dai a Sara il compito di…") → a task, a subagent with its report ([task.md](task.md));
 - a discussion ("voglio parlare con Matteo") → `talk`.
-When in doubt, `ask`: it costs little, and if the answer is not enough the user can still ask for the task. A colleague at work can be asked too.
+When in doubt, `ask`: it costs little. A question that turns out to need real work becomes a task at once, a subagent with its report; a second question to the same colleague within twenty minutes opens a conversation with them, which stays open until the user closes it. A colleague at work can be asked too.
 
 **Out**: each one leaving updates their memory and todo in a few lines, in their own voice; when the last one leaves, Claude is back with two or three lines on what was decided and what remains.
 

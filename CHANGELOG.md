@@ -2,9 +2,9 @@
 
 What changes for whoever uses Crew, version by version. Plugins update in a new chat: `/plugin`, Marketplaces, claude-crew, Update marketplace, or turn its auto-update on there.
 
-## 0.9.0 – 0.9.1
+## 0.9.0 – 0.9.2
 
-- A quick question to a colleague: `/crew:ask Giulia -- the question`, "domanda per Giulia: …", or the Ask button on their card. They answer at once in the chat, in their own voice, and the chat is Claude's again: no task, no report, no meeting; what the exchange leaves worth keeping (your decision, something learned) becomes one line of their memory. Something to check or change is still a task with its report; when in doubt Claude asks quickly.
+- A quick question to a colleague: `/crew:ask Giulia -- the question`, "domanda per Giulia: …", or the Ask button on their card. They answer at once in the chat, in their own voice, and the chat is Claude's again: no task, no report, no meeting; what the exchange leaves worth keeping (your decision, something learned) becomes one line of their memory. A second question to the same colleague within twenty minutes opens a conversation with them; a question that needs real work becomes a task at once. Something to check or change is still a task with its report; when in doubt Claude asks quickly.
 
 ## 0.7.1 – 0.8.12
 

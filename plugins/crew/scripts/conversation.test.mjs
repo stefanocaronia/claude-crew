@@ -66,13 +66,20 @@ describe("the commands", () => {
 
     it("ask has a colleague answer one question at once, with their files, and leaves the conversation as it was", () => {
         const text = run("ask", "ask", "Giulia -- tengo il più alto di tre dadi?");
+        assert.match(text, /Claude gives it to them at once as a task/);
         assert.match(text, /A quick question for Giulia: not a meeting/);
         assert.match(text, /The answer starts with \[Giulia\]/);
         assert.match(text, /The question: tengo il più alto di tre dadi\?/);
         assert.match(text, /Giulia remembers the playtest/);
         assert.match(text, /adds one line to their MEMORY\.md/);
         assert.equal(hook({ hook_event_name: "UserPromptSubmit", session_id: "ask", prompt: "ciao" }), "");
-        assert.match(run("ask", "ask", "Giulia"), /No question was given/);
+        // Asked again a little later, the question opens a conversation with Giulia, until the user closes it.
+        const again = run("ask", "ask", "Giulia -- e con lo svantaggio?");
+        assert.match(again, /A second question for Giulia: the quick question becomes a conversation/);
+        assert.match(again, /From here on Giulia speaks/);
+        assert.match(again, /The user opens on this topic: e con lo svantaggio\?/);
+        assert.match(hook({ hook_event_name: "UserPromptSubmit", session_id: "ask", prompt: "ciao" }), /Giulia is still speaking/);
+        run("ask", "end");
     });
 
     it("invite adds a colleague, introducing only the newcomer", () => {

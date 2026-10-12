@@ -7,4 +7,6 @@ Run, with Bash, from the project's folder: `node "<this skill's folder>/../../sc
 
 Without a question (the panel's button sends only the name), ask the user in one line what they want to ask, then run the command with it.
 
+A question that plainly needs real work (checking sources, running something, changing files) is a task from the start: give it to the colleague as a subagent ([task.md](../crew/references/task.md)) instead of running `ask`. A second question to the same colleague soon after the first opens a conversation by itself: the script says so.
+
 If `node` is missing (the shell says it is not found or not recognized), follow `<this skill's folder>/../crew/references/conversation.md`, "A quick question" and "Without Node".

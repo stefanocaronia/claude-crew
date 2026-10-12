@@ -13,6 +13,8 @@ const root = resolve(process.env.CLAUDE_PROJECT_DIR ?? process.cwd());
 const stateFolder = join(tmpdir(), "claude-crew");
 // Claude Code moves an additionalContext above 10,000 characters to a file: what does not fit is left to Read.
 const contextBudget = 9800;
+// A question to a colleague asked again within this time is a follow-up: the conversation opens.
+const followUpWindow = 20 * 60 * 1000;
 // Sections of a colleague's file that only serve the review rounds: in a conversation the rules below take their place.
 const roundOnlySections = /^## (?:What you return|Your memory|Cosa restituisci|La tua memoria)\b[^\n]*\n[\s\S]*?(?=^## |(?![\s\S]))/gm;
 const commands = "To bring someone in, let someone go or close the conversation, Claude runs /crew:invite, /crew:leave or "
@@ -48,9 +50,8 @@ function command(action, sessionId, text, topic = "")
         return `[Crew] No colleague ${unknown.length ? `named ${unknown.join(", ")}` : "named"} in this project: the team is ${team}. Nothing changed.`;
     }
 
-    // A quick question leaves the conversation as it is.
     if (action === "ask") {
-        return introduce(people(ids), people(ids), "", "", askRules(people(ids), topic));
+        return ask(sessionId, ids, active, people, topic);
     }
 
     const next = action === "talk" ? ids
@@ -266,6 +267,32 @@ function introduce(people, joining, opening = "", topic = "", header = "")
     return header + readLine + blocks.filter(block => block.isIncluded).map(block => block.rendered).join("") + closing;
 }
 
+// A quick question leaves the conversation as it is; a second one to a colleague asked a little earlier opens it, with them in.
+function ask(sessionId, ids, active, people, question)
+{
+    const asked = readAsked(sessionId);
+    const now = Date.now();
+    // Only a question counts: without one, Claude asks the user for it and runs the command again.
+    const again = question ? ids.filter(id => now - (asked[id] ?? 0) < followUpWindow) : [];
+
+    if (question) {
+        writeAsked(sessionId, { ...asked, ...Object.fromEntries(ids.map(id => [id, now])) });
+    }
+
+    if (!again.length) {
+        return introduce(people(ids), people(ids), "", "", askRules(people(ids), question));
+    }
+
+    const members = [...new Set([...active, ...ids])];
+    const known = people(again);
+    writeActive(sessionId, members);
+    const opening = `[Crew] A second question for ${listNames(known.map(person => person.name))}: the quick question becomes a conversation, open `
+        + "until the user closes it (\"torna Claude\", /crew:end). Say so in one italic line, then answer. "
+        + `The files of ${listNames(known.map(person => person.name))} are above, from the question before; if no longer in the context, read again `
+        + `${known.map(person => `${agentPath(person.id)} and ${memoryPath(person.id)}/`).join("; ")}.`;
+    return introduce(people(members), people(ids.filter(id => !again.includes(id) && !active.includes(id))), opening, question);
+}
+
 // A question answered at once: one turn each, in the chat, then the chat is Claude's again.
 function askRules(people, question)
 {
@@ -277,7 +304,7 @@ function askRules(people, question)
             + "as short as a chat message at work: two to five lines, the point, no headings or lists.",
         "- They answer from what they know, their memory and what the chat already holds, and may glance at a file to be sure; nothing changes "
             + "in the project and no subagent starts. When the answer needs real work (checking sources, running something, changing files), they say so "
-            + "in one line and offer it as a task, which Claude starts only if the user asks.",
+            + "in one line, and Claude gives it to them at once as a task, a subagent with its report, within their permissions.",
         "- When the exchange leaves something worth keeping (what the user decided, something learned about the project or the user), the colleague "
             + "adds one line to their MEMORY.md, editing it, never rewriting it: the date and what; a plain answer leaves no trace.",
         "- Then Claude is back, with no prefix, and adds nothing unless asked. The colleagues' instructions below no longer apply after the answer.",
@@ -349,6 +376,22 @@ function permissionPhrase(permissions)
 function withoutFrontmatter(text)
 {
     return text.replace(/^---\n[\s\S]*?\n---\n/, "");
+}
+
+// When each colleague was last asked a quick question in this session, by id.
+function readAsked(sessionId)
+{
+    try {
+        return JSON.parse(readFileSync(statePath(sessionId).replace(/\.json$/, ".asked.json"), "utf8"));
+    } catch {
+        return {};
+    }
+}
+
+function writeAsked(sessionId, asked)
+{
+    mkdirSync(stateFolder, { recursive: true });
+    writeFileSync(statePath(sessionId).replace(/\.json$/, ".asked.json"), JSON.stringify(asked));
 }
 
 function readActive(sessionId)

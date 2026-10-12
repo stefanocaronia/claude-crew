@@ -113,6 +113,8 @@ export const register: Register = (on, options) => {
     temporaryFolder = undefined;
     on("session.start", async ($, e, next) => {
         const started = await next(e);
+        // When this session last loaded the panel's code, at its start, at /reload-plugins or at a hot reload: what tells a load that took.
+        await $.fs.write(`${await tempFolder($)}/claude-crew/loaded-${(await $.session.id()).replace(/[^\w-]/g, "_")}.txt`, `${new Date(await $.clock.now()).toISOString()}\n`).catch(() => undefined);
         // The session starts again at /reload-plugins too, with its colleagues still at work: only a run whose agent the engine no
         // longer has stopped with what went before. Without the list, nobody is taken for stopped.
         const agents = await $.agent.list().catch(() => undefined);

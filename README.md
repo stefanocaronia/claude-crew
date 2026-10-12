@@ -101,7 +101,7 @@ MIT. Crew is an independent project, not affiliated with or endorsed by Anthropi
 
 ## Development notes
 
-This project was developed with assistance from AI coding tools. Every released change is reviewed, tested, and accepted by the project maintainer, who remains responsible for the software and its distribution.
+Developed with the help of AI coding agents. Everything is designed, reviewed and tested by the project maintainer.
 
 **We encourage everyone to use AI for their own purposes.**  
 The means of production should belong to the people.  

@@ -111,6 +111,10 @@ function world(on: On): void
     on("fs.stat", (_, e) => ({ value: { kind: "file", size: 1, mtimeMs: times[posix(e.path)] ?? 1, isLink: false } }) as never);
     on("agent.spawn", () => ({ model: "claude-opus-5-5", agentId: "preview-run" }) as never);
     on("tool.call", { tool: "Read" }, () => ({ result: "" }) as never);
+    // A model request of the colleague at work, with what it spent.
+    on("turn.step", async function* () {
+        return { usage: { model: "claude-opus-5-5", input_tokens: 58000, output_tokens: 1200 } };
+    } as never);
     on("ui.render", ($, e) => {
         const { Text } = $.ui.resolve(e);
         return <Text key="engine">engine</Text>;
@@ -120,7 +124,8 @@ function world(on: On): void
 test("preview", { options: { language: "${language}" }, timeoutMs: 20000 }, async ($, on) => {
     world(on);
     await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
-    ${working ? `await $.agent.spawn({ prompt: "Review.", description: "revisione del passo 13", subagentType: "${working}" } as never);
+    ${working ? `await $.agent.spawn({ prompt: "Review.", description: "revisione del passo 13", subagentType: "${working}", effort: "medium" } as never);
+    await $.turn.step({ agentId: "preview-run", model: "claude-opus-5-5", effort: "medium" } as never);
     await $.tool.call({ tool: "Read", file_path: "/p/private/project/DECISIONI.md", agentId: "preview-run", tool_use_id: "r1" } as never);
     await $.tool.call({ tool: "mcp__crew__step", done: 1, total: 5, note: "leggo todo, istruzioni e decisioni", agentId: "preview-run", tool_use_id: "s1" } as never);` : ""}
     const pane = await $.ui.mount({ plugin: "crew", surface: "desktop", component: "Pane", requestId: "crew", props: { title: "Crew", isFocused: false, bodyColumns: 50, placement: "dock" } as never });

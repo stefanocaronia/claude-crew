@@ -405,11 +405,12 @@ export const register: Register = (on, options) => {
             };
             const isDesktop = e.surface !== "terminal" && "Svg" in ui;
             // A hint under the pointer, for the controls that are only a sign: the desktop shows it on hover, the terminal draws none.
-            const tip = (key: string, hint: string, control: JSX.Element) => (isDesktop
+            // Below the control, or above it at the foot of a card, which cuts what overflows it.
+            const tip = (key: string, hint: string, control: JSX.Element, isAbove = false) => (isDesktop
                 ? (
                     <Box key={`tip-${key}`} flexShrink={0}>
                         {control}
-                        <Box position="absolute" top={1} right={0} display="none" hover={{ display: "flex" }} backgroundColor={tooltipBackground} borderStyle="round" borderColor={outline} paddingX={1}>
+                        <Box position="absolute" {...(isAbove ? { bottom: 1 } : { top: 1 })} right={0} display="none" hover={{ display: "flex" }} backgroundColor={tooltipBackground} borderStyle="round" borderColor={outline} paddingX={1}>
                             <Text color={tooltipText} wrap="truncate-end">{hint}</Text>
                         </Box>
                     </Box>
@@ -684,13 +685,36 @@ export const register: Register = (on, options) => {
                 const progress = progressOf(run);
                 const isRunning = run.status === "running";
                 // What the task costs, under its bar: the model and effort, memory and tokens, and while at work the time so far.
-                const stats = [
-                    modelName(run.model),
-                    run.effort ? say.effort(run.effort) : "",
-                    say.memoryUsed(Math.round(contextShare(run) * 100)),
-                    say.tokens(formatTokens(run.tokens, say.units)),
-                    isRunning ? formatTime((run.steppedAt ?? at) - run.startedAt) : "",
-                ].filter(Boolean).join(" · ");
+                const memory = say.memoryUsed(Math.round(contextShare(run) * 100));
+                const tokens = say.tokens(formatTokens(run.tokens, say.units));
+                const elapsed = isRunning ? formatTime((run.steppedAt ?? at) - run.startedAt) : "";
+                const effortMeter = run.effort ? effortSvg(run.effort) : undefined;
+                // On the desktop the model and its effort meter at the left, the figures at the right, each behind its sign.
+                const figure = (icon: "memory" | "bolt" | "clock", value: string, hint?: string) => {
+                    const drawn = (
+                        <Box key={`${icon}-${run.agentId}`} flexDirection="row" alignItems="center" columnGap={1} flexShrink={0}>
+                            {"Svg" in ui ? <ui.Svg source={iconSvg(icon, 12)} alt={hint ?? value} width={12} height={12} /> : null}
+                            <Text dimColor>{value}</Text>
+                        </Box>
+                    );
+                    return hint ? tip(`${icon}-${run.agentId}`, hint, drawn, true) : drawn;
+                };
+                const costs = isDesktop
+                    ? (
+                        <Box key={`stats-${run.agentId}`} flexDirection="row" flexWrap="wrap" alignItems="center" justifyContent="space-between" columnGap={2} minWidth={0}>
+                            <Box flexDirection="row" alignItems="center" columnGap={1} flexShrink={0}>
+                                <Text dimColor>{modelName(run.model)}</Text>
+                                {run.effort && effortMeter ? tip(`effort-of-${run.agentId}`, say.effort(run.effort), <ui.Svg key="meter" source={effortMeter} alt={say.effort(run.effort)} width={16} height={12} />, true) : null}
+                                {run.effort && !effortMeter ? <Text dimColor>{say.effort(run.effort)}</Text> : null}
+                            </Box>
+                            <Box flexDirection="row" alignItems="center" columnGap={2} flexShrink={0}>
+                                {figure("memory", `${Math.round(contextShare(run) * 100)}%`, memory)}
+                                {figure("bolt", formatTokens(run.tokens, say.units), tokens)}
+                                {elapsed ? figure("clock", elapsed) : null}
+                            </Box>
+                        </Box>
+                    )
+                    : <Text key={`stats-${run.agentId}`} dimColor wrap="truncate-end">{[modelName(run.model), run.effort ? say.effort(run.effort) : "", memory, tokens, elapsed].filter(Boolean).join(" · ")}</Text>;
                 const mark = isRunning ? "●" : run.status === "done" ? "✓" : "✗";
                 return colleagueCard(run.agentId, [
                     face(colleague, 40, true, isRunning),
@@ -703,12 +727,12 @@ export const register: Register = (on, options) => {
                             // Once finished, the opener shows what they answered.
                             isRunning || !run.report ? opener(isRunning ? `open-${colleague.id}` : `open-run-${run.agentId}`, colleague) : opener(`open-run-${run.agentId}`, colleague, () => openReport($, colleague.id, run.report ?? ""), say.readReport),
                         ])}
-                        <Text key={`role-${run.agentId}`} wrap="truncate-end">{roleOf(colleague)}</Text>
+                        <Text key={`role-${run.agentId}`} dimColor wrap="truncate-end">{roleOf(colleague)}</Text>
                         {workLines(run.agentId, run, colleague)}
                         <Box key={`progress-${run.agentId}`} marginTop={1}>
                             {wideBar(ui, e.surface, progress ?? contextShare(run), progress === undefined ? undefined : colleague.color)}
                         </Box>
-                        <Text key={`stats-${run.agentId}`} dimColor wrap="truncate-end">{stats}</Text>
+                        {costs}
                     </Box>,
                 ]);
             };
@@ -716,7 +740,7 @@ export const register: Register = (on, options) => {
                 face(colleague, 40, true),
                 <Box key={`lines-${colleague.id}`} flexDirection="column" flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
                     {nameRow(`open-${colleague.id}`, colleague, [writeMark(colleague), opener(`open-${colleague.id}`, colleague)])}
-                    <Text key={`role-${colleague.id}`} wrap="truncate-end">{roleOf(colleague)}</Text>
+                    <Text key={`role-${colleague.id}`} dimColor wrap="truncate-end">{roleOf(colleague)}</Text>
                     <Box key={`about-${colleague.id}`} flexDirection="row" flexWrap="nowrap" alignItems="center" minWidth={0} overflow="hidden">
                         <Box flexShrink={1} minWidth={0} overflow="hidden">
                             <Text dimColor wrap="truncate-end">{`${about(colleague)} · `}</Text>

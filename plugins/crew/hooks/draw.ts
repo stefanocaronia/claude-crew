@@ -73,6 +73,16 @@ const tints: Record<string, [string, string]> = {
     cyan: ["#0e7490", "#22d3ee"],
 };
 
+/** A square checkbox, 14 px: an outline, or filled in the colleague's light tint with a check. */
+export function checkboxSvg(isChecked: boolean, color: string): string
+{
+    const tint = tints[color.toLowerCase()]?.[1] ?? (/^#[0-9a-f]{6}$/i.test(color) ? color : "#8a8a86");
+    const box = isChecked
+        ? `<rect x="1" y="1" width="12" height="12" rx="3" fill="${tint}"/><path d="M4 7.2l2 2 4-4.4" fill="none" stroke="#1f1f1e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>`
+        : `<rect x="1.5" y="1.5" width="11" height="11" rx="2.5" fill="none" stroke="#8a8a86" stroke-width="1.2"/>`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14">${box}</svg>`;
+}
+
 /** A colleague's color as a faint background, for a card that is picked: its light tint at a tenth, readable in either theme. */
 export function pickedTint(color: string): string
 {

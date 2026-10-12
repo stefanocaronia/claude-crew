@@ -6,7 +6,7 @@ import type { EngineInterface, Register } from "claude-code";
 
 import type { Activity, Colleague, Meeting, Permissions, Preferences, Run, Speaker, WeeklyCounts } from "../types";
 
-import { avatarSvg, barEndSvg, barSvg, blankSvg, pickedTint, captionSvg, claudeSvg, effortSvg, iconSvg, nameSvg, thumbnailSvg, wideBarSvg } from "./draw.ts";
+import { avatarSvg, barEndSvg, barSvg, blankSvg, checkboxSvg, pickedTint, captionSvg, claudeSvg, effortSvg, iconSvg, nameSvg, thumbnailSvg, wideBarSvg } from "./draw.ts";
 import { claudeId, segmentsOf, speakersOf } from "./meeting.ts";
 import { imagePathsIn, imageTypeOf, isInside, isOwnMemory, resolvedPath } from "./paths.ts";
 import { contextShare, progressOf, totalTime, withCount } from "./progress.ts";
@@ -431,8 +431,16 @@ export const register: Register = (on, options) => {
             // On the desktop a small bordered button, empty or with a check, the surface's own checkbox look; on the terminal a box glyph.
             const pick = (colleague: Colleague) => {
                 const isPicked = picked.includes(colleague.id);
-                const box = isDesktop
-                    ? <Button key={`pick-${colleague.id}`} label={isPicked ? "✓" : "\u2009"} {...(isPicked ? { variant: "primary" as const } : {})} onPress={() => togglePick(colleague)} />
+                // On the desktop a square drawn at its size, a clear button laid over it takes the press; the terminal a box glyph.
+                const box = isDesktop && "Svg" in ui
+                    ? (
+                        <Box key={`pick-box-${colleague.id}`} flexShrink={0}>
+                            <ui.Svg source={checkboxSvg(isPicked, colleague.color)} alt={say.pickTip} width={14} height={14} />
+                            <Box position="absolute" top={0} left={0}>
+                                <Button key={`pick-${colleague.id}`} label={"\u2003"} plain onPress={() => togglePick(colleague)} />
+                            </Box>
+                        </Box>
+                    )
                     : <Button key={`pick-${colleague.id}`} label={isPicked ? "☑\uFE0E" : "☐"} plain onPress={() => togglePick(colleague)} />;
                 // Above it: the box sits on the card's last row, and the card cuts what overflows it.
                 return tip(`pick-${colleague.id}`, say.pickTip, box, { isAbove: true });
@@ -798,7 +806,7 @@ export const register: Register = (on, options) => {
                     <Text key={`role-${colleague.id}`} dimColor wrap="truncate-end">{roleOf(colleague)}</Text>
                     <Box key={`about-${colleague.id}`} flexDirection="row" flexWrap="nowrap" alignItems="center" columnGap={1} minWidth={0} overflow="hidden">
                         <Box flexShrink={1} minWidth={0} overflow="hidden">
-                            <Text dimColor wrap="truncate-end">{`${about(colleague)} ·`}</Text>
+                            <Text dimColor wrap="truncate-end">{about(colleague)}</Text>
                         </Box>
                         {effortButton(`effort-${colleague.id}`, colleague)}
                         <Box flexGrow={1} />

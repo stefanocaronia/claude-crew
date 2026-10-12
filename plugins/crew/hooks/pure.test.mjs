@@ -119,6 +119,13 @@ describe("meetings in the chat", () => {
 
     it("leaves alone a reply with no colleague in it, or a bracket that is not a colleague", () => {
         assert.equal(segmentsOf("Ecco il piano.", [matteo]), undefined);
+        // In a meeting, a reply that names nobody is Claude's, its italics apart.
+        const claude = { id: "claude", name: "Claude", fullName: "Claude", role: "Your assistant", color: "#D97757" };
+        assert.deepEqual(segmentsOf("*Tommaso aggiunge le scelte.*\n\nRegistro la decisione.", [matteo, claude], true)?.map(segment => [segment.speaker?.name, segment.text]), [
+            [undefined, "*Tommaso aggiunge le scelte.*"],
+            ["Claude", "Registro la decisione."],
+        ]);
+        assert.equal(segmentsOf("Registro la decisione.", [matteo, claude]), undefined);
         assert.equal(segmentsOf("[Nota] niente", [matteo]), undefined);
         assert.equal(segmentsOf("[Matteo] ciao", []), undefined);
     });

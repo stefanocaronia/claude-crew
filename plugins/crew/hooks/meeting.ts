@@ -12,8 +12,9 @@ export type Segment = {
     isContinued?: boolean;
 };
 
-/** The reply cut at each "[Name]" that starts a line, Name being a colleague's first name; undefined when no colleague speaks in it. */
-export function segmentsOf(text: string, team: Speaker[]): Segment[] | undefined
+/** The reply cut at each "[Name]" that starts a line, Name being a colleague's first name; undefined when no colleague speaks in it,
+ * unless a meeting goes on: there a reply without a name is Claude's, its italics the narration. */
+export function segmentsOf(text: string, team: Speaker[], isMeeting = false): Segment[] | undefined
 {
     if (!team.length) {
         return undefined;
@@ -23,7 +24,9 @@ export function segmentsOf(text: string, team: Speaker[]): Segment[] | undefined
     const markers = [...text.matchAll(new RegExp(`^[ \\t]*(?:\\*\\*)?\\[(${names})\\](?:\\*\\*)?:?(?:\\*\\*)?[ \\t]*`, "gim"))];
 
     if (!markers.length) {
-        return undefined;
+        const claude = team.find(member => member.id === claudeId);
+        const own = isMeeting && claude ? outside(text, claude) : [];
+        return own.length ? own : undefined;
     }
 
     const segments: Segment[] = outside(text.slice(0, markers[0]?.index ?? 0), team.find(member => member.id === claudeId));

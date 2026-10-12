@@ -907,7 +907,8 @@ export const register: Register = (on, options) => {
 
             // Claude speaks too, with [Claude], when it answers the user in a meeting.
             const claude = { id: claudeId, name: "Claude", fullName: "Claude", role: words[language].claudeRole, color: claudeOrange };
-            const segments = segmentsOf(e.props.text, [...(await read($, speakers)), claude]);
+            // In a meeting, a reply that names nobody is still Claude's, drawn as such.
+            const segments = segmentsOf(e.props.text, [...(await read($, speakers)), claude], (await read($, meeting)).members.length > 0);
 
             if (!segments) {
                 return next(e);

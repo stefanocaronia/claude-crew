@@ -98,3 +98,11 @@ The step tool, the run tracking and the drawings' light and dark colors follow [
 ## License
 
 MIT. Crew is an independent project, not affiliated with or endorsed by Anthropic. Claude is a trademark of Anthropic.
+
+---
+
+Built with the help of agentic AI.
+
+**We encourage everyone to use AI for their own purposes.**  
+The means of production should belong to the people.  
+Fight corporate control of technology, not our right to use it.

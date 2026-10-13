@@ -2,10 +2,11 @@
 
 What changes for whoever uses Crew, version by version. Plugins update in a new chat: `/plugin`, Marketplaces, claude-crew, Update marketplace, or turn its auto-update on there.
 
-## 0.10.0 – 0.10.2
+## 0.10.0 – 0.10.3
 
 - The panel shows the colleagues at work in the project's other chats too, under At work with «in another chat» beside their role: each panel shares who works in its chat every 5 seconds: who starts, stops or changes step shows at once, what they are doing and their tokens every 15 seconds, as for one's own colleagues; a chat that closes stops showing within a minute.
 - The bar's filled part is rounded at both ends too, at any width.
+- Under a quick answer, a button opens a meeting with whoever answered, for ten minutes after the question.
 
 ## 0.9.0 – 0.9.8
 

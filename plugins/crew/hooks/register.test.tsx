@@ -852,6 +852,20 @@ test("a colleague who had finished and is resumed by a message is at work again,
     await ui.unmount();
 });
 
+test("a quick answer carries a button that opens a meeting with whoever answered; a meeting's turns do not", async ($, on) => {
+    const sent = world(on, []);
+    const { files } = sent;
+    files["/tmp/claude-crew/s1.asked.json"] = JSON.stringify({ "giulia-ferri": Date.UTC(2026, 9, 10, 9, 0) });
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+    const ui = await $.ui.mount({ plugin, surface: "desktop", component: "AssistantMessage", props: { text: "[Giulia] Uno solo, il più alto.", isFirstOfReply: true } });
+    expect((await ui.find({ key: "ask-meeting" }))?.props.label).toBe("☰ Meeting with Giulia");
+    await ui.press({ key: "ask-meeting" });
+    expect(sent.at(-1)).toBe("/crew:talk Giulia");
+    // Someone who was not asked speaks in a meeting's turn: no button.
+    const other = await $.ui.mount({ plugin, surface: "desktop", component: "AssistantMessage", props: { text: "[Matteo] Regge.", isFirstOfReply: true } });
+    expect(await other.find({ key: "ask-meeting" })).toBeUndefined();
+});
+
 test("a colleague at work in another chat of the project shows at work here, and goes when that chat stops sharing", async ($, on) => {
     const { files, clock } = world(on, []);
     const at = Date.UTC(2026, 9, 10, 9, 0);

@@ -980,7 +980,10 @@ export const register: Register = (on, options) => {
             }
 
             const ui = $.ui.resolve(e);
-            const { Box, Text, Markdown } = ui;
+            const { Box, Text, Markdown, Button } = ui;
+            // A quick answer (/crew:ask, not a meeting) carries a button that opens a meeting with whoever answered.
+            const asked = (await read($, meeting)).members.length ? [] : await recentlyAsked($);
+            const answered = [...new Map(segments.flatMap(segment => (segment.speaker && asked.includes(segment.speaker.id) ? [[segment.speaker.id, segment.speaker] as const] : []))).values()];
             const stamp = await read($, gallery);
             // One weight for the whole message: the speakers' portraits first, in order, then the thumbnails with what is left.
             let left = drawingBudget;
@@ -1018,6 +1021,18 @@ export const register: Register = (on, options) => {
                             </Box>
                         );
                     })}
+                    {answered.length
+                        ? (
+                            <Box key="ask-meeting-row" flexDirection="row" flexWrap="nowrap" gap={1}>
+                                {spacer(ui, e.surface, answered[0] ?? claude)}
+                                <Button
+                                    key="ask-meeting"
+                                    label={`☰ ${say().meetWith(listNames(answered.map(speaker => speaker.name), say().and, say().comma))}`}
+                                    onPress={() => $.command.run({ command: "crew:talk", args: answered.map(speaker => speaker.name).join(" ") })}
+                                />
+                            </Box>
+                        )
+                        : null}
                 </Box>
             );
         };
@@ -1861,6 +1876,21 @@ async function shareWork($: EngineInterface): Promise<void>
         sharedDrawnAt = at;
         await update($, elsewhere, () => others);
     }
+}
+
+// The colleagues asked a quick question in this session a little while ago, as the conversation script keeps them: past that, an
+// answer's button would open a meeting nobody asked for.
+async function recentlyAsked($: EngineInterface): Promise<string[]>
+{
+    const path = `${await tempFolder($)}/claude-crew/${(await $.session.id()).replace(/[^\w-]/g, "_")}.asked.json`;
+
+    if (!(await $.fs.exists(path))) {
+        return [];
+    }
+
+    const at = await $.clock.now();
+    const asked = JSON.parse(await $.fs.read(path).catch(() => "{}")) as Record<string, number>;
+    return Object.entries(asked).flatMap(([id, when]) => (at - when < 10 * 60 * 1000 ? [id] : []));
 }
 
 async function projectRoot($: EngineInterface): Promise<string>

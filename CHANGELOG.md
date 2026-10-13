@@ -2,7 +2,7 @@
 
 What changes for whoever uses Crew, version by version. Plugins update in a new chat: `/plugin`, Marketplaces, claude-crew, Update marketplace, or turn its auto-update on there.
 
-## 0.10.0 – 0.10.3
+## 0.10.0 – 0.10.4
 
 - The panel shows the colleagues at work in the project's other chats too, under At work with «in another chat» beside their role: each panel shares who works in its chat every 5 seconds: who starts, stops or changes step shows at once, what they are doing and their tokens every 15 seconds, as for one's own colleagues; a chat that closes stops showing within a minute.
 - The bar's filled part is rounded at both ends too, at any width.
@@ -21,7 +21,7 @@ What changes for whoever uses Crew, version by version. Plugins update in a new 
 - The box that picks a free colleague for a meeting or a review is a small bordered button, with a check once picked; the picked card is tinted in their color.
 - Finished, a card says how long the task took and has a Report button that opens what they answered.
 - A colleague resumed by a message, or started before the panel saw them, shows at work.
-- In a meeting, turns are short work-chat messages; Claude speaks as itself, with its own portrait, even when it forgets to write [Claude]; colleagues act within their permissions, and the narrator's italic lines name who acts.
+- In a meeting, turns are short work-chat messages; Claude speaks as itself, with its own portrait, even when it forgets to write [Claude], and a note between tools that carries italics stays the narrator's; colleagues act within their permissions, and the narrator's italic lines name who acts.
 - Hints under the pointer on the controls that are only a sign; the settings open from a gear beside the team's actions.
 
 ## 0.7.0

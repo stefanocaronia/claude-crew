@@ -13,7 +13,7 @@ export type Segment = {
 };
 
 /** The reply cut at each "[Name]" that starts a line, Name being a colleague's first name; undefined when no colleague speaks in it,
- * unless a meeting goes on: there a reply without a name is Claude's, its italics the narration. */
+ * unless a meeting goes on: there a reply without a name is Claude's, or the narrator's when it carries italics. */
 export function segmentsOf(text: string, team: Speaker[], isMeeting = false): Segment[] | undefined
 {
     if (!team.length) {
@@ -25,7 +25,8 @@ export function segmentsOf(text: string, team: Speaker[], isMeeting = false): Se
 
     if (!markers.length) {
         const claude = team.find(member => member.id === claudeId);
-        const own = isMeeting && claude ? outside(text, claude) : [];
+        // A note that carries italics is the narrator's between tools, all of it; plain words alone are Claude speaking.
+        const own = !isMeeting || !claude ? [] : hasItalic(text) ? narration(text) : outside(text, claude);
         return own.length ? own : undefined;
     }
 
@@ -100,6 +101,13 @@ function outside(text: string, claude: Speaker | undefined): Segment[]
     }
 
     return segments;
+}
+
+// Words in italics anywhere in the text, out of code: *so* or _so_.
+function hasItalic(markdown: string): boolean
+{
+    const text = markdown.replace(/`[^`\n]*`/g, "");
+    return /(^|[^*\w])\*[^*\s][^*\n]*\*(?!\*)/.test(text) || /(^|[^_\w])_[^_\s][^_\n]*_(?!\w)/.test(text);
 }
 
 function isItalic(paragraph: string): boolean

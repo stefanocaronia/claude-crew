@@ -10,7 +10,7 @@ import { avatarSvg, barEndSvg, barSvg, blankSvg, checkboxSvg, pickedTint, captio
 import { claudeId, segmentsOf, speakersOf } from "./meeting.ts";
 import { imagePathsIn, imageTypeOf, isInside, isOwnMemory, resolvedPath } from "./paths.ts";
 import { contextShare, progressOf, totalTime, withCount } from "./progress.ts";
-import { backlogOf, cardFrom, colleagueFrom, colleagueOf, openTasks, retestsOf, withEffort, withPermissions } from "./team.ts";
+import { agentSpecFrom, backlogOf, cardFrom, colleagueFrom, colleagueOf, openTasks, retestsOf, withEffort, withPermissions } from "./team.ts";
 import { contextWindowOf, dateOf, formatTime, formatTokens, formatUntil, isoWeek, languageNames, languageOf, listNames, modelName, slugOf, words } from "./text.ts";
 import type { Language, Words } from "./text.ts";
 
@@ -35,6 +35,7 @@ const report = atom({ plugin: "crew", key: "report" } as const, null);
 const preferences = atom({ plugin: "crew", key: "preferences" } as const, { language: "auto", autoOpen: true });
 const gallery = atom({ plugin: "crew", key: "gallery" } as const, 0);
 const board = atom({ plugin: "crew", key: "board" } as const, { tasks: [], checkedAt: 0, hasCommands: true });
+const agentsWatched = atom({ plugin: "crew", key: "agentsWatched" } as const, null);
 
 // Module scope, set again at every load: the portraits as data URIs (too large for the state, whose `gallery` says when they
 // changed), and the panel's language.
@@ -106,6 +107,9 @@ const thumbnailHeight = 180;
 const thumbnailFileLimit = 60_000;
 const thumbnailsPerMessage = 2;
 const thumbnails = new Map<string, { mtimeMs: number; uri: string | undefined }>();
+// The colleagues whose profile Claude Code did not load, as the panel defines them: their agent type by id, and the profile it was
+// defined from. A load of the module defines them again, since an unload takes a plugin's agent types away.
+const lateTypes = new Map<string, { type: string; profile: string }>();
 const say = (): Words => words[language];
 
 type Table = ReturnType<EngineInterface["ui"]["resolve"]>;
@@ -115,6 +119,7 @@ export const register: Register = (on, options) => {
     language = languageOf(options.language);
     // A load that reuses the module (a test) reads the files again.
     readFiles.clear();
+    lateTypes.clear();
     temporaryFolder = undefined;
     on("session.start", async ($, e, next) => {
         const started = await next(e);
@@ -156,6 +161,14 @@ export const register: Register = (on, options) => {
             inputSchema: { type: "object", properties: {} },
         });
         await $.command.register({ name: "crew-panel", description: "Show or hide the Crew panel: the team with their cards, who is at work, the steps they report" });
+
+        // Claude Code loads the profiles of .claude/agents/ as they are written only when the folder was there at its start: noted once
+        // a session, since /reload-plugins starts it again with the folder there.
+        if ((await read($, agentsWatched)) === null) {
+            const isWatched = await $.fs.exists(`${await projectRoot($)}/.claude/agents`);
+            await update($, agentsWatched, () => isWatched);
+        }
+
         await safeRefresh($);
 
         // Five minutes after finishing, a colleague goes back to the coffee break. Checked once a minute, and the panel is redrawn only
@@ -258,6 +271,13 @@ export const register: Register = (on, options) => {
         }
 
         return result;
+    });
+
+    // A colleague hired in this session, in a project that had no .claude/agents/ at its start, is the panel's agent type: called by
+    // their id, as every colleague is.
+    on("tool.call", { tool: "Agent" }, async ($, e, next) => {
+        const late = lateTypes.get(String((e as unknown as { subagent_type?: unknown }).subagent_type ?? ""));
+        return next(late ? ({ ...e, subagent_type: late.type } as typeof e) : e);
     });
 
     on("agent.spawn", async ($, e, next) => {
@@ -1225,6 +1245,7 @@ async function refresh($: EngineInterface): Promise<void>
     const found = new Map<string, string>();
     const small = new Map<string, string>();
     const tasks: { colleague: string; lines: string[] }[] = [];
+    const profiles = new Map<string, string>();
 
     for (const [name, profile] of (await $.fs.exists(agents)) ? await filesIn($, agents) : new Map<string, FileStamp>()) {
         const id = name.endsWith(".md") ? name.slice(0, -".md".length) : "";
@@ -1255,7 +1276,13 @@ async function refresh($: EngineInterface): Promise<void>
             tasks.push({ colleague: id, lines });
         }
 
-        loaded.push(colleagueFrom(id, await cached(`${agents}/${name}`, profile, () => $.fs.read(`${agents}/${name}`)), todo, portrait?.stamp ?? 0));
+        const text = await cached(`${agents}/${name}`, profile, () => $.fs.read(`${agents}/${name}`));
+        loaded.push(colleagueFrom(id, text, todo, portrait?.stamp ?? 0));
+        profiles.set(id, text);
+    }
+
+    if ((await read($, agentsWatched)) === false) {
+        await defineLate($, root, profiles);
     }
 
     // The drawings read the portraits from the module, which a reload empties: `gallery` tells them to draw again.
@@ -1891,6 +1918,23 @@ async function recentlyAsked($: EngineInterface): Promise<string[]>
     const at = await $.clock.now();
     const asked = JSON.parse(await $.fs.read(path).catch(() => "{}")) as Record<string, number>;
     return Object.entries(asked).flatMap(([id, when]) => (at - when < 10 * 60 * 1000 ? [id] : []));
+}
+
+// The colleagues Claude Code has not loaded, as agent types of the panel's, usable from the next turn: those of a project whose
+// .claude/agents/ was missing when the session started. Defined again when their profile changes.
+async function defineLate($: EngineInterface, root: string, profiles: Map<string, string>): Promise<void>
+{
+    for (const [id, profile] of profiles) {
+        if (lateTypes.get(id)?.profile === profile) {
+            continue;
+        }
+
+        const defined = await $.agent.register(agentSpecFrom(id, profile, `${root}/.claude/agent-memory/${id}`)).catch(() => undefined);
+
+        if (defined) {
+            lateTypes.set(id, { type: defined.agent, profile });
+        }
+    }
 }
 
 async function projectRoot($: EngineInterface): Promise<string>

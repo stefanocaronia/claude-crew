@@ -89,6 +89,28 @@ export function profileSections(profile: string): Card["profile"]
     return sections.filter(section => section.text);
 }
 
+/** A colleague as an agent type the panel defines, for a profile Claude Code has not loaded: its frontmatter's description, tools,
+ * model and effort, and its body as the prompt. Their memory folder is named in the prompt, since a type of the panel's own
+ * would keep a memory of its own elsewhere. */
+export function agentSpecFrom(id: string, profile: string, memoryFolder: string): { name: string; description: string; prompt: string; tools?: string[]; model?: string; effort?: string }
+{
+    const text = profile.replace(/^﻿/, "").replace(/\r\n/g, "\n");
+    const tools = listField(text, "tools");
+    const model = field(text, "model");
+    const effort = field(text, "effort");
+    const body = text.replace(/^---\n[\s\S]*?\n---\n/, "").trim();
+    const memory = `Your memory is the folder ${memoryFolder}/: read its MEMORY.md and todo.md before anything else, and write what you learn there, `
+        + "as your profile says.";
+    return {
+        name: id,
+        description: field(text, "description") ?? id,
+        prompt: `${body}\n\n${memory}`,
+        ...(tools === undefined ? {} : { tools: toolsOf(tools) }),
+        ...(model ? { model } : {}),
+        ...(effort ? { effort } : {}),
+    };
+}
+
 /** The colleague behind an agent type: "matteo-conti", or "plugin:matteo-conti" for an agent a plugin ships. */
 export function colleagueOf(team: Colleague[], subagentType: string): Colleague | undefined
 {

@@ -159,6 +159,9 @@ declare module "claude-code" {
             board: Board;
             /** Changes when the portraits are read again, so the drawings that show them are redrawn. */
             gallery: number;
+            /** Whether .claude/agents/ was there when the session started, so Claude Code loads the profiles written in it later on its own;
+             * null until the session first starts. */
+            agentsWatched: boolean | null;
         };
     }
 }

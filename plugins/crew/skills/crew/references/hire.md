@@ -21,4 +21,4 @@
 4. **Open their folder**, `.claude/agent-memory/<id>/`: `MEMORY.md` (`# <First>: memory`, then `## <date>: hired` and why, in a line or two) and `todo.md` (`# <First>: todo`, with the first tasks if there are any).
 5. **Portrait**: [portrait.md](portrait.md).
 6. **Add their row** to the team table.
-7. **Tell the user** who joined, their field and their files. Claude Code picks up a new agent file during the session; if the Agent tool does not list the new colleague yet, they work from the next session.
+7. **Tell the user** who joined, their field and their files. Claude Code picks up a new agent file during the session when `.claude/agents/` was there at its start; when it was not, the panel defines the new colleague, called by their id from the next message. Without the panel, a colleague the Agent tool does not list yet works from the next session.

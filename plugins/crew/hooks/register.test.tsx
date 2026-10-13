@@ -369,6 +369,49 @@ test("a meeting that starts sends whoever had finished to the coffee break", asy
     expect((await ui.find({ key: "team-toggle" }))?.props.label).toBe("▾ ☕︎ On a coffee break · 2");
 });
 
+test("a colleague hired in a project that had no .claude/agents/ at the session's start is the panel's agent type, called by their id", async ($, on) => {
+    const sent = world(on, []);
+    const { files } = sent;
+    const hired = Object.entries(files).filter(([path]) => path.startsWith("/p/.claude/"));
+    hired.forEach(([path]) => delete files[path]);
+    const defined: { name: string; prompt: string; tools?: string[] }[] = [];
+    on("agent.register", (_, e) => {
+        defined.push(e as never);
+        return { value: { agent: `crew:${(e as { name: string }).name}` } } as never;
+    });
+    const calls: string[] = [];
+    on("tool.call", (_, e) => {
+        calls.push(String((e as { subagent_type?: string }).subagent_type));
+        return { result: "ran" } as never;
+    });
+    on("turn.complete", () => ({ text: "" }) as never);
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+    hired.forEach(([path, text]) => (files[path] = text));
+    await $.turn.complete({ reason: "answer", answer: "", durationMs: 1000, isAborted: false, turnId: "t1" } as never);
+    expect(defined.map(spec => spec.name).sort()).toEqual(["giulia-ferri", "matteo-conti", "sara-lombardi"]);
+    expect(defined.find(spec => spec.name === "matteo-conti")?.tools).toEqual(["Read"]);
+    expect(defined.find(spec => spec.name === "matteo-conti")?.prompt).toMatch(/^# Matteo Conti, code review\n\nYour memory is the folder \/p\/\.claude\/agent-memory\/matteo-conti\//);
+    await $.tool.call({ tool: "Agent", subagent_type: "matteo-conti", prompt: "Review.", description: "review", tool_use_id: "t2" } as never);
+    await $.tool.call({ tool: "Agent", subagent_type: "Explore", prompt: "Find.", description: "find", tool_use_id: "t3" } as never);
+    expect(calls).toEqual(["crew:matteo-conti", "Explore"]);
+    // Read again unchanged, nobody is defined twice.
+    await $.turn.complete({ reason: "answer", answer: "", durationMs: 1000, isAborted: false, turnId: "t4" } as never);
+    expect(defined.length).toBe(3);
+});
+
+test("a project whose .claude/agents/ was there at the start leaves its new profiles to Claude Code", async ($, on) => {
+    world(on, []);
+    const defined: string[] = [];
+    on("agent.register", (_, e) => {
+        defined.push((e as { name: string }).name);
+        return { value: { agent: "x" } } as never;
+    });
+    on("turn.complete", () => ({ text: "" }) as never);
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+    await $.turn.complete({ reason: "answer", answer: "", durationMs: 1000, isAborted: false, turnId: "t1" } as never);
+    expect(defined).toEqual([]);
+});
+
 test("a colleague without reading or writing works only in their own memory folder", async ($, on) => {
     world(on, []);
     on("tool.call", () => ({ result: "ran" }) as never);

@@ -1563,7 +1563,7 @@ async function recordRun($: EngineInterface, colleague: Colleague, task: string,
     // A new task sends whoever had finished back to the coffee break: the panel shows the work now going on.
     await update($, runs, list => [...list.filter(other => other.agentId !== run.agentId).map(other => (other.status !== "running" ? { ...other, isBack: true } : other)), run].slice(-100));
     await countWeek($, colleague.id, "tasks");
-    await openOnce($);
+    await openForWork($);
 }
 
 // A colleague's answer kept in their notes, so the round's report outlives the session: notes/<date>-<task>.md, never over another.
@@ -1947,6 +1947,10 @@ async function setMeeting($: EngineInterface, members: string[], pending?: Meeti
 {
     const current = await read($, meeting);
 
+    if (members.some(id => !current.members.includes(id))) {
+        await openForWork($);
+    }
+
     if (members.some(id => !current.members.includes(id)) && (await read($, runs)).some(run => run.status !== "running" && !run.isBack)) {
         await update($, runs, list => list.map(run => (run.status !== "running" ? { ...run, isBack: true } : run)));
     }
@@ -2033,6 +2037,17 @@ async function systemTemp($: EngineInterface): Promise<string>
     }
 
     return isWindows ? `${((await $.env.get("SystemRoot")) ?? "C:/Windows").replace(/\\/g, "/")}/temp` : "/tmp";
+}
+
+// A colleague who starts a task or joins a meeting brings the panel back, closed or not, to follow them there.
+async function openForWork($: EngineInterface): Promise<void>
+{
+    if ((await $.ui.panes().catch(() => [])).some(open => open.id === pane)) {
+        return;
+    }
+
+    // A session with nowhere to draw (headless) has no pane to open.
+    void $.ui.open({ id: pane, title: say().pane }).catch(() => undefined);
 }
 
 async function openOnce($: EngineInterface): Promise<void>

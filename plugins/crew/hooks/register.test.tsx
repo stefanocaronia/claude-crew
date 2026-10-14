@@ -412,6 +412,23 @@ test("a project whose .claude/agents/ was there at the start leaves its new prof
     expect(defined).toEqual([]);
 });
 
+test("a colleague who starts a task or joins a meeting opens the panel when it is closed, and leaves it alone when open", async ($, on) => {
+    const sent = world(on, []);
+    let isOpen = false;
+    on("ui.panes", () => ({ value: isOpen ? [{ id: "crew" }] : [] }) as never);
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+    const before = opens;
+    await $.agent.spawn({ prompt: "Think about modes.", description: "modes", subagentType: "sara-lombardi" } as never);
+    expect(opens).toBe(before + 1);
+    isOpen = true;
+    await $.agent.spawn({ prompt: "Review.", description: "review", subagentType: "matteo-conti" } as never);
+    expect(opens).toBe(before + 1);
+    isOpen = false;
+    sent.files["/tmp/claude-crew/s1.json"] = JSON.stringify({ active: ["giulia-ferri"] });
+    await $.turn.start({ text: "/crew:talk Giulia", turnId: "t1" } as never);
+    expect(opens).toBe(before + 2);
+});
+
 test("a colleague without reading or writing works only in their own memory folder", async ($, on) => {
     world(on, []);
     on("tool.call", () => ({ result: "ran" }) as never);

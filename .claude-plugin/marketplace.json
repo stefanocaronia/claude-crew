@@ -12,7 +12,7 @@
       "name": "crew",
       "source": "./plugins/crew",
       "description": "Crew: set up a team of expert colleagues, hire, fire and portray them, run review rounds, talk with them one-to-one or in meetings; the Crew panel shows the team, their work, their reports and the meetings.",
-      "version": "0.10.5",
+      "version": "0.10.6",
       "category": "skill"
     }
   ]

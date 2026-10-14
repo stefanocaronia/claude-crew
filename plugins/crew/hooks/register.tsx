@@ -1972,8 +1972,8 @@ async function busyReason($: EngineInterface, colleague: Colleague): Promise<str
 
     if ((await read($, meeting)).members.includes(colleague.id)) {
         await countWeek($, colleague.id, "refusals");
-        return `${colleague.name} is in the meeting with the user and takes no other task: what the user asks during the meeting, ${colleague.name} does there, in the chat. `
-            + `To give them this task, ask the user whether to let them leave the meeting (/crew:leave ${colleague.name}) or to close it (/crew:end).`;
+        return `${colleague.name} is in the meeting with the user: short acts they do there, in the chat. Long work goes in the background: `
+            + `run /crew:leave ${colleague.name} first (the others stay), then give them this task again.`;
     }
 
     return undefined;

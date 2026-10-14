@@ -327,7 +327,7 @@ test("a colleague at work or in the meeting takes no other task, and Claude is t
     const again = await $.agent.spawn({ prompt: "Review the map.", description: "review the map", subagentType: "matteo-conti" } as never);
     expect((again as { deny?: string }).deny).toMatch(/Matteo is already at work on "review the parser", and a colleague takes one task at a time\. Give this one to them when that task's result comes back, to another colleague of the field, or do it yourself; ask the user if it matters which\./);
     const met = await $.agent.spawn({ prompt: "Read the playtest.", description: "read the playtest", subagentType: "giulia-ferri" } as never);
-    expect((met as { deny?: string }).deny).toMatch(/Giulia is in the meeting.*\/crew:leave Giulia.*\/crew:end/);
+    expect((met as { deny?: string }).deny).toMatch(/Giulia is in the meeting.*Long work goes in the background.*\/crew:leave Giulia first/);
     const free = await $.agent.spawn({ prompt: "Think about modes.", description: "modes", subagentType: "sara-lombardi" } as never);
     expect((free as { agentId?: string }).agentId).toBe("a2");
 });

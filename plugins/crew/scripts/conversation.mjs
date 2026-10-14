@@ -224,6 +224,9 @@ function rules(people)
             : `- Every message starts with [${names[0]}].`,
         "- Talk, don't report: this is a conversation, not a review round. Each colleague also acts in it, themselves, within their own permissions: "
             + "reading the project, changing the files of their field, running commands, under the project's rules (discuss first, then change; commit only when the user asks).",
+        "- Long work the user asks of one of them (a prototype, a run of tests, changes across many files: minutes, not a glance) goes in the background: "
+            + "they say so in their turn, Claude runs the leave command for them (/crew:leave <name>; the others stay), then gives them the task as a subagent with its report. "
+            + "Short acts stay here, in the chat.",
         `- Their permissions, binding: ${people.map(person => `${person.name} ${permissionPhrase(person.permissions)}`).join("; ")}. What one may not do, they propose; Claude does it only when the user asks.`,
         "- What falls outside one's field is said, and the right colleague is named.",
         "- Memory and todo: the lines ticked [x] in an earlier session are removed, and open lines already done in the project are ticked; both are edited, never rewritten, because other "
@@ -231,7 +234,8 @@ function rules(people)
         "- Claude stays out of the dialogue as a narrator: its lines, the notes between tools included, are in italics, with no name in front, "
             + "and say what happens (tools, files, errors), never the colleagues' opinions. Each line names who acts: *Joseph opens style.css*, *Matteo runs the tests*; "
             + "Claude names itself only for what it does in its own name. When Claude itself speaks to the user (an answer, a question, "
-            + "what it is about to do), the turn starts with [Claude] and is as short as the others'.",
+            + "what it is about to do), the turn starts with [Claude] and is as short as the others'. A colleague's words, their plans and what they are about to do "
+            + "included, are their own turn under their name: never plain lines in their first person.",
         "- Answer in the language the user writes in.",
         `- ${commands}`,
     ].join("\n");
@@ -320,7 +324,8 @@ function remind(people)
         ? `Still a meeting with ${listNames(names)}: each turn starts with the speaker's name, each in their own voice, as short as a chat message at work (two to five lines, one point, no lists); what happens, notes between tools too, in italics, naming who acts; each acts only within their permissions; Claude speaking to the user starts with [Claude].`
         : `${names[0]} is still speaking: start with [${names[0]}], as short as a chat message at work (two to five lines, one point, no lists); what happens, notes between tools too, in italics, naming who acts; ${names[0]} acts only within their permissions; Claude speaking to the user starts with [Claude].`;
     const files = people.map(person => `${agentPath(person.id)} and ${memoryPath(person.id)}/`).join("; ");
-    return `[Crew] ${who} If no longer in the context, read again ${files}.`;
+    const work = "A colleague's plans are their turn, under their name. Long work asked of one goes in the background: /crew:leave <name>, then the task.";
+    return `[Crew] ${who} ${work} If no longer in the context, read again ${files}.`;
 }
 
 function dismiss(people)

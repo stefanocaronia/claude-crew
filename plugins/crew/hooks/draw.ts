@@ -37,14 +37,7 @@ export function claudeSvg(size: number): string
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="${size}" height="${size}"><circle cx="8" cy="8" r="8" fill="#F3E6DC"/><g shape-rendering="crispEdges">${runs.join("")}</g></svg>`;
 }
 
-export function barSvg(share: number, color: string | undefined, width: number): string
-{
-    const height = 6;
-    const fill = Math.round(width * Math.max(0, Math.min(1, share)));
-    return svg(width, height, `<rect class="k" width="${width}" height="${height}" rx="3"/><rect width="${fill}" height="${height}" rx="3" fill="${color ?? "#8a8a86"}"/>`);
-}
-
-/** A small line icon for the usage cards: a clock for the five hours, a calendar for the week, a bolt for the colleagues' work. */
+/** A small line icon: a clock for time, a calendar, a bolt for the colleagues' work, a pencil, their memory. */
 export function iconSvg(name: "clock" | "calendar" | "bolt" | "pencil" | "memory", size: number, top = 0): string
 {
     const stroke = `fill="none" stroke="#8a8a86" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"`;

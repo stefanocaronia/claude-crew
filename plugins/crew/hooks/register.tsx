@@ -6,12 +6,12 @@ import type { EngineInterface, Register } from "claude-code";
 
 import type { Activity, Colleague, Meeting, Permissions, Preferences, Run, Speaker, WeeklyCounts } from "../types";
 
-import { avatarSvg, barEndSvg, barSvg, blankSvg, checkboxSvg, pickedTint, captionSvg, claudeSvg, effortSvg, iconSvg, nameSvg, thumbnailSvg, wideBarSvg } from "./draw.ts";
+import { avatarSvg, barEndSvg, blankSvg, checkboxSvg, pickedTint, captionSvg, claudeSvg, effortSvg, iconSvg, nameSvg, thumbnailSvg, wideBarSvg } from "./draw.ts";
 import { claudeId, segmentsOf, speakersOf } from "./meeting.ts";
 import { imagePathsIn, imageTypeOf, isInside, isOwnMemory, resolvedPath } from "./paths.ts";
-import { contextShare, progressOf, totalTime, withCount } from "./progress.ts";
+import { contextShare, progressOf, withCount } from "./progress.ts";
 import { agentSpecFrom, backlogOf, cardFrom, colleagueFrom, colleagueOf, openTasks, retestsOf, withEffort, withPermissions } from "./team.ts";
-import { contextWindowOf, dateOf, formatTime, formatTokens, formatUntil, isoWeek, languageNames, languageOf, listNames, modelName, slugOf, words } from "./text.ts";
+import { contextWindowOf, dateOf, formatTime, formatTokens, isoWeek, languageNames, languageOf, listNames, modelName, slugOf, words } from "./text.ts";
 import type { Language, Words } from "./text.ts";
 
 const pane = "crew";
@@ -28,7 +28,6 @@ const speakers = atom({ plugin: "crew", key: "speakers" } as const, []);
 const runs = atom({ plugin: "crew", key: "runs" } as const, []);
 const elsewhere = atom({ plugin: "crew", key: "elsewhere" } as const, []);
 const meeting = atom({ plugin: "crew", key: "meeting" } as const, { members: [] });
-const budget = atom({ plugin: "crew", key: "budget" } as const, []);
 const view = atom({ plugin: "crew", key: "view" } as const, { isFinishedCollapsed: false, autoOpened: false });
 const card = atom({ plugin: "crew", key: "card" } as const, null);
 const report = atom({ plugin: "crew", key: "report" } as const, null);
@@ -371,8 +370,15 @@ export const register: Register = (on, options) => {
         releaseFiles([agentId]);
         const ended = (await read($, runs)).find(other => other.agentId === agentId);
         const file = ended && e.reason === "answer" && e.answer.trim() ? await saveReport($, ended, e.answer, at).catch(() => undefined) : undefined;
+        // The week counts the tokens not yet counted: a run resumed by a message ends again with all of them.
+        const tokens = ended ? withSteps(ended, steps).tokens : 0;
+
+        if (ended && tokens > (ended.countedTokens ?? 0)) {
+            await countWeek($, ended.colleague, "tokens", tokens - (ended.countedTokens ?? 0));
+        }
+
         // One write, so the panel is redrawn once: the steps not yet shown, the end, the report's file.
-        await update($, runs, list => list.map(run => (run.agentId !== agentId ? run : { ...withSteps(run, steps), status: e.reason === "answer" ? "done" : "failed", endedAt: at, ...(file ? { report: file } : {}) })));
+        await update($, runs, list => list.map(run => (run.agentId !== agentId ? run : { ...withSteps(run, steps), status: e.reason === "answer" ? "done" : "failed", endedAt: at, countedTokens: tokens, ...(file ? { report: file } : {}) })));
 
         return next(e);
     });
@@ -411,7 +417,6 @@ export const register: Register = (on, options) => {
             const colleagues = await read($, team);
             const list = await read($, runs);
             const talk = await read($, meeting);
-            const windows = await read($, budget);
             const panel = await read($, view);
             const stamp = await read($, gallery);
             const latest = await read($, board);
@@ -854,17 +859,13 @@ export const register: Register = (on, options) => {
                     </Box>
                 )
                 : null);
-            // Only what the engine knows: the plan's windows when it has a reading, the colleagues' work once there is some.
-            const tiles = [
-                ...windows.filter(window => window.kind === "seven_day" || window.kind === "five_hour").map(window => ({
-                    label: window.kind === "seven_day" ? say.week : say.hours,
-                    icon: window.kind === "seven_day" ? "calendar" as const : "clock" as const,
-                    value: say.used(Math.round(window.percentUsed)),
-                    note: window.resetsAt ? say.resetsIn(formatUntil(window.resetsAt, at, say.units)) : "",
-                    share: window.percentUsed / 100,
-                })),
-                ...(list.length ? [{ label: say.teamWork, value: `${formatTime(totalTime(list, at))} · ${say.tokens(formatTokens(list.reduce((sum, run) => sum + run.tokens, 0), say.units))}`, note: "", icon: "bolt" as const, share: undefined }] : []),
-            ];
+            // The colleagues' week, which the plan's limits do not tell: their tasks and tokens, and who worked most. The limits
+            // themselves are the app's to show.
+            const thisWeek = (await weeklyCounts($))[isoWeek(await $.clock.now())] ?? {};
+            const weekRows = colleagues.flatMap(colleague => (thisWeek[colleague.id]?.tasks ? [{ colleague, tasks: thisWeek[colleague.id]?.tasks ?? 0, tokens: thisWeek[colleague.id]?.tokens ?? 0 }] : []))
+                .sort((first, second) => second.tasks - first.tasks || first.colleague.name.localeCompare(second.colleague.name));
+            const weekTokens = weekRows.reduce((sum, row) => sum + row.tokens, 0);
+            const weekValue = [say.tasksCount(weekRows.reduce((sum, row) => sum + row.tasks, 0)), weekTokens ? say.tokens(formatTokens(weekTokens, say.units)) : ""].filter(Boolean).join(" · ");
             // The backlog: a low card for each task, with who holds it, the task on one line cut at the edge (whole in a tooltip) and a
             // meter of the effort it needs.
             const effortCell = (key: string, level: string) => (
@@ -907,21 +908,17 @@ export const register: Register = (on, options) => {
                     {latest.error ? <Text key="error" dimColor>{say.readError(latest.error)}</Text> : null}
                     {heavy.length ? <Text key="heavy" dimColor>{say.heavyPortraits(listNames(heavy, say.and, say.comma))}</Text> : null}
                     {latest.hasCommands ? null : <Text key="install" dimColor>{say.installSkill}</Text>}
-                    {tiles.length
-                        ? (
-                            <Box key="tiles" flexDirection="row" flexWrap="wrap" gap={1}>
-                                {tiles.map(tile => (
-                                    <Box key={`tile-${tile.label}`} flexDirection="column" flexGrow={1} minWidth={0} overflow="hidden" borderStyle="round" {...border} paddingX={1}>
-                                        <Box flexDirection="row" columnGap={1} alignItems="center">
-                                            {isDesktop ? <ui.Svg source={iconSvg(tile.icon, 16)} alt={tile.label} width={16} height={16} /> : null}
-                                            <Text dimColor wrap="truncate-end">{tile.label}</Text>
-                                        </Box>
-                                        <Text bold wrap="truncate-end">{tile.value}{tile.note ? <Text dimColor>{` · ${tile.note}`}</Text> : null}</Text>
-                                        {tile.share === undefined ? null : bar(ui, e.surface, tile.share, tile.share > 0.85 ? errorColor : tile.share > 0.6 ? "#D9932B" : "#3B9C5F")}
-                                    </Box>
-                                ))}
-                            </Box>
-                        )
+                    {weekRows.length
+                        ? outlined("week", [
+                            <Box key="week-head" flexDirection="row" columnGap={1} alignItems="center">
+                                {isDesktop ? <ui.Svg source={iconSvg("bolt", 16)} alt={say.teamWeek} width={16} height={16} /> : null}
+                                <Text dimColor wrap="truncate-end">{say.teamWeek}</Text>
+                            </Box>,
+                            <Text key="week-value" bold wrap="truncate-end">
+                                {weekValue}
+                                <Text dimColor>{` · ${weekRows.slice(0, 3).map(row => `${row.colleague.name} ${row.tasks}`).join(say.comma)}`}</Text>
+                            </Text>,
+                        ])
                         : null}
                     {fold("meeting", sectionIcons.meeting, say.inMeetingSection, meetingMembers.map(colleague => teamRow(colleague, false)), Boolean(panel.isMeetingCollapsed), current => ({ ...current, isMeetingCollapsed: !current.isMeetingCollapsed }))}
                     {fold("working", sectionIcons.working, say.working, running.map(runRow), Boolean(panel.isWorkingCollapsed), current => ({ ...current, isWorkingCollapsed: !current.isWorkingCollapsed }))}
@@ -1163,18 +1160,6 @@ function wideBar(ui: Table, surface: string, share: number, color: string | unde
     );
 }
 
-function bar(ui: Table, surface: string, share: number, color: string | undefined)
-{
-    const { Text } = ui;
-
-    if (surface === "terminal" || !("Svg" in ui)) {
-        const filled = Math.round(12 * Math.max(0, Math.min(1, share)));
-        return <Text key="bar" color={color} dimColor={!color}>{"█".repeat(filled) + "░".repeat(12 - filled)}</Text>;
-    }
-
-    return <ui.Svg key="bar" source={barSvg(share, color, 120)} alt={`${Math.round(share * 100)}%`} width={120} height={6} />;
-}
-
 // The meeting above the prompt, on one line: its title, an outlined chip for each one in it (portrait, name, who speaks, a ✕ to let
 // them go), a menu to invite whoever is free, and at the right the button that closes it. Each control sends the crew plugin's
 // command, as the user would type it.
@@ -1333,12 +1318,6 @@ async function refresh($: EngineInterface): Promise<void>
         await update($, speakers, () => voices);
     }
 
-    const usage = await $.session.usage();
-    const windows = usage.rateLimits.map(window => ({ kind: window.kind, percentUsed: window.percentUsed, resetsAt: window.resetsAt }));
-
-    if (JSON.stringify(windows) !== JSON.stringify(await read($, budget))) {
-        await update($, budget, () => windows);
-    }
 
     await refreshMeeting($);
 }
@@ -1560,9 +1539,9 @@ async function recordRun($: EngineInterface, colleague: Colleague, task: string,
         contextMax: contextWindowOf(model),
         tokens: 0,
     };
+    await countWeek($, colleague.id, "tasks");
     // A new task sends whoever had finished back to the coffee break: the panel shows the work now going on.
     await update($, runs, list => [...list.filter(other => other.agentId !== run.agentId).map(other => (other.status !== "running" ? { ...other, isBack: true } : other)), run].slice(-100));
-    await countWeek($, colleague.id, "tasks");
     await openForWork($);
 }
 
@@ -1616,11 +1595,11 @@ async function weeklyCounts($: EngineInterface): Promise<WeeklyCounts>
     }
 }
 
-// One more task or refusal for a colleague this week, kept across sessions; only the last weeks stay.
-async function countWeek($: EngineInterface, id: string, kind: "tasks" | "refusals"): Promise<void>
+// One more task or refusal for a colleague this week, or their tokens, kept across sessions; only the last weeks stay.
+async function countWeek($: EngineInterface, id: string, kind: "tasks" | "refusals" | "tokens", amount = 1): Promise<void>
 {
     counting = counting.then(async () => {
-        await $.store.set("weekly", withCount(await weeklyCounts($), isoWeek(await $.clock.now()), id, kind, weeksKept));
+        await $.store.set("weekly", withCount(await weeklyCounts($), isoWeek(await $.clock.now()), id, kind, weeksKept, amount));
     }).catch(() => undefined);
     await counting;
 }

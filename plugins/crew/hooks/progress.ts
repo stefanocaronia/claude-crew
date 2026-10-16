@@ -28,10 +28,10 @@ export function totalTime(runs: Run[], now: number): number
     return end - start;
 }
 
-/** The week's counts with one more task or refusal for a colleague; only the last `kept` weeks stay. */
-export function withCount(counts: WeeklyCounts, week: string, id: string, kind: "tasks" | "refusals", kept: number): WeeklyCounts
+/** The week's counts with one more task or refusal for a colleague, or their tokens added; only the last `kept` weeks stay. */
+export function withCount(counts: WeeklyCounts, week: string, id: string, kind: "tasks" | "refusals" | "tokens", kept: number, amount = 1): WeeklyCounts
 {
     const current = counts[week]?.[id] ?? { tasks: 0, refusals: 0 };
-    const next: WeeklyCounts = { ...counts, [week]: { ...counts[week], [id]: { ...current, [kind]: current[kind] + 1 } } };
+    const next: WeeklyCounts = { ...counts, [week]: { ...counts[week], [id]: { ...current, [kind]: (current[kind] ?? 0) + amount } } };
     return Object.fromEntries(Object.keys(next).sort().slice(-kept).map(key => [key, next[key] ?? {}]));
 }

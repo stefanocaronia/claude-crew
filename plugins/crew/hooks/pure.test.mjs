@@ -229,6 +229,7 @@ describe("the week's counts", () => {
         assert.deepEqual(Object.keys(next), ["2026-W31", "2026-W32", "2026-W33", "2026-W34", "2026-W35", "2026-W36", "2026-W37", "2026-W41"]);
         assert.deepEqual(next["2026-W41"], { sara: { tasks: 0, refusals: 1 } });
         assert.deepEqual(withCount(next, "2026-W41", "sara", "tasks", 8)["2026-W41"], { sara: { tasks: 1, refusals: 1 } });
+        assert.deepEqual(withCount(withCount(next, "2026-W41", "sara", "tokens", 8, 1200), "2026-W41", "sara", "tokens", 8, 300)["2026-W41"], { sara: { tasks: 0, refusals: 1, tokens: 1500 } });
     });
 
     it("makes a file name of a task", () => {

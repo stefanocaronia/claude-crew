@@ -202,7 +202,9 @@ test("under the team: the backlog, each task with who holds it and its effort; t
 
     for (const surface of surfaces) {
         const ui = await $.ui.mount({ plugin, surface, component: "Pane", requestId: "crew", props: { title: "Crew", isFocused: false, bodyColumns: 50, placement: "dock" } as never });
-        expect(await ui.find({ type: "Text", text: /62% used · resets in 1d 20h/ })).toBeDefined();
+        // The plan's limits are the app's to show; the colleagues' week shows once they work.
+        expect(await ui.find({ type: "Text", text: /% used/ })).toBeUndefined();
+        expect(await ui.find({ type: "Text", text: "Colleagues this week" })).toBeUndefined();
         expect((await ui.find({ key: "backlog-toggle" }))?.props.label).toBe("▸ Backlog");
         expect(await ui.find({ type: "Text", text: "retest the parser" })).toBeUndefined();
         await ui.press({ key: "backlog-toggle" });
@@ -427,6 +429,22 @@ test("a colleague who starts a task or joins a meeting opens the panel when it i
     sent.files["/tmp/claude-crew/s1.json"] = JSON.stringify({ active: ["giulia-ferri"] });
     await $.turn.start({ text: "/crew:talk Giulia", turnId: "t1" } as never);
     expect(opens).toBe(before + 2);
+});
+
+test("the colleagues' week: their tasks and tokens, who worked most, at the top of the panel", async ($, on) => {
+    world(on, []);
+    on("turn.complete", () => ({ text: "" }) as never);
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+    await $.agent.spawn({ prompt: "Think about modes.", description: "modes", subagentType: "sara-lombardi" } as never);
+    await $.turn.complete({ agentId: "a1", reason: "answer", answer: "done", durationMs: 1000, isAborted: false, turnId: "t1" } as never);
+    await $.agent.spawn({ prompt: "Again.", description: "modes again", subagentType: "sara-lombardi" } as never);
+    await $.agent.spawn({ prompt: "Review.", description: "review", subagentType: "matteo-conti" } as never);
+
+    for (const surface of surfaces) {
+        const ui = await $.ui.mount({ plugin, surface, component: "Pane", requestId: "crew", props: pane });
+        expect(await ui.find({ type: "Text", text: "Colleagues this week" })).toBeDefined();
+        expect(await ui.find({ type: "Text", text: /^3 tasks · Sara 2, Matteo 1$/ })).toBeDefined();
+    }
 });
 
 test("a colleague without reading or writing works only in their own memory folder", async ($, on) => {

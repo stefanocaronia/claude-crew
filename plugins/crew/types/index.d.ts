@@ -33,6 +33,8 @@ export type RunStatus = "running" | "done" | "failed";
 export type Run = {
     /** At work in another chat of the project, shown here as its panel shares it. */
     isElsewhere?: boolean;
+    /** The tokens already added to the week's counts, for a run that ends again after a message resumes it. */
+    countedTokens?: number;
     agentId: string;
     colleague: string;
     task: string;
@@ -70,13 +72,6 @@ export type Meeting = {
     members: string[];
     /** What the band's controls just set, until the command's state file says the same. */
     pending?: { members: string[]; at: number };
-};
-
-/** A rate-limit window as the status line has it: five_hour, seven_day. */
-export type Budget = {
-    kind: string;
-    percentUsed: number;
-    resetsAt?: string;
 };
 
 /** The team's open tasks, read from their files at every turn. */
@@ -140,7 +135,7 @@ export type Report = {
 };
 
 /** What the colleagues did in each ISO week, kept across sessions in the plugin's store: by week ("2026-W41"), then by id. */
-export type WeeklyCounts = Record<string, Record<string, { tasks: number; refusals: number }>>;
+export type WeeklyCounts = Record<string, Record<string, { tasks: number; refusals: number; tokens?: number }>>;
 
 declare module "claude-code" {
     interface PluginState {
@@ -151,7 +146,6 @@ declare module "claude-code" {
             /** The colleagues at work in the project's other chats, as their panels share them. */
             elsewhere: Run[];
             meeting: Meeting;
-            budget: Budget[];
             view: PanelView;
             card: Card | null;
             report: Report | null;

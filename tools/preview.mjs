@@ -248,6 +248,10 @@ function boxStyle(props)
         props.columnGap !== undefined ? `column-gap:${cell(props.columnGap)}` : "",
         props.rowGap !== undefined ? `row-gap:${cell(props.rowGap)}` : "",
         props.paddingLeft !== undefined ? `padding-left:${cell(props.paddingLeft)}` : "",
+        props.paddingX !== undefined ? `padding-left:${cell(props.paddingX)};padding-right:${cell(props.paddingX)}` : "",
+        props.paddingY !== undefined ? `padding-top:${cell(props.paddingY)};padding-bottom:${cell(props.paddingY)}` : "",
+        // The outlined cards: a thin line in their color, rounded as the desktop draws them.
+        props.borderStyle ? `border:1px solid ${props.borderColor ?? "#8080803d"};border-radius:${props.borderStyle === "round" ? 8 : 0}px;padding-top:4px;padding-bottom:4px` : "",
         props.marginBottom !== undefined ? `margin-bottom:${cell(props.marginBottom)}` : "",
         props.backgroundColor ? `background:${props.backgroundColor}` : "",
         // Laid over its neighbours, as the app does: the clear buttons over a drawing take no room.

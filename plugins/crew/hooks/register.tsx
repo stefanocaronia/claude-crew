@@ -1712,7 +1712,8 @@ async function adopt($: EngineInterface, agentId: string, at: number): Promise<v
     }
 
     const run: Run = { agentId, colleague: colleague.id, task: agent.description, model: "", status: "running", startedAt: at, steppedAt: at, contextTokens: 0, contextMax: contextWindowOf(""), tokens: 0 };
-    await update($, runs, list => [...list, run].slice(-100));
+    // Its start may have been recorded while the session's agents were asked: then the run is already there.
+    await update($, runs, list => (list.some(other => other.agentId === agentId) ? list : [...list, run].slice(-100)));
 }
 
 // What a colleague is doing, from the tool they call: the description of their command, or the kind of action and its object.

@@ -963,6 +963,21 @@ test("a colleague at work in another chat of the project shows at work here, and
     expect(await ui.find({ type: "Text", text: "Game design · in another chat" })).toBeUndefined();
 });
 
+test("a colleague's first step while their start is still being recorded shows them at work once, not twice", async ($, on) => {
+    world(on, []);
+    on("tool.call", { tool: "Read" }, () => ({ result: "" }) as never);
+    // The session's agents answer late: the start is recorded meanwhile, as in a real session.
+    on("agent.list", () => new Promise(resolve => setTimeout(() => resolve({ value: [{ id: "a1", description: "modes", type: "sara-lombardi", status: "running" }] }), 50)) as never);
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+    await Promise.all([
+        $.agent.spawn({ prompt: "Think about modes.", description: "modes", subagentType: "sara-lombardi" } as never),
+        $.tool.call({ tool: "Read", file_path: "/p/.claude/agent-memory/sara-lombardi/todo.md", agentId: "a1", tool_use_id: "r1" } as never),
+    ]);
+    const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
+    expect((await ui.find({ key: "working-toggle" }))?.props.label).toBe("▾ ⚒︎ Working · 1");
+    await ui.unmount();
+});
+
 test("a colleague at work whom the panel never saw start is found among the session's agents and shown at work", async ($, on) => {
     world(on, []);
     on("tool.call", { tool: "Read" }, () => ({ result: "" }) as never);

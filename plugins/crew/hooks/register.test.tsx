@@ -446,7 +446,7 @@ test("the dashboard at the top: who is at work, the open tasks by priority, the 
         // Two at work, three tasks this week, the two open lines without a priority; no tile counts what the plan's limits say.
         expect(await ui.find({ type: "Text", text: "tasks given this week" })).toBeDefined();
         expect(await ui.find({ type: "Text", text: "tasks without a priority" })).toBeDefined();
-        expect(await ui.find({ type: "Text", text: "P1 tasks · now" })).toBeDefined();
+        expect(await ui.find({ type: "Text", text: "high priority" })).toBeDefined();
         expect(await ui.find({ type: "Text", text: "3" })).toBeDefined();
         expect(await ui.find({ type: "Text", text: /% used/ })).toBeUndefined();
     }

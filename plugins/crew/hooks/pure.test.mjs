@@ -5,7 +5,7 @@ import { describe, it } from "node:test";
 import { segmentsOf, speakersOf } from "./meeting.ts";
 import { imagePathsIn, isInside, isOwnMemory, resolvedPath } from "./paths.ts";
 import { withCount } from "./progress.ts";
-import { ageOf, agentSpecFrom, backlogOf, cardFrom, colleagueFrom, colleagueOf, memorySizeOf, openTasks, permissionsOf, retestsOf, taskOf, withEffort, withNextPriority, withPermissions } from "./team.ts";
+import { ageOf, agentSpecFrom, backlogOf, blockersOf, cardFrom, colleagueFrom, colleagueOf, memorySizeOf, openIdsOf, openTasks, permissionsOf, retestsOf, taskOf, withEffort, withNextPriority, withPermissions } from "./team.ts";
 import { dateOf, formatTokens, formatUntil, isoWeek, languageOf, listNames, modelName, slugOf, words } from "./text.ts";
 
 const profile = "---\r\nname: matteo-conti\r\ndescription: \"Matteo Conti, architetto TypeScript. Usalo per le revisioni.\"\r\ntools: Read\r\nmemory: project\r\neffort: high\r\ncolor: red\r\n---\r\n\r\n# Matteo Conti, architetto TypeScript\r\n\r\nChi sei.";
@@ -56,6 +56,17 @@ describe("colleagues from their files", () => {
         assert.equal(withNextPriority("P3 · 2026-10-07 · later", "2026-10-29"), "P1 · 2026-10-07 · later");
         assert.equal(withNextPriority("old line", "2026-10-29"), "P1 · 2026-10-29 · old line");
         assert.equal(withNextPriority("2026-10-14 · dated only", "2026-10-29"), "P1 · 2026-10-14 · dated only");
+        assert.equal(withNextPriority("P1 · 2026-10-28 · #matteo-3 · fix it", "2026-10-29"), "P2 · 2026-10-28 · #matteo-3 · fix it");
+    });
+
+    it("reads a task's id and the tasks it waits for, and which of those are still open", () => {
+        assert.deepEqual(taskOf("matteo", "P1 · 2026-10-28 · #matteo-3 · correct lootNote"), { colleague: "matteo", text: "correct lootNote", priority: "P1", date: "2026-10-28", id: "#matteo-3" });
+        assert.deepEqual(taskOf("elena", "P1 · 2026-10-28 · run loot2 again (after: #matteo-3, #andrea-1) (effort: high)"), { colleague: "elena", text: "run loot2 again", priority: "P1", date: "2026-10-28", effort: "high", after: ["#matteo-3", "#andrea-1"] });
+        assert.deepEqual(taskOf("elena", "run it (effort: low) (after: #matteo-3)"), { colleague: "elena", text: "run it", effort: "low", after: ["#matteo-3"] });
+        const open = openIdsOf([{ colleague: "matteo-conti", lines: ["P1 · 2026-10-28 · #matteo-3 · correct lootNote", "plain"] }, { colleague: "andrea-moretti", lines: [] }]);
+        assert.deepEqual([...open], [["#matteo-3", "matteo-conti"]]);
+        assert.deepEqual(blockersOf(taskOf("elena", "run it (after: #matteo-3, #andrea-1)"), open), [{ id: "#matteo-3", colleague: "matteo-conti" }]);
+        assert.deepEqual(blockersOf(taskOf("elena", "run it"), open), []);
     });
 
     it("takes a bold name with its colon whole, leaving no stars", () => {

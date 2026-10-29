@@ -213,7 +213,7 @@ export function withPermissions(profile: string, permissions: Permissions): stri
 }
 
 /** A task of the backlog: its words, and what its line says of it: priority, the day it was written, the effort it needs. */
-export type Task = { colleague: string; text: string; priority?: string; date?: string; effort?: string; line?: string };
+export type Task = { colleague: string; text: string; priority?: string; date?: string; id?: string; effort?: string; after?: string[]; line?: string };
 
 /** The open tasks that ask to try something again: those starting with Riprova, Retest, Re-test or Check again. */
 export function retestsOf(tasks: string[]): string[]
@@ -235,19 +235,57 @@ export function backlogOf(tasks: { colleague: string; lines: string[] }[], limit
     return ranked.slice(0, limit).map(entry => ({ ...entry.task, line: tasks[entry.groupIndex]?.lines[entry.index] }));
 }
 
-/** A todo line's parts: `P2 · 2026-10-29 · the task (effort: high)`, each but the words optional. */
+/** A todo line's parts: `P2 · 2026-10-29 · #matteo-3 · the task (after: #elena-1) (effort: high)`, each but the words optional: the
+ * id is there when other tasks wait for this one, `after` names the tasks this one waits for, in any order with the effort. */
 export function taskOf(colleague: string, line: string): Task
 {
-    const head = /^(?:(P[1-3]) · )?(?:(\d{4}-\d{2}-\d{2}) · )?/.exec(line);
-    const rest = line.slice(head?.[0].length ?? 0);
-    const effort = /\s*\(effort:\s*(low|medium|high|xhigh|max)\)\s*$/i.exec(rest);
+    const head = /^(?:(P[1-3]) · )?(?:(\d{4}-\d{2}-\d{2}) · )?(?:(#[\w-]+) · )?/.exec(line);
+    let rest = line.slice(head?.[0].length ?? 0);
+    let effort: string | undefined;
+    let after: string[] | undefined;
+
+    // The suffixes, read from the end, whichever comes last.
+    for (let found = true; found;) {
+        const effortMatch = /\s*\(effort:\s*(low|medium|high|xhigh|max)\)\s*$/i.exec(rest);
+        const afterMatch = /\s*\(after:\s*([^)]*)\)\s*$/i.exec(rest);
+        const match = effortMatch ?? afterMatch;
+        found = Boolean(match);
+
+        if (effortMatch) {
+            effort = effortMatch[1]?.toLowerCase();
+        } else if (afterMatch) {
+            after = (afterMatch[1] ?? "").split(/[,\s]+/).filter(id => /^#[\w-]+$/.test(id));
+        }
+
+        if (match) {
+            rest = rest.slice(0, match.index);
+        }
+    }
+
     return {
         colleague,
-        text: effort ? rest.slice(0, effort.index) : rest,
+        text: rest,
         ...(head?.[1] ? { priority: head[1] } : {}),
         ...(head?.[2] ? { date: head[2] } : {}),
-        ...(effort ? { effort: effort[1]?.toLowerCase() } : {}),
+        ...(head?.[3] ? { id: head[3] } : {}),
+        ...(effort ? { effort } : {}),
+        ...(after?.length ? { after } : {}),
     };
+}
+
+/** The tasks a task still waits for: those of its `after` whose line is still open in some todo, with who holds them. */
+export function blockersOf(task: Task, open: Map<string, string>): { id: string; colleague: string }[]
+{
+    return (task.after ?? []).flatMap(id => (open.has(id) ? [{ id, colleague: open.get(id) ?? "" }] : []));
+}
+
+/** The ids of the open tasks of every todo, with who holds each. */
+export function openIdsOf(tasks: { colleague: string; lines: string[] }[]): Map<string, string>
+{
+    return new Map(tasks.flatMap(group => group.lines.flatMap(line => {
+        const id = taskOf(group.colleague, line).id;
+        return id ? [[id, group.colleague] as const] : [];
+    })));
 }
 
 /** A todo line with its next priority, P1 to P2 to P3 and back to P1, a line without one becoming P1; its date kept, or today's

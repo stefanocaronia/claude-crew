@@ -11,7 +11,7 @@ import { avatarSvg, barEndSvg, blankSvg, checkboxSvg, pickedTint, captionSvg, cl
 import { claudeId, segmentsOf, speakersOf } from "./meeting.ts";
 import { imagePathsIn, imageTypeOf, isInside, isOwnMemory, resolvedPath } from "./paths.ts";
 import { contextShare, progressOf, withCount } from "./progress.ts";
-import { ageOf, agentSpecFrom, backlogOf, cardFrom, colleagueFrom, colleagueOf, memorySizeOf, openTasks, retestsOf, taskOf as todoTask, withEffort, withNextPriority, withPermissions } from "./team.ts";
+import { ageOf, agentSpecFrom, backlogOf, blockersOf, cardFrom, colleagueFrom, colleagueOf, memorySizeOf, openIdsOf, openTasks, retestsOf, taskOf as todoTask, withEffort, withNextPriority, withPermissions } from "./team.ts";
 import { contextWindowOf, dateOf, formatTime, formatTokens, isoWeek, languageNames, languageOf, listNames, modelName, slugOf, words } from "./text.ts";
 import type { Language, Words } from "./text.ts";
 
@@ -66,6 +66,8 @@ const priorityGlyphs: Record<string, { glyph: string; color: string }> = { P1: {
 // The dashboard's tiles of who is at work and of the week.
 const workingColor = "#4E9A6B";
 const weekColor = "#8A63C9";
+// A task that waits for another's: its chain mark, its words and the dashboard's tile.
+const blockedColor = "#C9A227";
 const outline = "#8080803d";
 const stateLayer = "#80808014";
 // The name 2 px larger than the panel's text (13 px), and larger still in a colleague's own card.
@@ -741,6 +743,8 @@ export const register: Register = (on, options) => {
                     await readCard($, colleague.id);
                 }
             };
+            // Every open task with an id, by who holds it: what a task waits for is found there, without asking anyone.
+            const openIds = openIdsOf(latest.tasks);
             const taskRow = (prefix: string, index: number, task: Task, colleague: Colleague, face: JSX.Element | null) => {
                 const line = task.line;
                 const text = plainText(task.text);
@@ -751,7 +755,10 @@ export const register: Register = (on, options) => {
                 const taskKey = `${colleague.id}:${task.text}`;
                 const isOpen = panel.openTask === taskKey;
                 const toggleTask = () => update($, view, current => ({ ...current, openTask: current.openTask === taskKey ? undefined : taskKey }));
-                const facts = [face ? colleague.fullName : "", task.priority ?? "", task.date ? `${task.date} (${days})` : "", effort ? say.effort(effort) : ""].filter(Boolean).join(" · ");
+                // The tasks it still waits for, from their ids: who holds them, in place of its age.
+                const blockers = blockersOf(task, openIds);
+                const waits = blockers.length ? say.waitsFor(listNames([...new Set(blockers.map(blocker => byId.get(blocker.colleague)?.name ?? blocker.colleague))], say.and, say.comma)) : "";
+                const facts = [face ? colleague.fullName : "", task.priority ?? "", task.id ?? "", task.date ? `${task.date} (${days})` : "", effort ? say.effort(effort) : ""].filter(Boolean).join(" · ");
                 return (
                     <Box key={`${prefix}-${index}`} flexDirection="column" borderStyle="round" {...border} paddingX={1} {...(isDesktop ? { hover: { backgroundColor: stateLayer } } : {})}>
                         <Box flexDirection="row" flexWrap="nowrap" gap={1} alignItems="center">
@@ -772,7 +779,11 @@ export const register: Register = (on, options) => {
                                     <Text wrap="truncate-end">{`${isOpen ? "▾" : "▸"} ${text}`}</Text>
                                 </Button>
                             </Box>
-                            {days ? <Box key={`${prefix}-age-${index}`} flexShrink={0}><Text dimColor wrap="truncate">{days}</Text></Box> : null}
+                            {waits
+                                ? <Box key={`${prefix}-waits-${index}`} flexShrink={0}><Text color={blockedColor} wrap="truncate">{`⛓︎ ${waits}`}</Text></Box>
+                                : days
+                                ? <Box key={`${prefix}-age-${index}`} flexShrink={0}><Text dimColor wrap="truncate">{days}</Text></Box>
+                                : null}
                             {effortCell(`${prefix}-effort-${index}`, effort)}
                             {isFree(colleague) ? <Button key={`${prefix}-start-${index}`} label="▶" plain dimColor onPress={() => startTask(colleague, task.text)} /> : null}
                         </Box>
@@ -781,6 +792,9 @@ export const register: Register = (on, options) => {
                                 <Box key={`${prefix}-details-${index}`} flexDirection="column" gap={1} paddingLeft={face ? 4 : 2}>
                                     <Text>{text}</Text>
                                     <Text dimColor>{facts}</Text>
+                                    {blockers.length
+                                        ? <Text key={`${prefix}-blockers-${index}`} color={blockedColor}>{`⛓︎ ${say.waitsFor(blockers.map(blocker => `${blocker.id} (${byId.get(blocker.colleague)?.name ?? blocker.colleague})`).join(say.comma))}`}</Text>
+                                        : null}
                                     {line
                                         ? (
                                             <Button key={`${prefix}-remove-${index}`} plain onPress={() => removeTask(colleague, line)}>
@@ -1002,10 +1016,12 @@ export const register: Register = (on, options) => {
             const weekCounts = colleagues.map(colleague => thisWeek[colleague.id]);
             const weekTasks = weekCounts.reduce((sum, counts) => sum + (counts?.tasks ?? 0), 0);
             const openByPriority = new Map<string, number>();
+            let blockedCount = 0;
 
             for (const line of latest.tasks.flatMap(group => group.lines)) {
-                const priority = todoTask("", line).priority ?? "";
-                openByPriority.set(priority, (openByPriority.get(priority) ?? 0) + 1);
+                const task = todoTask("", line);
+                openByPriority.set(task.priority ?? "", (openByPriority.get(task.priority ?? "") ?? 0) + 1);
+                blockedCount += blockersOf(task, openIds).length ? 1 : 0;
             }
 
             const tile = (key: string, value: number, label: string, color: string, mark: JSX.Element | null = null) => (
@@ -1021,6 +1037,7 @@ export const register: Register = (on, options) => {
                 tile("dash-working", running.length, say.dashWorking, workingColor, isDesktop ? <Text color={workingColor}>●</Text> : null),
                 ...["P1", "P2", "P3"].map(priority => tile(`dash-${priority}`, openByPriority.get(priority) ?? 0, say.priorityNames[priority as "P1"], priorityGlyphs[priority]?.color ?? "#888780", priorityMark(`dash-mark-${priority}`, priority))),
                 ...(openByPriority.get("") ? [tile("dash-unranked", openByPriority.get("") ?? 0, say.unranked, "#888780")] : []),
+                ...(blockedCount ? [tile("dash-blocked", blockedCount, say.blockedTasks, blockedColor, <Text color={blockedColor}>⛓︎</Text>)] : []),
                 tile("dash-week", weekTasks, say.thisWeekShort, weekColor, isDesktop ? <ui.Svg key="dash-week-mark" source={iconSvg("calendar", 14, 0, weekColor)} alt={say.thisWeekShort} width={14} height={14} /> : null),
             ];
             const backlog = backlogOf(latest.tasks, backlogSize);

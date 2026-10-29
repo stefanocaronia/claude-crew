@@ -543,6 +543,26 @@ test("a press on a task's priority turns it in its todo, and Remove moves the ta
     await last.unmount();
 });
 
+test("a task that waits for another's open task shows who it waits for, and is free once that one is ticked", async ($, on) => {
+    const sent = world(on, []);
+    const { files } = sent;
+    files["/p/.claude/agent-memory/matteo-conti/todo.md"] = "- [ ] P2 · 2026-10-28 · #matteo-3 · correct lootNote\n";
+    files["/p/.claude/agent-memory/sara-lombardi/todo.md"] = "- [ ] P1 · 2026-10-28 · run loot2 again (after: #matteo-3)\n";
+    on("turn.complete", () => ({ text: "" }) as never);
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+    const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
+    await ui.press({ key: "backlog-toggle" });
+    expect(await ui.find({ type: "Text", text: "⛓︎ waits for Matteo" })).toBeDefined();
+    expect(await ui.find({ type: "Text", text: "blocked tasks" })).toBeDefined();
+    await ui.unmount();
+    files["/p/.claude/agent-memory/matteo-conti/todo.md"] = "- [x] 2026-10-29 · #matteo-3 · correct lootNote\n";
+    await $.turn.complete({ reason: "answer", answer: "", durationMs: 1000, isAborted: false, turnId: "t1" } as never);
+    const after = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
+    expect(await after.find({ type: "Text", text: /waits for/ })).toBeUndefined();
+    expect(await after.find({ type: "Text", text: "blocked tasks" })).toBeUndefined();
+    await after.unmount();
+});
+
 test("▶ on a backlog row starts that task; Next task starts the next one of the colleagues picked, or of those free", async ($, on) => {
     const sent = world(on, []);
     sent.files["/p/.claude/agent-memory/sara-lombardi/todo.md"] = "- [ ] P3 · 2026-10-01 · later\n- [ ] P1 · 2026-10-07 · now\n";

@@ -2,6 +2,10 @@
 
 What changes for whoever uses Crew, version by version. Plugins update in a new chat: `/plugin`, Marketplaces, claude-crew, Update marketplace, or turn its auto-update on there.
 
+## 0.12.0
+
+- Tasks can wait for other tasks, written in their own lines when they are written: the task waited for has an id after its date (`- [ ] P1 · 2026-10-28 · #matteo-3 · correct lootNote`), the waiting one ends with `(after: #matteo-3)`. A colleague who finds that their task needs another's work gives that task an id, or writes it in the other's todo `(for <name>)`. The panel reads the dependencies from the lines: a blocked task shows a chain mark and who it waits for, and the dashboard counts the blocked tasks. `/crew:next` and ▶ on a blocked task show the whole chain and ask once, then start each link when the one before is done. Tidying never archives a task others wait for.
+
 ## 0.11.0 – 0.11.11
 
 - Every todo line carries a priority and the day it was written: `- [ ] P2 · 2026-10-29 · task` (P1 now, P2 in the plan, P3 later); done, `- [x] 2026-10-30 · task`. The colleagues write it so, tidying keeps the 15 open lines by priority and gives a priority and a date to the lines without, and the backlog puts P1 first, with the priority as a mark and the task's age. Lines in the old form still read.

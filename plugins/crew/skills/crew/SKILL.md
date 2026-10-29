@@ -32,6 +32,7 @@ A colleague is an agent of `.claude/agents/` with a `todo.md` in its memory fold
 | to change one: field, tools, character, name | [references/edit.md](references/edit.md) |
 | to set the permissions, of the team or of one, sensibly | [references/edit.md](references/edit.md), "Permissions" |
 | a portrait, for one colleague or the whole team (`/crew:portraits` asks the style first) | [references/portrait.md](references/portrait.md) |
+| to start the next task of some colleagues, or one task of the backlog (`/crew:next`, the panel's Next task button and ▶) | the next skill |
 | to tidy the todos past 15 open lines (`/crew:tidy`, the panel's Tidy button, for the colleagues picked or the long todos) | the tidy skill, and "Always" below |
 | a review round, or a milestone is reached (`/crew:review` asks first what to review) | [references/round.md](references/round.md) |
 | a task for a colleague, or Claude finds one useful: a check, research, a test, a change in their field | [references/task.md](references/task.md) |

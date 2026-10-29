@@ -438,6 +438,10 @@ export const register: Register = (on, options) => {
             const finished = [...new Map(list.filter(run => run.status !== "running" && !run.isBack && !busy.has(run.colleague) && !inMeeting.has(run.colleague)).map(run => [run.colleague, run])).values()].reverse();
             const done = new Set(finished.map(run => run.colleague));
             const idle = colleagues.filter(colleague => !busy.has(colleague.id) && !inMeeting.has(colleague.id) && !done.has(colleague.id));
+            // Who can start a task now: neither at work nor in the meeting.
+            const isFree = (colleague: Colleague) => !busy.has(colleague.id) && !inMeeting.has(colleague.id);
+            // One task of a colleague's todo, the one the user pressed ▶ on, as a command, as the user would type it.
+            const startTask = (colleague: Colleague, text: string) => $.command.run({ command: "crew:next", args: `${colleague.name} -- ${text}` });
             const sendBack = (ids: string[]) => update($, runs, all => all.map(run => (ids.includes(run.colleague) && run.status !== "running" ? { ...run, isBack: true } : run)));
             const selected = panel.selected ? byId.get(panel.selected) : undefined;
             // The meeting itself is in the main chat and above the prompt: here only a ring says who is in it.
@@ -892,17 +896,21 @@ export const register: Register = (on, options) => {
                 const text = plainText(task.text);
                 const effort = colleague ? task.effort ?? colleague.effort ?? "" : "";
                 const age = ageOf(task.date, today);
-                const days = age === undefined ? "" : `${age}${say.units.gap}${say.units.day}`;
+                // A space that never breaks: "15 g" stays on one line.
+                const days = age === undefined ? "" : `${age}${say.units.gap.replace(" ", " ")}${say.units.day}`;
                 return colleague
                     ? (
                         <Box key={`backlog-${index}`} flexDirection="row" flexWrap="nowrap" gap={1} alignItems="center" borderStyle="round" {...border} paddingX={1} {...(isDesktop ? { hover: { backgroundColor: stateLayer } } : {})}>
                             {faceOf(ui, e.surface, colleague, 24, stamp, false, false, isBacklogLight ? "small" : "initials")}
-                            {task.priority ? priorityMark(`backlog-priority-${index}`, task.priority) : null}
+                            {task.priority ? <Box key={`backlog-priority-${index}`} flexShrink={0}>{priorityMark(`priority-${index}`, task.priority)}</Box> : null}
                             <Box flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
                                 <Text wrap="truncate-end">{text}</Text>
                             </Box>
-                            {days ? <Text key={`backlog-age-${index}`} dimColor>{days}</Text> : null}
+                            {days ? <Box key={`backlog-age-${index}`} flexShrink={0}><Text dimColor wrap="truncate">{days}</Text></Box> : null}
                             {effortCell(`backlog-effort-${index}`, effort)}
+                            {isFree(colleague)
+                                ? tip(`backlog-start-${index}`, say.nextTip, <Button key={`backlog-start-${index}`} label="▶" plain dimColor onPress={() => startTask(colleague, task.text)} />, { isAbove: true })
+                                : null}
                             {isDesktop
                                 ? (
                                     <Box position="absolute" bottom={1} left={4} right={0} display="none" hover={{ display: "flex" }} backgroundColor={tooltipBackground} borderStyle="round" borderColor={outline} paddingX={1}>
@@ -944,6 +952,9 @@ export const register: Register = (on, options) => {
                         {pickedNames ? fireButton("act-fire", pickedTeam) : null}
                         {portraitButton("act-portraits", say.portraits, pickedTeam)}
                         <Button key="act-tidy" label={`✦ ${pickedNames ? say.tidyWith(pickedNames) : say.tidy}`} onPress={() => runCommand("crew:tidy", pickedTeam.length ? pickedTeam : longTodos)} />
+                        {pickedNames || colleagues.some(colleague => isFree(colleague) && colleague.openTasks)
+                            ? <Button key="act-next" label={`▶ ${pickedNames ? say.nextWith(pickedNames) : say.next}`} onPress={() => runCommand("crew:next", pickedTeam.length ? pickedTeam : colleagues.filter(colleague => isFree(colleague) && colleague.openTasks))} />
+                            : null}
                         {tip("open-settings", say.panelSettings, <Button key="open-settings" label={"⚙︎"} onPress={openSettings} />)}
                     </Box>
                     {backlogRows.length

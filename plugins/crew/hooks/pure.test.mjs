@@ -48,7 +48,7 @@ describe("colleagues from their files", () => {
         assert.deepEqual(taskOf("matteo", "2026-10-14 · done long ago"), { colleague: "matteo", text: "done long ago", date: "2026-10-14" });
         assert.deepEqual(taskOf("matteo", "P2 is a word here"), { colleague: "matteo", text: "P2 is a word here" });
         const tasks = [{ colleague: "matteo", lines: ["P3 · 2026-10-01 · m-later", "old line", "P1 · 2026-10-28 · m-now"] }, { colleague: "giulia", lines: ["P2 · 2026-10-20 · g-plan", "P1 · 2026-10-27 · g-now"] }];
-        assert.deepEqual(backlogOf(tasks, 10).map(task => task.text), ["m-now", "g-now", "g-plan", "m-later", "old line"]);
+        assert.deepEqual(backlogOf(tasks, 10).map(task => task.text), ["g-now", "m-now", "g-plan", "m-later", "old line"]);
         assert.deepEqual(retestsOf(["P1 · 2026-10-28 · Riprova il parser", "P2 · 2026-10-28 · the map"]), ["P1 · 2026-10-28 · Riprova il parser"]);
         assert.equal(ageOf("2026-10-26", Date.parse("2026-10-29T12:00:00")), 3);
         assert.equal(ageOf(undefined, 0), undefined);

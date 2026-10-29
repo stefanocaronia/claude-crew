@@ -475,6 +475,30 @@ test("the backlog puts a P1 task first, with its priority and its age", async ($
     await ui.unmount();
 });
 
+test("▶ on a backlog row starts that task; Next task starts the next one of the colleagues picked, or of those free", async ($, on) => {
+    const sent = world(on, []);
+    sent.files["/p/.claude/agent-memory/sara-lombardi/todo.md"] = "- [ ] P3 · 2026-10-01 · later\n- [ ] P1 · 2026-10-07 · now\n";
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+
+    for (const surface of surfaces) {
+        const ui = await $.ui.mount({ plugin, surface, component: "Pane", requestId: "crew", props: pane });
+
+        // The backlog stays open from one surface to the next, as the panel's view is the session's.
+        if (surface === "terminal") {
+            await ui.press({ key: "backlog-toggle" });
+        }
+
+        await ui.press({ key: "backlog-start-0" });
+        expect(sent.at(-1)).toBe("/crew:next Sara -- now");
+        await ui.press({ key: "act-next" });
+        expect(sent.at(-1)).toBe("/crew:next Matteo Sara");
+        await ui.press({ key: "pick-giulia-ferri" });
+        expect((await ui.find({ key: "act-next" }))?.props.label).toBe("▶ Next task for Giulia");
+        await ui.press({ key: "pick-giulia-ferri" });
+        await ui.unmount();
+    }
+});
+
 test("a colleague without reading or writing works only in their own memory folder", async ($, on) => {
     world(on, []);
     on("tool.call", () => ({ result: "ran" }) as never);

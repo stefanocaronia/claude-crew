@@ -205,23 +205,17 @@ export function retestsOf(tasks: string[]): string[]
     return tasks.filter(task => /^(?:riprov|re-?test|check again)/i.test(taskOf("", task).text.replace(/^[\s*_`]+/, "")));
 }
 
-/** Up to `limit` open tasks, P1 first, then P2, P3 and those without a priority; within each, every colleague's next one in turn. */
+/** Up to `limit` open tasks, by priority (P1, P2, P3, then those without), the oldest first within one, those without a date
+ * last; where all that is equal, every colleague's next one in turn. */
 export function backlogOf(tasks: { colleague: string; lines: string[] }[], limit: number): Task[]
 {
-    const picked: Task[] = [];
-    const parsed = tasks.map(group => group.lines.map(line => taskOf(group.colleague, line)));
-
-    for (const rank of [...priorities, undefined]) {
-        const groups = parsed.map(group => group.filter(task => task.priority === rank));
-
-        for (let round = 0; picked.length < limit && groups.some(group => group.length > round); round++) {
-            for (const group of groups.filter(candidate => candidate.length > round).slice(0, limit - picked.length)) {
-                picked.push(group[round] as Task);
-            }
-        }
-    }
-
-    return picked;
+    const ranked = tasks.flatMap((group, groupIndex) => group.lines.map((line, index) => ({ task: taskOf(group.colleague, line), index, groupIndex })));
+    const rank = (task: Task) => (task.priority ? priorities.indexOf(task.priority) : priorities.length);
+    ranked.sort((first, second) => rank(first.task) - rank(second.task)
+        || (first.task.date ?? "9999").localeCompare(second.task.date ?? "9999")
+        || first.index - second.index
+        || first.groupIndex - second.groupIndex);
+    return ranked.slice(0, limit).map(entry => entry.task);
 }
 
 /** A todo line's parts: `P2 · 2026-10-29 · the task (effort: high)`, each but the words optional. */

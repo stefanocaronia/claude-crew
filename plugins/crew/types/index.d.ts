@@ -95,6 +95,10 @@ export type PanelView = {
     autoOpened: boolean;
     /** Whether the backlog shows its tasks; closed until the user opens it. */
     isBacklogOpen?: boolean;
+    /** A colleague's card shows all their tasks, not only the first ones. */
+    isCardTasksOpen?: boolean;
+    /** A colleague's card shows the latest section of their memory. */
+    isMemoryOpen?: boolean;
     /** The backlog's task opened to read it whole, as "<colleague>:<its words>". */
     openTask?: string;
     /** The colleagues picked on their cards for a meeting, by id. */

@@ -5,6 +5,7 @@ import { atom, read, update } from "claude-code";
 import type { EngineInterface, Register } from "claude-code";
 
 import type { Activity, Colleague, Meeting, Permissions, Preferences, Run, Speaker, WeeklyCounts } from "../types";
+import type { Task } from "./team.ts";
 
 import { avatarSvg, barEndSvg, blankSvg, checkboxSvg, pickedTint, captionSvg, claudeSvg, effortSvg, iconSvg, nameSvg, prioritySvg, thumbnailSvg, wideBarSvg } from "./draw.ts";
 import { claudeId, segmentsOf, speakersOf } from "./meeting.ts";
@@ -88,6 +89,8 @@ const effortLevels = ["inherit", "low", "medium", "high", "xhigh", "max"] as con
 const reportLimit = 40_000;
 // How many open tasks the backlog shows; its effort column and a colleague's card at its narrowest, in cells.
 const backlogSize = 20;
+// The tasks a colleague's card shows before "show all".
+const cardTaskLimit = 10;
 // The open lines a colleague's todo keeps, as the skill says; past them, the tidy button picks it when nobody is picked.
 const todoLimit = 15;
 const effortWidth = 4;
@@ -703,6 +706,57 @@ export const register: Register = (on, options) => {
                 );
             }
 
+            // A task of a todo, in the backlog and in a colleague's card: its priority as an issue tracker draws it, its words on one line
+            // that open in place to read them whole, its age, the effort it needs and a ▶ that starts it.
+            const effortCell = (key: string, level: string) => (
+                <Box key={key} width={effortWidth} flexShrink={0} justifyContent="flex-end" alignItems="center">
+                    {isDesktop && effortSvg(level) ? <ui.Svg source={effortSvg(level) ?? ""} alt={say.effort(level)} width={16} height={12} /> : <Text dimColor>{meterOf(level)}</Text>}
+                </Box>
+            );
+            const priorityMark = (key: string, priority: string) => {
+                const drawn = isDesktop ? prioritySvg(priority) : undefined;
+                const glyph = priorityGlyphs[priority];
+                return drawn && "Svg" in ui
+                    ? <ui.Svg key={key} source={drawn} alt={priority} width={14} height={14} />
+                    : <Text key={key} bold color={glyph?.color}>{glyph?.glyph ?? priority}</Text>;
+            };
+            const today = await $.clock.now();
+            const taskRow = (prefix: string, index: number, task: Task, colleague: Colleague, face: JSX.Element | null) => {
+                const text = plainText(task.text);
+                const effort = task.effort ?? colleague.effort ?? "";
+                const age = ageOf(task.date, today);
+                // A space that never breaks: "15 g" stays on one line.
+                const days = age === undefined ? "" : `${age}${say.units.gap.replace(" ", " ")}${say.units.day}`;
+                const taskKey = `${colleague.id}:${task.text}`;
+                const isOpen = panel.openTask === taskKey;
+                const toggleTask = () => update($, view, current => ({ ...current, openTask: current.openTask === taskKey ? undefined : taskKey }));
+                const facts = [face ? colleague.fullName : "", task.priority ?? "", task.date ? `${task.date} (${days})` : "", effort ? say.effort(effort) : ""].filter(Boolean).join(" · ");
+                return (
+                    <Box key={`${prefix}-${index}`} flexDirection="column" borderStyle="round" {...border} paddingX={1} {...(isDesktop ? { hover: { backgroundColor: stateLayer } } : {})}>
+                        <Box flexDirection="row" flexWrap="nowrap" gap={1} alignItems="center">
+                            {face}
+                            {task.priority ? <Box key={`${prefix}-priority-${index}`} flexShrink={0}>{priorityMark(`priority-${index}`, task.priority)}</Box> : null}
+                            <Box flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
+                                <Button key={`${prefix}-open-${index}`} plain onPress={toggleTask}>
+                                    <Text wrap="truncate-end">{`${isOpen ? "▾" : "▸"} ${text}`}</Text>
+                                </Button>
+                            </Box>
+                            {days ? <Box key={`${prefix}-age-${index}`} flexShrink={0}><Text dimColor wrap="truncate">{days}</Text></Box> : null}
+                            {effortCell(`${prefix}-effort-${index}`, effort)}
+                            {isFree(colleague) ? <Button key={`${prefix}-start-${index}`} label="▶" plain dimColor onPress={() => startTask(colleague, task.text)} /> : null}
+                        </Box>
+                        {isOpen
+                            ? (
+                                <Box key={`${prefix}-details-${index}`} flexDirection="column" gap={1} paddingLeft={face ? 4 : 2}>
+                                    <Text>{text}</Text>
+                                    <Text dimColor>{facts}</Text>
+                                </Box>
+                            )
+                            : null}
+                    </Box>
+                );
+            };
+
             if (selected) {
                 const details = (await read($, card))?.id === selected.id ? await read($, card) : null;
                 // A run left at work by an event that never came keeps the colleague busy: the user can free them.
@@ -711,6 +765,19 @@ export const register: Register = (on, options) => {
                 const current = running.find(run => run.colleague === selected.id);
                 const retests = details ? retestsOf(details.openTasks).length : 0;
                 const week = (await weeklyCounts($))[isoWeek(at)]?.[selected.id];
+                // Their tasks as the backlog draws them, by priority and age: the first ones, or all of them when the user asks.
+                const isCardTasksOpen = Boolean(panel.isCardTasksOpen);
+                const cardTasks = details ? backlogOf([{ colleague: selected.id, lines: details.openTasks }], isCardTasksOpen ? details.openTasks.length : cardTaskLimit) : [];
+                // How many open tasks of each priority, beside their name.
+                const priorityCounts = ["P1", "P2", "P3"].flatMap(priority => {
+                    const count = (details?.openTasks ?? []).filter(line => todoTask("", line).priority === priority).length;
+                    return count ? [[priority, count] as const] : [];
+                });
+                // Their memory's latest section, closed until asked: its heading names it.
+                const isMemoryOpen = Boolean(panel.isMemoryOpen);
+                const [memoryHead = "", ...memoryRest] = (details?.memory ?? "").split("\n");
+                const memoryTitle = /^##\s+(.+)$/.exec(memoryHead)?.[1]?.trim() ?? "";
+                const memoryBody = memoryTitle ? memoryRest.join("\n").trim() : details?.memory ?? "";
                 const markFree = async () => {
                     const freedAt = await $.clock.now();
                     releaseFiles(stuck);
@@ -727,6 +794,18 @@ export const register: Register = (on, options) => {
                                 <Box flexDirection="row" flexWrap="wrap" alignItems="center">
                                     <Text dimColor>{[presence(selected), say.toDo(selected.openTasks), selected.model ? modelName(selected.model) : ""].filter(Boolean).join(" · ")}</Text>
                                 </Box>
+                                {priorityCounts.length
+                                    ? (
+                                        <Box key="card-priorities" flexDirection="row" flexWrap="wrap" alignItems="center" columnGap={1}>
+                                            {priorityCounts.map(([priority, count]) => (
+                                                <Box key={`count-${priority}`} flexDirection="row" alignItems="center" columnGap={1} marginRight={1}>
+                                                    {priorityMark(`count-mark-${priority}`, priority)}
+                                                    <Text dimColor>{String(count)}</Text>
+                                                </Box>
+                                            ))}
+                                        </Box>
+                                    )
+                                    : null}
                                 {week ? <Text key="week" dimColor>{say.thisWeek(week.tasks, week.refusals)}</Text> : null}
                                 {details?.latestReport ? <Button key="card-report" label={`${say.latestReport(details.latestReport)} ❯`} plain dimColor onPress={() => openReport($, selected.id, details.latestReport ?? "")} /> : null}
                             </Box>
@@ -746,45 +825,30 @@ export const register: Register = (on, options) => {
                         <Box key="card-actions" flexDirection="row" flexWrap="wrap" gap={1}>
                             {isBusy ? null : <Button key="talk" variant="primary" label={`☰ ${say.talk(selected.name)}`} onPress={() => talkWith(selected)} />}
                             <Button key="card-ask" label={`? ${say.ask(selected.name)}`} onPress={() => askOf(selected)} />
+                            {isBusy || !selected.openTasks ? null : <Button key="card-next" label={`▶ ${say.nextWith(selected.name)}`} onPress={() => runCommand("crew:next", [selected])} />}
                             {isBusy ? null : <Button key="card-round" label={`↻ ${say.roundWith(selected.name)}`} onPress={() => runCommand("crew:review", [selected])} />}
                             {retests ? <Button key="card-retest" label={`↻ ${say.retest(retests)}`} onPress={() => send(say.retestPrompt(selected.name))} /> : null}
                             {stuck.length ? <Button key="card-free" label={say.markFree} plain onPress={markFree} /> : null}
-                            {portraitButton("card-portrait", say.portrait, [selected])}
-                            {fireButton("card-fire", [selected])}
-                        </Box>
-                        <Box key="card-settings" flexDirection="column">
-                            <Text bold>{say.settings}</Text>
-                            {outlined("card-settings-list", [
-                                <Box key="effort-row" flexDirection="row" flexWrap="wrap" alignItems="center" columnGap={1}>
-                                    <Text dimColor>{say.effortTitle}</Text>
-                                    <Button key="card-effort" label={selected.effort ? (say.levels as Record<string, string>)[selected.effort] ?? selected.effort : say.sessionLevel} plain onPress={() => setEffort($, selected.id, nextEffort(selected.effort))} />
-                                </Box>,
-                                <Box key="permissions-row" flexDirection="row" flexWrap="wrap" alignItems="center" columnGap={1}>
-                                    <Text dimColor>{say.permissions}</Text>
-                                    {permissionKinds.map(kind => (
-                                        <Button
-                                            key={`permission-${kind}`}
-                                            label={`${selected.permissions[kind] ? "☑\uFE0E" : "☐"} ${say.permissionNames[kind]}`}
-                                            plain
-                                            onPress={() => setPermissions($, selected.id, toggled(selected.permissions, kind))}
-                                        />
-                                    ))}
-                                </Box>,
-                            ])}
                         </Box>
                         {details
                             ? (
-                                <Box key="card-tasks" flexDirection="column">
-                                    <Text bold>{say.tasks}</Text>
-                                    {outlined("card-tasks-list", [<Markdown key="tasks" text={details.openTasks.length ? details.openTasks.map(line => todoTask("", line)).map(task => `- ${task.priority ? `**${task.priority}** · ` : ""}${task.text}`).join("\n") : `*${say.toDo(0)}*`} />])}
+                                <Box key="card-tasks" flexDirection="column" gap={1}>
+                                    <Box flexDirection="row" justifyContent="space-between" alignItems="center">
+                                        <Text bold>{say.tasks}</Text>
+                                        {isBusy ? null : <Button key="card-tidy" label={`✦ ${say.tidy}`} plain dimColor onPress={() => runCommand("crew:tidy", [selected])} />}
+                                    </Box>
+                                    {cardTasks.length ? cardTasks.map((task, index) => taskRow("card-task", index, task, selected, null)) : <Text key="card-no-tasks" dimColor>{say.toDo(0)}</Text>}
+                                    {details.openTasks.length > cardTaskLimit
+                                        ? <Button key="card-tasks-all" label={isCardTasksOpen ? say.showFewer : say.showAll(details.openTasks.length)} plain dimColor onPress={() => update($, view, current => ({ ...current, isCardTasksOpen: !current.isCardTasksOpen }))} />
+                                        : null}
                                 </Box>
                             )
                             : null}
                         {details?.memory
                             ? (
                                 <Box key="card-memory" flexDirection="column">
-                                    <Text bold>{say.memory}</Text>
-                                    {outlined("card-memory-text", [<Markdown key="memory" text={clip(details.memory, 1600)} dimColor />])}
+                                    <Button key="card-memory-toggle" label={`${isMemoryOpen ? "▾" : "▸"} ${say.memory}${memoryTitle ? ` · ${memoryTitle}` : ""}`} plain onPress={() => update($, view, current => ({ ...current, isMemoryOpen: !current.isMemoryOpen }))} />
+                                    {isMemoryOpen ? outlined("card-memory-text", [<Markdown key="memory" text={clip(memoryBody, 1600)} dimColor />]) : null}
                                 </Box>
                             )
                             : null}
@@ -806,6 +870,30 @@ export const register: Register = (on, options) => {
                                 </Box>
                             )
                             : null}
+                        <Box key="card-settings" flexDirection="column">
+                            <Text bold>{say.settings}</Text>
+                            {outlined("card-settings-list", [
+                                <Box key="effort-row" flexDirection="row" flexWrap="wrap" alignItems="center" columnGap={1}>
+                                    <Text dimColor>{say.effortTitle}</Text>
+                                    <Button key="card-effort" label={selected.effort ? (say.levels as Record<string, string>)[selected.effort] ?? selected.effort : say.sessionLevel} plain onPress={() => setEffort($, selected.id, nextEffort(selected.effort))} />
+                                </Box>,
+                                <Box key="permissions-row" flexDirection="row" flexWrap="wrap" alignItems="center" columnGap={1}>
+                                    <Text dimColor>{say.permissions}</Text>
+                                    {permissionKinds.map(kind => (
+                                        <Button
+                                            key={`permission-${kind}`}
+                                            label={`${selected.permissions[kind] ? "☑︎" : "☐"} ${say.permissionNames[kind]}`}
+                                            plain
+                                            onPress={() => setPermissions($, selected.id, toggled(selected.permissions, kind))}
+                                        />
+                                    ))}
+                                </Box>,
+                            ])}
+                        </Box>
+                        <Box key="card-manage" flexDirection="row" flexWrap="wrap" gap={1}>
+                            {portraitButton("card-portrait", say.portrait, [selected])}
+                            {fireButton("card-fire", [selected])}
+                        </Box>
                     </Box>
                 );
             }
@@ -874,21 +962,6 @@ export const register: Register = (on, options) => {
                 .sort((first, second) => second.tasks - first.tasks || first.colleague.name.localeCompare(second.colleague.name));
             const weekTokens = weekRows.reduce((sum, row) => sum + row.tokens, 0);
             const weekValue = [say.tasksCount(weekRows.reduce((sum, row) => sum + row.tasks, 0)), weekTokens ? say.tokens(formatTokens(weekTokens, say.units)) : ""].filter(Boolean).join(" · ");
-            // The backlog: a low card for each task, with who holds it, the task on one line cut at the edge (whole in a tooltip) and a
-            // meter of the effort it needs.
-            const effortCell = (key: string, level: string) => (
-                <Box key={key} width={effortWidth} flexShrink={0} justifyContent="flex-end" alignItems="center">
-                    {isDesktop && effortSvg(level) ? <ui.Svg source={effortSvg(level) ?? ""} alt={say.effort(level)} width={16} height={12} /> : <Text dimColor>{meterOf(level)}</Text>}
-                </Box>
-            );
-            // A task's priority as a short mark: P1 in amber, P2 plain, P3 dim.
-            const priorityMark = (key: string, priority: string) => {
-                const drawn = isDesktop ? prioritySvg(priority) : undefined;
-                const glyph = priorityGlyphs[priority];
-                return drawn && "Svg" in ui
-                    ? <ui.Svg key={key} source={drawn} alt={priority} width={14} height={14} />
-                    : <Text key={key} bold color={glyph?.color}>{glyph?.glyph ?? priority}</Text>;
-            };
             const backlog = backlogOf(latest.tasks, backlogSize);
             // The colleagues whose todo is past the 15 open lines it keeps: with nobody picked, the tidy button gives them the task.
             const longTodos = latest.tasks.flatMap(group => (group.lines.length > todoLimit ? byId.get(group.colleague) ?? [] : []));
@@ -896,45 +969,9 @@ export const register: Register = (on, options) => {
             // initials.
             const portraitWeight = colleagues.reduce((sum, colleague) => sum + (portraits.get(colleague.id)?.length ?? 0), 0);
             const isBacklogLight = backlog.reduce((sum, task) => sum + (smallPortraits.get(task.colleague)?.length ?? 0), 0) <= drawingBudget - portraitWeight;
-            const today = await $.clock.now();
             const backlogRows = backlog.map((task, index) => {
                 const colleague = byId.get(task.colleague);
-                const text = plainText(task.text);
-                const effort = colleague ? task.effort ?? colleague.effort ?? "" : "";
-                const age = ageOf(task.date, today);
-                // A space that never breaks: "15 g" stays on one line.
-                const days = age === undefined ? "" : `${age}${say.units.gap.replace(" ", " ")}${say.units.day}`;
-                // A row opens in place to read the task whole, with who holds it, when it was written and the effort; no hint covers the row.
-                const taskKey = `${task.colleague}:${task.text}`;
-                const isOpen = panel.openTask === taskKey;
-                const toggleTask = () => update($, view, current => ({ ...current, openTask: current.openTask === taskKey ? undefined : taskKey }));
-                const details = [colleague?.fullName ?? "", task.priority ?? "", task.date ? `${task.date} (${days})` : "", effort ? say.effort(effort) : ""].filter(Boolean).join(" · ");
-                return colleague
-                    ? (
-                        <Box key={`backlog-${index}`} flexDirection="column" borderStyle="round" {...border} paddingX={1} {...(isDesktop ? { hover: { backgroundColor: stateLayer } } : {})}>
-                            <Box flexDirection="row" flexWrap="nowrap" gap={1} alignItems="center">
-                                {faceOf(ui, e.surface, colleague, 24, stamp, false, false, isBacklogLight ? "small" : "initials")}
-                                {task.priority ? <Box key={`backlog-priority-${index}`} flexShrink={0}>{priorityMark(`priority-${index}`, task.priority)}</Box> : null}
-                                <Box flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
-                                    <Button key={`backlog-open-${index}`} plain onPress={toggleTask}>
-                                        <Text wrap="truncate-end">{`${isOpen ? "▾" : "▸"} ${text}`}</Text>
-                                    </Button>
-                                </Box>
-                                {days ? <Box key={`backlog-age-${index}`} flexShrink={0}><Text dimColor wrap="truncate">{days}</Text></Box> : null}
-                                {effortCell(`backlog-effort-${index}`, effort)}
-                                {isFree(colleague) ? <Button key={`backlog-start-${index}`} label="▶" plain dimColor onPress={() => startTask(colleague, task.text)} /> : null}
-                            </Box>
-                            {isOpen
-                                ? (
-                                    <Box key={`backlog-details-${index}`} flexDirection="column" gap={1} paddingLeft={4}>
-                                        <Text>{text}</Text>
-                                        <Text dimColor>{details}</Text>
-                                    </Box>
-                                )
-                                : null}
-                        </Box>
-                    )
-                    : null;
+                return colleague ? taskRow("backlog", index, task, colleague, faceOf(ui, e.surface, colleague, 24, stamp, false, false, isBacklogLight ? "small" : "initials")) : null;
             });
             const openCount = latest.tasks.reduce((sum, group) => sum + group.lines.length, 0);
             const heavy = (latest.heavy ?? []).map(id => byId.get(id)?.name ?? id);

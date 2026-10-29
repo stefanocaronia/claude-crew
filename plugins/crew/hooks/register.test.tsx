@@ -254,7 +254,8 @@ test("the panel shows who is at work and the team, and a colleague's card with i
         expect(await ui.find({ type: "Text", text: "Code review" })).toBeDefined();
         expect(Boolean(await ui.find({ type: "Svg", props: { alt: "Matteo Conti" } } as never))).toBe(surface === "desktop");
         await ui.press({ key: "open-matteo-conti" });
-        expect(await ui.find({ type: "Markdown", text: /retest the parser/ })).toBeDefined();
+        // The card's tasks are rows as the backlog's, with their ▶ only while the colleague is free.
+        expect(await ui.find({ type: "Text", text: "▸ retest the parser" })).toBeDefined();
         expect((await ui.find({ key: "card-effort" }))?.props.label).toBe("as the session");
 
         for (const level of ["low", "medium", "high", "extra", "max", "as the session"]) {
@@ -482,6 +483,23 @@ test("the backlog puts a P1 task first, with its priority and its age", async ($
     expect(await ui.find({ type: "Text", text: "Sara Lombardi · P1 · 2026-10-07 (3d)" })).toBeDefined();
     await ui.press({ key: "backlog-open-0" });
     expect(await ui.find({ type: "Text", text: /Sara Lombardi · P1/ })).toBeUndefined();
+    await ui.unmount();
+});
+
+test("a colleague's card: their tasks as rows, the first ten until all are asked, the memory closed under its heading", async ($, on) => {
+    const sent = world(on, []);
+    sent.files["/p/.claude/agent-memory/matteo-conti/todo.md"] = Array.from({ length: 12 }, (_, index) => `- [ ] P2 · 2026-10-0${(index % 9) + 1} · task ${index + 1}`).join("\n");
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+    const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
+    await ui.press({ key: "open-matteo-conti" });
+    expect(await ui.find({ key: "card-task-start-9" })).toBeDefined();
+    expect(await ui.find({ key: "card-task-start-10" })).toBeUndefined();
+    await ui.press({ key: "card-tasks-all" });
+    expect(await ui.find({ key: "card-task-start-11" })).toBeDefined();
+    expect((await ui.find({ key: "card-memory-toggle" }))?.props.label).toMatch(/^▸ .* · 9 October$/);
+    expect(await ui.find({ type: "Markdown", text: /the parser holds/ })).toBeUndefined();
+    await ui.press({ key: "card-memory-toggle" });
+    expect(await ui.find({ type: "Markdown", text: /the parser holds/ })).toBeDefined();
     await ui.unmount();
 });
 

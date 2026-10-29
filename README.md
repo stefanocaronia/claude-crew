@@ -11,7 +11,7 @@ A standing team of expert colleagues for your projects, in Claude Code. Each col
 
 One plugin, `crew`:
 
-- **The skill** (setting the team up, hiring and firing, portraits, review rounds, tasks, conversations and meetings), its commands (`/crew:init`, `/crew:review`, `/crew:meeting`, `/crew:ask`, `/crew:talk`, `/crew:invite`, `/crew:leave`, `/crew:end`, `/crew:hire`, `/crew:fire`, `/crew:portraits`, `/crew:tidy`) and the hook that hands the chat over to the colleagues and back.
+- **The skill** (setting the team up, hiring and firing, portraits, review rounds, tasks, conversations and meetings), its commands (`/crew:init`, `/crew:review`, `/crew:meeting`, `/crew:ask`, `/crew:talk`, `/crew:invite`, `/crew:leave`, `/crew:end`, `/crew:hire`, `/crew:fire`, `/crew:portraits`, `/crew:tidy`, `/crew:panel`) and the hook that hands the chat over to the colleagues and back.
 - **The panel** and a group chat. The panel shows each colleague in one of four sections: in the meeting, at work (with the steps they report, their context, tokens and time), finished, on a coffee break. Their card holds their open tasks, latest memory and settings: effort and permissions. Under the team and in a colleague's card, the buttons for a review, a meeting, hiring, firing and new portraits: each runs a command that asks in the chat what it needs (what to review and the meeting's topic, with three proposals from the work and the todos and a box for your own; the new colleague's field; the portraits' style; a yes before a firing). Then the backlog of open tasks, with a Tidy button when a todo is past 15 open lines; in a project without colleagues, a button that sets the team up. A finished colleague's report opens in the panel, from their row or their card. The panel speaks eleven languages (English, Italian, Spanish, French, German, Portuguese, Japanese, Chinese, Korean, Arabic, Russian), following Claude Code's language or the system's; its own settings page (⚙) picks another and says whether it opens at the start of a session. In a meeting, each colleague's turn is drawn under their portrait, name and role, and a card above the prompt holds the participants, an invite menu and the button that closes it.
 
 ## Requirements
@@ -55,7 +55,7 @@ Ask Claude in your own words; the `crew` skill knows the operations:
 
 `/crew:init` sets the team up in the current project; if it already has colleagues, Claude says who they are and asks whether to add someone. Conversations go through four commands, `/crew:talk Matteo Giulia`, `/crew:invite Sara`, `/crew:leave Sara` and `/crew:end`; `/crew:meeting Matteo Giulia` asks the topic first. The panel's other buttons run `/crew:review`, `/crew:hire`, `/crew:fire`, `/crew:portraits` and `/crew:tidy`, which only you or the panel start. You can type them, press the panel's buttons, or just ask in your own words in any language: Claude invokes them. Nothing starts from a phrase that only mentions a colleague.
 
-The panel opens by itself at the start of a session in a project with colleagues; `/crew-panel` shows or hides it.
+The panel opens by itself at the start of a session in a project with colleagues, and whenever a colleague starts a task or joins a meeting. `/crew:panel` asks Claude to open it, as asking in words does; `/crew-panel`, the panel's own command, shows or hides it at once, without Claude.
 
 ## Permissions and tasks
 

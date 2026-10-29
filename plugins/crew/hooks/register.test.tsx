@@ -563,28 +563,30 @@ test("a task that waits for another's open task shows who it waits for, and is f
     await after.unmount();
 });
 
-test("▶ on a backlog row starts that task; Next task starts the next one of the colleagues picked, or of those free", async ($, on) => {
+test("▶ on a backlog row starts that task; Next task starts the next one of the colleagues picked, or of those free; each says it is starting", async ($, on) => {
     const sent = world(on, []);
     sent.files["/p/.claude/agent-memory/sara-lombardi/todo.md"] = "- [ ] P3 · 2026-10-01 · later\n- [ ] P1 · 2026-10-07 · now\n";
     await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
-
-    for (const surface of surfaces) {
-        const ui = await $.ui.mount({ plugin, surface, component: "Pane", requestId: "crew", props: pane });
-
-        // The backlog stays open from one surface to the next, as the panel's view is the session's.
-        if (surface === "terminal") {
-            await ui.press({ key: "backlog-toggle" });
-        }
-
-        await ui.press({ key: "backlog-start-0" });
-        expect(sent.at(-1)).toBe("/crew:next Sara -- now");
-        await ui.press({ key: "act-next" });
-        expect(sent.at(-1)).toBe("/crew:next Matteo Sara");
-        await ui.press({ key: "pick-giulia-ferri" });
-        expect((await ui.find({ key: "act-next" }))?.props.label).toBe("▶ Next task for Giulia");
-        await ui.press({ key: "pick-giulia-ferri" });
-        await ui.unmount();
-    }
+    const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
+    await ui.press({ key: "backlog-toggle" });
+    await ui.press({ key: "pick-giulia-ferri" });
+    expect((await ui.find({ key: "act-next" }))?.props.label).toBe("▶ Next task for Giulia");
+    await ui.press({ key: "pick-giulia-ferri" });
+    await ui.press({ key: "backlog-start-0" });
+    expect(sent.at(-1)).toBe("/crew:next Sara -- now");
+    // Until Sara is at work the row says it is starting, and offers no second start.
+    expect(await ui.find({ key: "backlog-start-0" })).toBeUndefined();
+    expect(await ui.find({ type: "Text", text: "⏳ Starting…" })).toBeDefined();
+    await ui.press({ key: "act-next" });
+    expect(sent.at(-1)).toBe("/crew:next Matteo Sara");
+    expect((await ui.find({ key: "act-next" }))?.props.label).toBe("⏳ Starting…");
+    const count = sent.length;
+    await ui.press({ key: "act-next" });
+    expect(sent.length).toBe(count);
+    // Once Sara is at work, her task is no longer starting.
+    await $.agent.spawn({ prompt: "Now.", description: "now", subagentType: "sara-lombardi" } as never);
+    expect(await ui.find({ type: "Text", text: "⏳ Starting…" })).toBeUndefined();
+    await ui.unmount();
 });
 
 test("a colleague without reading or writing works only in their own memory folder", async ($, on) => {

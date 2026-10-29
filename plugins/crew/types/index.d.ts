@@ -103,6 +103,9 @@ export type PanelView = {
     isMemoryOpen?: boolean;
     /** The backlog's task opened to read it whole, as "<colleague>:<its words>". */
     openTask?: string;
+    /** What the user just asked to start, by key (a task as "<colleague>:<its words>", or "next:<colleague ids>"), with when: its
+     * button says it is starting until the colleague is at work, or for two minutes. */
+    starting?: Record<string, number>;
     /** The colleagues picked on their cards for a meeting, by id. */
     picked?: string[];
     /** The colleague whose card the panel shows, by id. */

@@ -99,6 +99,8 @@ const cardTaskLimit = 10;
 // The open lines a colleague's todo keeps, as the skill says; past them, the tidy button picks it when nobody is picked.
 const todoLimit = 15;
 const effortWidth = 4;
+// How long a start the user asked for shows on its button, at most, while Claude starts the colleague.
+const startingFor = 120_000;
 const cardWidth = 30;
 // A tooltip in Material's inverse colors, which read on both themes.
 const tooltipBackground = "#2b2b29";
@@ -448,8 +450,30 @@ export const register: Register = (on, options) => {
             const idle = colleagues.filter(colleague => !busy.has(colleague.id) && !inMeeting.has(colleague.id) && !done.has(colleague.id));
             // Who can start a task now: neither at work nor in the meeting.
             const isFree = (colleague: Colleague) => !busy.has(colleague.id) && !inMeeting.has(colleague.id);
+            // A start the user asked for shows on its button until one of its colleagues begins a task, or for two minutes: Claude takes a
+            // moment to start them, and a second press would start them twice.
+            const drawnAt = await $.clock.now();
+            const isStarting = (key: string, ids: string[]) => {
+                const asked = panel.starting?.[key];
+                return asked !== undefined && drawnAt - asked < startingFor && !list.some(run => ids.includes(run.colleague) && run.startedAt >= asked);
+            };
+            const markStarting = async (key: string) => {
+                const asked = await $.clock.now();
+                await update($, view, current => ({ ...current, starting: { ...Object.fromEntries(Object.entries(current.starting ?? {}).filter(([, when]) => asked - when < startingFor)), [key]: asked } }));
+            };
             // One task of a colleague's todo, the one the user pressed ▶ on, as a command, as the user would type it.
-            const startTask = (colleague: Colleague, text: string) => $.command.run({ command: "crew:next", args: `${colleague.name} -- ${text}` });
+            const startTask = async (colleague: Colleague, text: string) => {
+                await markStarting(`${colleague.id}:${text}`);
+                await $.command.run({ command: "crew:next", args: `${colleague.name} -- ${text}` });
+            };
+            // The next tasks of some colleagues, from the Next task buttons.
+            const startNext = async (members: Colleague[]) => {
+                await markStarting(`next:${members.map(member => member.id).join(",")}`);
+                await runCommand("crew:next", members);
+            };
+            const isNextStarting = (members: Colleague[]) => isStarting(`next:${members.map(member => member.id).join(",")}`, members.map(member => member.id));
+            // The team's button: any Next task still starting, since its press clears the colleagues picked.
+            const isAnyNextStarting = Object.keys(panel.starting ?? {}).some(key => key.startsWith("next:") && isStarting(key, key.slice("next:".length).split(",")));
             const sendBack = (ids: string[]) => update($, runs, all => all.map(run => (ids.includes(run.colleague) && run.status !== "running" ? { ...run, isBack: true } : run)));
             const selected = panel.selected ? byId.get(panel.selected) : undefined;
             // The meeting itself is in the main chat and above the prompt: here only a ring says who is in it.
@@ -785,7 +809,11 @@ export const register: Register = (on, options) => {
                                 ? <Box key={`${prefix}-age-${index}`} flexShrink={0}><Text dimColor wrap="truncate">{days}</Text></Box>
                                 : null}
                             {effortCell(`${prefix}-effort-${index}`, effort)}
-                            {isFree(colleague) ? <Button key={`${prefix}-start-${index}`} label="▶" plain dimColor onPress={() => startTask(colleague, task.text)} /> : null}
+                            {!isFree(colleague)
+                                ? null
+                                : isStarting(`${colleague.id}:${task.text}`, [colleague.id])
+                                ? <Box key={`${prefix}-starting-${index}`} flexShrink={0}><Text dimColor wrap="truncate">{`⏳ ${say.starting}`}</Text></Box>
+                                : <Button key={`${prefix}-start-${index}`} label="▶" plain dimColor onPress={() => startTask(colleague, task.text)} />}
                         </Box>
                         {isOpen
                             ? (
@@ -877,7 +905,11 @@ export const register: Register = (on, options) => {
                         <Box key="card-actions" flexDirection="row" flexWrap="wrap" gap={1}>
                             {isBusy ? null : <Button key="talk" variant="primary" label={`☰ ${say.talk(selected.name)}`} onPress={() => talkWith(selected)} />}
                             <Button key="card-ask" label={`? ${say.ask(selected.name)}`} onPress={() => askOf(selected)} />
-                            {isBusy || !selected.openTasks ? null : <Button key="card-next" label={`▶ ${say.nextWith(selected.name)}`} onPress={() => runCommand("crew:next", [selected])} />}
+                            {isBusy || !selected.openTasks
+                                ? null
+                                : isNextStarting([selected])
+                                ? <Button key="card-next" label={`⏳ ${say.starting}`} onPress={() => undefined} />
+                                : <Button key="card-next" label={`▶ ${say.nextWith(selected.name)}`} onPress={() => startNext([selected])} />}
                             {isBusy ? null : <Button key="card-round" label={`↻ ${say.roundWith(selected.name)}`} onPress={() => runCommand("crew:review", [selected])} />}
                             {retests ? <Button key="card-retest" label={`↻ ${say.retest(retests)}`} onPress={() => send(say.retestPrompt(selected.name))} /> : null}
                             {stuck.length ? <Button key="card-free" label={say.markFree} plain onPress={markFree} /> : null}
@@ -1043,6 +1075,8 @@ export const register: Register = (on, options) => {
             const backlog = backlogOf(latest.tasks, backlogSize);
             // The colleagues whose todo is past the 15 open lines it keeps: with nobody picked, the tidy button gives them the task.
             const longTodos = colleagues.filter(colleague => latest.tasks.some(group => group.colleague === colleague.id && group.lines.length > todoLimit) || (latest.longMemories ?? []).includes(colleague.id));
+            // Who the team's Next task button starts: the colleagues picked, or everyone free with something to do.
+            const nextTeam = pickedTeam.length ? pickedTeam : colleagues.filter(colleague => isFree(colleague) && colleague.openTasks);
             // One weight for the whole panel: the team's portraits first, then one small portrait a row with what is left; past that,
             // initials.
             const portraitWeight = colleagues.reduce((sum, colleague) => sum + (portraits.get(colleague.id)?.length ?? 0), 0);
@@ -1071,7 +1105,9 @@ export const register: Register = (on, options) => {
                         {portraitButton("act-portraits", say.portraits, pickedTeam)}
                         <Button key="act-tidy" label={`✦ ${pickedNames ? say.tidyWith(pickedNames) : say.tidy}`} onPress={() => runCommand("crew:tidy", pickedTeam.length ? pickedTeam : longTodos)} />
                         {pickedNames || colleagues.some(colleague => isFree(colleague) && colleague.openTasks)
-                            ? <Button key="act-next" label={`▶ ${pickedNames ? say.nextWith(pickedNames) : say.next}`} onPress={() => runCommand("crew:next", pickedTeam.length ? pickedTeam : colleagues.filter(colleague => isFree(colleague) && colleague.openTasks))} />
+                            ? isAnyNextStarting
+                                ? <Button key="act-next" label={`⏳ ${say.starting}`} onPress={() => undefined} />
+                                : <Button key="act-next" label={`▶ ${pickedNames ? say.nextWith(pickedNames) : say.next}`} onPress={() => startNext(nextTeam)} />
                             : null}
                         {tip("open-settings", say.panelSettings, <Button key="open-settings" label={"⚙︎"} onPress={openSettings} />)}
                     </Box>

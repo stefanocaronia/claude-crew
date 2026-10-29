@@ -204,7 +204,7 @@ test("under the team: the backlog, each task with who holds it and its effort; t
         const ui = await $.ui.mount({ plugin, surface, component: "Pane", requestId: "crew", props: { title: "Crew", isFocused: false, bodyColumns: 50, placement: "dock" } as never });
         // The plan's limits are the app's to show; the colleagues' week shows once they work.
         expect(await ui.find({ type: "Text", text: /% used/ })).toBeUndefined();
-        expect(await ui.find({ type: "Text", text: "no priority" })).toBeDefined();
+        expect(await ui.find({ type: "Text", text: "tasks without a priority" })).toBeDefined();
         expect((await ui.find({ key: "backlog-toggle" }))?.props.label).toBe("▸ Backlog");
         expect(await ui.find({ type: "Text", text: "retest the parser" })).toBeUndefined();
         await ui.press({ key: "backlog-toggle" });
@@ -444,9 +444,9 @@ test("the dashboard at the top: who is at work, the open tasks by priority, the 
     for (const surface of surfaces) {
         const ui = await $.ui.mount({ plugin, surface, component: "Pane", requestId: "crew", props: pane });
         // Two at work, three tasks this week, the two open lines without a priority; no tile counts what the plan's limits say.
-        expect(await ui.find({ type: "Text", text: "this week" })).toBeDefined();
-        expect(await ui.find({ type: "Text", text: "no priority" })).toBeDefined();
-        expect(await ui.find({ type: "Text", text: "now" })).toBeDefined();
+        expect(await ui.find({ type: "Text", text: "tasks given this week" })).toBeDefined();
+        expect(await ui.find({ type: "Text", text: "tasks without a priority" })).toBeDefined();
+        expect(await ui.find({ type: "Text", text: "P1 tasks · now" })).toBeDefined();
         expect(await ui.find({ type: "Text", text: "3" })).toBeDefined();
         expect(await ui.find({ type: "Text", text: /% used/ })).toBeUndefined();
     }
@@ -475,7 +475,7 @@ test("the backlog puts a P1 task first, with its priority and its age", async ($
     const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
     await ui.press({ key: "backlog-toggle" });
     // The desktop draws the priority as an issue tracker's mark, never its letters; the terminal, as two red arrows up.
-    expect(await ui.find({ type: "Text", text: "P1" })).toBeUndefined();
+    expect(await ui.find({ type: "Text", text: /^P1$/ })).toBeUndefined();
     expect(await ui.find({ type: "Text", text: "3d" })).toBeDefined();
     const terminal = await $.ui.mount({ plugin, surface: "terminal", component: "Pane", requestId: "crew", props: pane });
     expect((await terminal.find({ type: "Text", text: "⇈" }))?.props.color).toBe("#E5493A");

@@ -961,12 +961,11 @@ export const register: Register = (on, options) => {
                     </Box>
                 )
                 : null);
-            // The team at a glance, in a few colored tiles: who is at work, the open tasks by priority, the week's tasks and tokens. The
+            // The team at a glance, in a few colored tiles: who is at work, the open tasks by priority, the tasks given this week. The
             // plan's limits are the app's to show.
             const thisWeek = (await weeklyCounts($))[isoWeek(today)] ?? {};
             const weekCounts = colleagues.map(colleague => thisWeek[colleague.id]);
             const weekTasks = weekCounts.reduce((sum, counts) => sum + (counts?.tasks ?? 0), 0);
-            const weekTokens = weekCounts.reduce((sum, counts) => sum + (counts?.tokens ?? 0), 0);
             const openByPriority = new Map<string, number>();
 
             for (const line of latest.tasks.flatMap(group => group.lines)) {
@@ -984,10 +983,10 @@ export const register: Register = (on, options) => {
                 </Box>
             );
             const tiles = [
-                tile("dash-working", running.length, say.working, workingColor, isDesktop ? <Text color={workingColor}>●</Text> : null),
+                tile("dash-working", running.length, say.dashWorking, workingColor, isDesktop ? <Text color={workingColor}>●</Text> : null),
                 ...["P1", "P2", "P3"].map(priority => tile(`dash-${priority}`, openByPriority.get(priority) ?? 0, say.priorityNames[priority as "P1"], priorityGlyphs[priority]?.color ?? "#888780", priorityMark(`dash-mark-${priority}`, priority))),
                 ...(openByPriority.get("") ? [tile("dash-unranked", openByPriority.get("") ?? 0, say.unranked, "#888780")] : []),
-                tile("dash-week", weekTasks, weekTokens ? `${say.thisWeekShort} · ${formatTokens(weekTokens, say.units)}` : say.thisWeekShort, weekColor),
+                tile("dash-week", weekTasks, say.thisWeekShort, weekColor),
             ];
             const backlog = backlogOf(latest.tasks, backlogSize);
             // The colleagues whose todo is past the 15 open lines it keeps: with nobody picked, the tidy button gives them the task.

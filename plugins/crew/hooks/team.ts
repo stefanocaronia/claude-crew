@@ -213,7 +213,7 @@ export function withPermissions(profile: string, permissions: Permissions): stri
 }
 
 /** A task of the backlog: its words, and what its line says of it: priority, the day it was written, the effort it needs. */
-export type Task = { colleague: string; text: string; priority?: string; date?: string; effort?: string };
+export type Task = { colleague: string; text: string; priority?: string; date?: string; effort?: string; line?: string };
 
 /** The open tasks that ask to try something again: those starting with Riprova, Retest, Re-test or Check again. */
 export function retestsOf(tasks: string[]): string[]
@@ -231,7 +231,8 @@ export function backlogOf(tasks: { colleague: string; lines: string[] }[], limit
         || (first.task.date ?? "9999").localeCompare(second.task.date ?? "9999")
         || first.index - second.index
         || first.groupIndex - second.groupIndex);
-    return ranked.slice(0, limit).map(entry => entry.task);
+    // Each task keeps its own line of the todo, to change or remove it there.
+    return ranked.slice(0, limit).map(entry => ({ ...entry.task, line: tasks[entry.groupIndex]?.lines[entry.index] }));
 }
 
 /** A todo line's parts: `P2 · 2026-10-29 · the task (effort: high)`, each but the words optional. */
@@ -247,6 +248,16 @@ export function taskOf(colleague: string, line: string): Task
         ...(head?.[2] ? { date: head[2] } : {}),
         ...(effort ? { effort: effort[1]?.toLowerCase() } : {}),
     };
+}
+
+/** A todo line with its next priority, P1 to P2 to P3 and back to P1, a line without one becoming P1; its date kept, or today's
+ * when it had none. */
+export function withNextPriority(line: string, today: string): string
+{
+    const task = taskOf("", line);
+    const next = task.priority ? priorities[(priorities.indexOf(task.priority) + 1) % priorities.length] : priorities[0];
+    const head = /^(?:P[1-3] · )?(?:\d{4}-\d{2}-\d{2} · )?/.exec(line)?.[0] ?? "";
+    return `${next} · ${task.date ?? today} · ${line.slice(head.length)}`;
 }
 
 /** Whole days from a task's date to `now`; undefined without a date. */

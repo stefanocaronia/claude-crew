@@ -519,6 +519,30 @@ test("a memory past 80 lines says so on its card in red, and Tidy with nobody pi
     await ui.unmount();
 });
 
+test("a press on a task's priority turns it in its todo, and Remove moves the task to the archive", async ($, on) => {
+    const sent = world(on, []);
+    const { files } = sent;
+    const todo = "/p/.claude/agent-memory/sara-lombardi/todo.md";
+    files[todo] = "# Sara: todo\n\n- [ ] P1 · 2026-10-07 · now\n- [ ] later\n";
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+    const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
+    await ui.press({ key: "backlog-toggle" });
+    await ui.press({ key: "backlog-cycle-0" });
+    expect(files[todo]).toBe("# Sara: todo\n\n- [ ] P2 · 2026-10-07 · now\n- [ ] later\n");
+    await ui.unmount();
+    // A task without a priority starts at P1, dated today: Sara's second line, after Matteo's line, which comes first in its file.
+    const again = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
+    await again.press({ key: "backlog-cycle-2" });
+    expect(files[todo]).toContain("- [ ] P1 · 2026-10-10 · later");
+    await again.unmount();
+    const last = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
+    await last.press({ key: "backlog-open-0" });
+    await last.press({ key: "backlog-remove-0" });
+    expect(files[todo]).not.toContain("later");
+    expect(files["/p/.claude/agent-memory/sara-lombardi/notes/todo-archive.md"]).toContain("- 2026-10-10 · removed from the panel: P1 · 2026-10-10 · later");
+    await last.unmount();
+});
+
 test("▶ on a backlog row starts that task; Next task starts the next one of the colleagues picked, or of those free", async ($, on) => {
     const sent = world(on, []);
     sent.files["/p/.claude/agent-memory/sara-lombardi/todo.md"] = "- [ ] P3 · 2026-10-01 · later\n- [ ] P1 · 2026-10-07 · now\n";

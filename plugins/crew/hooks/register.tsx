@@ -11,7 +11,7 @@ import { avatarSvg, barEndSvg, blankSvg, checkboxSvg, pickedTint, captionSvg, cl
 import { claudeId, segmentsOf, speakersOf } from "./meeting.ts";
 import { imagePathsIn, imageTypeOf, isInside, isOwnMemory, resolvedPath } from "./paths.ts";
 import { contextShare, progressOf, withCount } from "./progress.ts";
-import { ageOf, agentSpecFrom, backlogOf, cardFrom, colleagueFrom, colleagueOf, memorySizeOf, openTasks, retestsOf, taskOf as todoTask, withEffort, withPermissions } from "./team.ts";
+import { ageOf, agentSpecFrom, backlogOf, cardFrom, colleagueFrom, colleagueOf, memorySizeOf, openTasks, retestsOf, taskOf as todoTask, withEffort, withNextPriority, withPermissions } from "./team.ts";
 import { contextWindowOf, dateOf, formatTime, formatTokens, isoWeek, languageNames, languageOf, listNames, modelName, slugOf, words } from "./text.ts";
 import type { Language, Words } from "./text.ts";
 
@@ -724,7 +724,25 @@ export const register: Register = (on, options) => {
                     : <Text key={key} bold color={glyph?.color}>{glyph?.glyph ?? priority}</Text>;
             };
             const today = await $.clock.now();
+            // The panel changes a todo itself, at once, without Claude: a task's priority turned, a task removed to the archive.
+            const cyclePriority = async (colleague: Colleague, line: string) => {
+                const day = dateOf(await $.clock.now());
+                await changeTodoLine($, colleague.id, line, current => withNextPriority(current, day));
+                await safeRefresh($);
+                if ((await read($, view)).selected === colleague.id) {
+                    await readCard($, colleague.id);
+                }
+            };
+            const removeTask = async (colleague: Colleague, line: string) => {
+                await removeTodoLine($, colleague.id, line);
+                await update($, view, current => ({ ...current, openTask: undefined }));
+                await safeRefresh($);
+                if ((await read($, view)).selected === colleague.id) {
+                    await readCard($, colleague.id);
+                }
+            };
             const taskRow = (prefix: string, index: number, task: Task, colleague: Colleague, face: JSX.Element | null) => {
+                const line = task.line;
                 const text = plainText(task.text);
                 const effort = task.effort ?? colleague.effort ?? "";
                 const age = ageOf(task.date, today);
@@ -738,7 +756,17 @@ export const register: Register = (on, options) => {
                     <Box key={`${prefix}-${index}`} flexDirection="column" borderStyle="round" {...border} paddingX={1} {...(isDesktop ? { hover: { backgroundColor: stateLayer } } : {})}>
                         <Box flexDirection="row" flexWrap="nowrap" gap={1} alignItems="center">
                             {face}
-                            {task.priority ? <Box key={`${prefix}-priority-${index}`} flexShrink={0}>{priorityMark(`priority-${index}`, task.priority)}</Box> : null}
+                            {line
+                                ? (
+                                    // A press on the mark turns the priority, P1, P2, P3 and P1 again; a task without one shows a dim circle to start from.
+                                    <Box key={`${prefix}-priority-${index}`} flexShrink={0}>
+                                        {task.priority ? priorityMark(`priority-${index}`, task.priority) : <Text dimColor>○</Text>}
+                                        <Box position="absolute" top={0} left={0}>
+                                            <Button key={`${prefix}-cycle-${index}`} label={" "} plain onPress={() => cyclePriority(colleague, line)} />
+                                        </Box>
+                                    </Box>
+                                )
+                                : null}
                             <Box flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
                                 <Button key={`${prefix}-open-${index}`} plain onPress={toggleTask}>
                                     <Text wrap="truncate-end">{`${isOpen ? "▾" : "▸"} ${text}`}</Text>
@@ -753,6 +781,13 @@ export const register: Register = (on, options) => {
                                 <Box key={`${prefix}-details-${index}`} flexDirection="column" gap={1} paddingLeft={face ? 4 : 2}>
                                     <Text>{text}</Text>
                                     <Text dimColor>{facts}</Text>
+                                    {line
+                                        ? (
+                                            <Button key={`${prefix}-remove-${index}`} plain onPress={() => removeTask(colleague, line)}>
+                                                <Text color={errorColor}>{`✕ ${say.removeTask}`}</Text>
+                                            </Button>
+                                        )
+                                        : null}
                                 </Box>
                             )
                             : null}
@@ -2015,6 +2050,48 @@ async function defineLate($: EngineInterface, root: string, profiles: Map<string
             lateTypes.set(id, { type: defined.agent, profile });
         }
     }
+}
+
+// One open line of a colleague's todo changed in place, or removed when `change` gives nothing back; the file keeps its line ends.
+// False when the line is no longer there: another session changed the todo meanwhile.
+async function changeTodoLine($: EngineInterface, colleague: string, line: string, change: (line: string) => string | undefined): Promise<boolean>
+{
+    const path = `${await projectRoot($)}/.claude/agent-memory/${colleague}/todo.md`;
+    const text = await $.fs.read(path).catch(() => undefined);
+
+    if (text === undefined) {
+        return false;
+    }
+
+    const lines = text.replace(/\r\n/g, "\n").split("\n");
+    const at = lines.findIndex(entry => /^\s*- \[ \]\s*(.+?)\s*$/.exec(entry)?.[1] === line);
+
+    if (at < 0) {
+        return false;
+    }
+
+    const box = /^\s*- \[ \]\s*/.exec(lines[at] ?? "")?.[0] ?? "- [ ] ";
+    const changed = change(line);
+
+    if (changed === undefined) {
+        lines.splice(at, 1);
+    } else {
+        lines[at] = `${box}${changed}`;
+    }
+
+    await $.fs.write(path, lines.join(text.includes("\r\n") ? "\r\n" : "\n"));
+    return true;
+}
+
+// A task the user removes from the panel leaves its todo for the colleague's archive, with the day: nothing is lost.
+async function removeTodoLine($: EngineInterface, colleague: string, line: string): Promise<void>
+{
+    const today = dateOf(await $.clock.now());
+    const archive = `${await projectRoot($)}/.claude/agent-memory/${colleague}/notes/todo-archive.md`;
+    const kept = (await $.fs.exists(archive)) ? await $.fs.read(archive).catch(() => "") : "";
+    const entry = `- ${today} · removed from the panel: ${line}`;
+    await $.fs.write(archive, kept ? `${kept.replace(/\s*$/, "")}\n${entry}\n` : `# Todo archive\n\n${entry}\n`).catch(() => undefined);
+    await changeTodoLine($, colleague, line, () => undefined);
 }
 
 async function projectRoot($: EngineInterface): Promise<string>

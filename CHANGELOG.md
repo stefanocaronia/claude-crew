@@ -2,7 +2,7 @@
 
 What changes for whoever uses Crew, version by version. Plugins update in a new chat: `/plugin`, Marketplaces, claude-crew, Update marketplace, or turn its auto-update on there.
 
-## 0.11.0 – 0.11.10
+## 0.11.0 – 0.11.11
 
 - Every todo line carries a priority and the day it was written: `- [ ] P2 · 2026-10-29 · task` (P1 now, P2 in the plan, P3 later); done, `- [x] 2026-10-30 · task`. The colleagues write it so, tidying keeps the 15 open lines by priority and gives a priority and a date to the lines without, and the backlog puts P1 first, with the priority as a mark and the task's age. Lines in the old form still read.
 - The backlog orders the tasks by priority, then the oldest first. `/crew:next`, the panel's Next task button, starts the next task of the colleagues picked, or of everyone free: the highest priority and the oldest, skipping those waiting for the user, for an event or for a permission the colleague lacks. A ▶ on a backlog row starts that very task.
@@ -10,6 +10,7 @@ What changes for whoever uses Crew, version by version. Plugins update in a new 
 - The backlog draws a task's priority as an issue tracker does: P1 two red arrows up, P2 an orange equals, P3 a blue arrow down.
 - A colleague's card is lighter: their tasks are rows as in the backlog, by priority and age, the first ten until you ask for all; how many they have of each priority shows beside their name; their memory opens under its heading; Next task and Tidy are there for them; portrait and firing move to the foot, under the settings.
 - The top of the panel is a small dashboard of colored tiles in place of the week's card: who is at work, the team's open tasks of each priority (and those without one), and the tasks given to colleagues this week; each tile says what its number counts: tasks in progress, high, normal and low priority; the week's tile has a calendar.
+- In the backlog and in a colleague's card the panel changes a todo itself, at once, without Claude: a press on a task's priority turns it (P1, P2, P3, P1; a task without one starts at P1, dated today), and an opened task has a Remove button that moves it to the colleague's `notes/todo-archive.md` with the day.
 - A colleague's `MEMORY.md` is an index, not a diary: at most 80 lines and 10 KB, since Claude Code hands them only its beginning. Past that, at the end of a task or with Tidy, its oldest dated sections move whole to `notes/diary-<year>-<month>.md` and the index keeps a line for each, with its link; nothing is deleted. A card says in red when a memory is too long, and Tidy with nobody picked takes those colleagues too.
 - Colleagues are born with a marked character, unlike every other on the team: their temperament, how they joke and get angry, two or three phrases of their own, their roots heard in how they talk, and a new section of the profile, «With the others», with an affinity and a friction. In a meeting each keeps their own voice.
 

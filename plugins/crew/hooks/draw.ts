@@ -38,9 +38,9 @@ export function claudeSvg(size: number): string
 }
 
 /** A small line icon: a clock for time, a calendar, a bolt for the colleagues' work, a pencil, their memory. */
-export function iconSvg(name: "clock" | "calendar" | "bolt" | "pencil" | "memory", size: number, top = 0): string
+export function iconSvg(name: "clock" | "calendar" | "bolt" | "pencil" | "memory", size: number, top = 0, color = "#8a8a86"): string
 {
-    const stroke = `fill="none" stroke="#8a8a86" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"`;
+    const stroke = `fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"`;
     const shapes = {
         clock: `<circle cx="12" cy="12" r="9" ${stroke}/><path d="M12 7v5l3 2" ${stroke}/>`,
         calendar: `<rect x="3.5" y="5" width="17" height="15" rx="2.5" ${stroke}/><path d="M3.5 10h17M8 3v4M16 3v4" ${stroke}/>`,

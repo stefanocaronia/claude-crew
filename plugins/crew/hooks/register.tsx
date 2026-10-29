@@ -986,7 +986,7 @@ export const register: Register = (on, options) => {
                 tile("dash-working", running.length, say.dashWorking, workingColor, isDesktop ? <Text color={workingColor}>●</Text> : null),
                 ...["P1", "P2", "P3"].map(priority => tile(`dash-${priority}`, openByPriority.get(priority) ?? 0, say.priorityNames[priority as "P1"], priorityGlyphs[priority]?.color ?? "#888780", priorityMark(`dash-mark-${priority}`, priority))),
                 ...(openByPriority.get("") ? [tile("dash-unranked", openByPriority.get("") ?? 0, say.unranked, "#888780")] : []),
-                tile("dash-week", weekTasks, say.thisWeekShort, weekColor),
+                tile("dash-week", weekTasks, say.thisWeekShort, weekColor, isDesktop ? <ui.Svg key="dash-week-mark" source={iconSvg("calendar", 14, 0, weekColor)} alt={say.thisWeekShort} width={14} height={14} /> : null),
             ];
             const backlog = backlogOf(latest.tasks, backlogSize);
             // The colleagues whose todo is past the 15 open lines it keeps: with nobody picked, the tidy button gives them the task.

@@ -463,6 +463,18 @@ test("the Tidy button runs /crew:tidy with the colleagues picked, or with nobody
     }
 });
 
+test("the backlog puts a P1 task first, with its priority and its age", async ($, on) => {
+    const sent = world(on, []);
+    sent.files["/p/.claude/agent-memory/sara-lombardi/todo.md"] = "- [ ] P3 · 2026-10-01 · later\n- [ ] P1 · 2026-10-07 · now\n";
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+    const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
+    await ui.press({ key: "backlog-toggle" });
+    expect((await ui.find({ type: "Text", text: "P1" }))?.props.color).toBe("#D9932B");
+    expect(await ui.find({ type: "Text", text: "3d" })).toBeDefined();
+    expect(await ui.find({ type: "Text", text: "now" })).toBeDefined();
+    await ui.unmount();
+});
+
 test("a colleague without reading or writing works only in their own memory folder", async ($, on) => {
     world(on, []);
     on("tool.call", () => ({ result: "ran" }) as never);

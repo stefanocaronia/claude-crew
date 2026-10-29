@@ -335,8 +335,8 @@ function dismiss(people)
     const files = people.map(person => `${memoryPath(person.id)}/MEMORY.md and todo.md`).join("; ");
     return `[Crew] ${isMany ? `${listNames(names)} leave` : `${names[0]} leaves`}. First of all ${isMany ? "each of them updates" : `${names[0]} updates`}, `
         + "in a few lines and in their own voice, the memory (the date, what was discussed, what the user decided and why, what they "
-        + `understood) and the todo (- [x] what is done, - [ ] what remains), editing them, never rewriting them: ${files}. Then they tidy the todo: `
-        + "remove the lines ticked [x], merge duplicates, keep at most 15 open lines, the most important first, and move the rest, and what no longer matters, "
+        + `understood) and the todo (- [x] <the day> · what is done, - [ ] P1, P2 or P3 · <the day> · what remains), editing them, never rewriting them: ${files}. Then they tidy the todo: `
+        + "remove the lines ticked [x], merge duplicates, keep at most 15 open lines, by priority, P1 first, and move the rest, and what no longer matters, "
         + "to notes/todo-archive.md with the date: never deleted.";
 }
 

@@ -196,36 +196,62 @@ export function withPermissions(profile: string, permissions: Permissions): stri
     return lines.join(newline);
 }
 
+/** A task of the backlog: its words, and what its line says of it: priority, the day it was written, the effort it needs. */
+export type Task = { colleague: string; text: string; priority?: string; date?: string; effort?: string };
+
 /** The open tasks that ask to try something again: those starting with Riprova, Retest, Re-test or Check again. */
 export function retestsOf(tasks: string[]): string[]
 {
-    return tasks.filter(task => /^(?:riprov|re-?test|check again)/i.test(task.replace(/^[\s*_`]+/, "")));
+    return tasks.filter(task => /^(?:riprov|re-?test|check again)/i.test(taskOf("", task).text.replace(/^[\s*_`]+/, "")));
 }
 
-/** Up to `limit` open tasks, each colleague's next one in turn; a task ending in "(effort: high)" names the effort it needs. */
-export function backlogOf(tasks: { colleague: string; lines: string[] }[], limit: number): { colleague: string; text: string; effort?: string }[]
+/** Up to `limit` open tasks, P1 first, then P2, P3 and those without a priority; within each, every colleague's next one in turn. */
+export function backlogOf(tasks: { colleague: string; lines: string[] }[], limit: number): Task[]
 {
-    const picked: { colleague: string; text: string; effort?: string }[] = [];
+    const picked: Task[] = [];
+    const parsed = tasks.map(group => group.lines.map(line => taskOf(group.colleague, line)));
 
-    for (let round = 0; picked.length < limit && tasks.some(group => group.lines.length > round); round++) {
-        for (const group of tasks.filter(candidate => candidate.lines.length > round).slice(0, limit - picked.length)) {
-            picked.push(taskOf(group.colleague, group.lines[round] ?? ""));
+    for (const rank of [...priorities, undefined]) {
+        const groups = parsed.map(group => group.filter(task => task.priority === rank));
+
+        for (let round = 0; picked.length < limit && groups.some(group => group.length > round); round++) {
+            for (const group of groups.filter(candidate => candidate.length > round).slice(0, limit - picked.length)) {
+                picked.push(group[round] as Task);
+            }
         }
     }
 
     return picked;
 }
 
+/** A todo line's parts: `P2 · 2026-10-29 · the task (effort: high)`, each but the words optional. */
+export function taskOf(colleague: string, line: string): Task
+{
+    const head = /^(?:(P[1-3]) · )?(?:(\d{4}-\d{2}-\d{2}) · )?/.exec(line);
+    const rest = line.slice(head?.[0].length ?? 0);
+    const effort = /\s*\(effort:\s*(low|medium|high|xhigh|max)\)\s*$/i.exec(rest);
+    return {
+        colleague,
+        text: effort ? rest.slice(0, effort.index) : rest,
+        ...(head?.[1] ? { priority: head[1] } : {}),
+        ...(head?.[2] ? { date: head[2] } : {}),
+        ...(effort ? { effort: effort[1]?.toLowerCase() } : {}),
+    };
+}
+
+/** Whole days from a task's date to `now`; undefined without a date. */
+export function ageOf(date: string | undefined, now: number): number | undefined
+{
+    const written = date ? Date.parse(`${date}T00:00:00`) : NaN;
+    return Number.isNaN(written) ? undefined : Math.max(0, Math.floor((now - written) / 86_400_000));
+}
+
+const priorities = ["P1", "P2", "P3"];
+
 /** The open lines of a todo, without their box. */
 export function openTasks(todo: string): string[]
 {
     return [...todo.replace(/\r\n/g, "\n").matchAll(/^\s*- \[ \]\s*(.+)$/gm)].map(match => match[1]?.trim() ?? "");
-}
-
-function taskOf(colleague: string, line: string): { colleague: string; text: string; effort?: string }
-{
-    const match = /\s*\(effort:\s*(low|medium|high|xhigh|max)\)\s*$/i.exec(line);
-    return match ? { colleague, text: line.slice(0, match.index), effort: match[1]?.toLowerCase() } : { colleague, text: line };
 }
 
 // The tools the permissions stand for; the panel's own tool goes with every colleague it draws.

@@ -5,7 +5,7 @@ import { describe, it } from "node:test";
 import { segmentsOf, speakersOf } from "./meeting.ts";
 import { imagePathsIn, isInside, isOwnMemory, resolvedPath } from "./paths.ts";
 import { withCount } from "./progress.ts";
-import { agentSpecFrom, backlogOf, cardFrom, colleagueFrom, colleagueOf, openTasks, permissionsOf, retestsOf, withEffort, withPermissions } from "./team.ts";
+import { ageOf, agentSpecFrom, backlogOf, cardFrom, colleagueFrom, colleagueOf, openTasks, permissionsOf, retestsOf, taskOf, withEffort, withPermissions } from "./team.ts";
 import { dateOf, formatTokens, formatUntil, isoWeek, languageOf, listNames, modelName, slugOf, words } from "./text.ts";
 
 const profile = "---\r\nname: matteo-conti\r\ndescription: \"Matteo Conti, architetto TypeScript. Usalo per le revisioni.\"\r\ntools: Read\r\nmemory: project\r\neffort: high\r\ncolor: red\r\n---\r\n\r\n# Matteo Conti, architetto TypeScript\r\n\r\nChi sei.";
@@ -41,6 +41,17 @@ describe("colleagues from their files", () => {
         assert.deepEqual(backlogOf(tasks, 10).map(task => task.text), ["m1", "g1", "s1", "m2", "s2", "m3"]);
         assert.equal(backlogOf(tasks, 10)[4]?.effort, "low");
         assert.deepEqual(backlogOf([], 10), []);
+    });
+
+    it("reads a task's priority and date, and puts P1 first, then P2, P3 and the lines without a priority", () => {
+        assert.deepEqual(taskOf("matteo", "P2 · 2026-10-29 · the parser (effort: high)"), { colleague: "matteo", text: "the parser", priority: "P2", date: "2026-10-29", effort: "high" });
+        assert.deepEqual(taskOf("matteo", "2026-10-14 · done long ago"), { colleague: "matteo", text: "done long ago", date: "2026-10-14" });
+        assert.deepEqual(taskOf("matteo", "P2 is a word here"), { colleague: "matteo", text: "P2 is a word here" });
+        const tasks = [{ colleague: "matteo", lines: ["P3 · 2026-10-01 · m-later", "old line", "P1 · 2026-10-28 · m-now"] }, { colleague: "giulia", lines: ["P2 · 2026-10-20 · g-plan", "P1 · 2026-10-27 · g-now"] }];
+        assert.deepEqual(backlogOf(tasks, 10).map(task => task.text), ["m-now", "g-now", "g-plan", "m-later", "old line"]);
+        assert.deepEqual(retestsOf(["P1 · 2026-10-28 · Riprova il parser", "P2 · 2026-10-28 · the map"]), ["P1 · 2026-10-28 · Riprova il parser"]);
+        assert.equal(ageOf("2026-10-26", Date.parse("2026-10-29T12:00:00")), 3);
+        assert.equal(ageOf(undefined, 0), undefined);
     });
 
     it("takes a bold name with its colon whole, leaving no stars", () => {

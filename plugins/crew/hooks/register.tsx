@@ -10,7 +10,7 @@ import { avatarSvg, barEndSvg, blankSvg, checkboxSvg, pickedTint, captionSvg, cl
 import { claudeId, segmentsOf, speakersOf } from "./meeting.ts";
 import { imagePathsIn, imageTypeOf, isInside, isOwnMemory, resolvedPath } from "./paths.ts";
 import { contextShare, progressOf, withCount } from "./progress.ts";
-import { agentSpecFrom, backlogOf, cardFrom, colleagueFrom, colleagueOf, openTasks, retestsOf, withEffort, withPermissions } from "./team.ts";
+import { ageOf, agentSpecFrom, backlogOf, cardFrom, colleagueFrom, colleagueOf, openTasks, retestsOf, taskOf as todoTask, withEffort, withPermissions } from "./team.ts";
 import { contextWindowOf, dateOf, formatTime, formatTokens, isoWeek, languageNames, languageOf, listNames, modelName, slugOf, words } from "./text.ts";
 import type { Language, Words } from "./text.ts";
 
@@ -60,6 +60,8 @@ const restAfter = 5 * 60_000;
 const sectionIcons = { meeting: "☰", working: "⚒\uFE0E", finished: "✓", resting: "☕\uFE0E" };
 // The error color, readable on both themes: the firing buttons.
 const errorColor = "#D0453F";
+// The amber of what comes first: a task of priority P1.
+const priorityColor = "#D9932B";
 const outline = "#8080803d";
 const stateLayer = "#80808014";
 // The name 2 px larger than the panel's text (13 px), and larger still in a colleague's own card.
@@ -770,7 +772,7 @@ export const register: Register = (on, options) => {
                             ? (
                                 <Box key="card-tasks" flexDirection="column">
                                     <Text bold>{say.tasks}</Text>
-                                    {outlined("card-tasks-list", [<Markdown key="tasks" text={details.openTasks.length ? details.openTasks.map(task => `- ${task}`).join("\n") : `*${say.toDo(0)}*`} />])}
+                                    {outlined("card-tasks-list", [<Markdown key="tasks" text={details.openTasks.length ? details.openTasks.map(line => todoTask("", line)).map(task => `- ${task.priority ? `**${task.priority}** · ` : ""}${task.text}`).join("\n") : `*${say.toDo(0)}*`} />])}
                                 </Box>
                             )
                             : null}
@@ -875,6 +877,8 @@ export const register: Register = (on, options) => {
                     {isDesktop && effortSvg(level) ? <ui.Svg source={effortSvg(level) ?? ""} alt={say.effort(level)} width={16} height={12} /> : <Text dimColor>{meterOf(level)}</Text>}
                 </Box>
             );
+            // A task's priority as a short mark: P1 in amber, P2 plain, P3 dim.
+            const priorityMark = (key: string, priority: string) => <Text key={key} bold={priority !== "P3"} color={priority === "P1" ? priorityColor : undefined} dimColor={priority === "P3"}>{priority}</Text>;
             const backlog = backlogOf(latest.tasks, backlogSize);
             // The colleagues whose todo is past the 15 open lines it keeps: with nobody picked, the tidy button gives them the task.
             const longTodos = latest.tasks.flatMap(group => (group.lines.length > todoLimit ? byId.get(group.colleague) ?? [] : []));
@@ -882,22 +886,27 @@ export const register: Register = (on, options) => {
             // initials.
             const portraitWeight = colleagues.reduce((sum, colleague) => sum + (portraits.get(colleague.id)?.length ?? 0), 0);
             const isBacklogLight = backlog.reduce((sum, task) => sum + (smallPortraits.get(task.colleague)?.length ?? 0), 0) <= drawingBudget - portraitWeight;
+            const today = await $.clock.now();
             const backlogRows = backlog.map((task, index) => {
                 const colleague = byId.get(task.colleague);
                 const text = plainText(task.text);
                 const effort = colleague ? task.effort ?? colleague.effort ?? "" : "";
+                const age = ageOf(task.date, today);
+                const days = age === undefined ? "" : `${age}${say.units.gap}${say.units.day}`;
                 return colleague
                     ? (
                         <Box key={`backlog-${index}`} flexDirection="row" flexWrap="nowrap" gap={1} alignItems="center" borderStyle="round" {...border} paddingX={1} {...(isDesktop ? { hover: { backgroundColor: stateLayer } } : {})}>
                             {faceOf(ui, e.surface, colleague, 24, stamp, false, false, isBacklogLight ? "small" : "initials")}
+                            {task.priority ? priorityMark(`backlog-priority-${index}`, task.priority) : null}
                             <Box flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
                                 <Text wrap="truncate-end">{text}</Text>
                             </Box>
+                            {days ? <Text key={`backlog-age-${index}`} dimColor>{days}</Text> : null}
                             {effortCell(`backlog-effort-${index}`, effort)}
                             {isDesktop
                                 ? (
                                     <Box position="absolute" bottom={1} left={4} right={0} display="none" hover={{ display: "flex" }} backgroundColor={tooltipBackground} borderStyle="round" borderColor={outline} paddingX={1}>
-                                        <Text color={tooltipText}>{`${colleague.name}: ${text}${effort ? ` · ${say.effort(effort)}` : ""}`}</Text>
+                                        <Text color={tooltipText}>{[`${colleague.name}: ${text}`, task.priority ?? "", task.date ?? "", effort ? say.effort(effort) : ""].filter(Boolean).join(" · ")}</Text>
                                     </Box>
                                 )
                                 : null}

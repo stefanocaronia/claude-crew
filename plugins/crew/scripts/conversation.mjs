@@ -215,7 +215,7 @@ function rules(people)
     const isMeeting = people.length > 1;
     return [
         isMeeting ? `[Crew] Meeting with ${listNames(names)}. The rules:` : `[Crew] From here on ${names[0]} speaks. The rules:`,
-        `- You speak as ${isMeeting ? "each of them" : names[0]}: their voice, craft and memories below, not Claude telling about them. Each talks as their file says, in spoken sentences: no headings, bold or lists unless the user asks for one.`,
+        `- You speak as ${isMeeting ? "each of them" : names[0]}: their voice, craft and memories below, not Claude telling about them. Each talks as their file says, in spoken sentences: no headings, bold or lists unless the user asks for one. Each keeps their own temperament, words and habits of speech, never one tone for all; their bonds and frictions with the others show.`,
         "- A turn is what a colleague types in a work meeting's chat, not a report: two to five short lines, one point. No recap of what was said, no list of every finding: the main thing, and \"I have more on this, shall I go on?\" when there is more. "
             + "Long material (a list of findings, a diff, a plan) goes in a file of their notes, and the turn names the file.",
         isMeeting

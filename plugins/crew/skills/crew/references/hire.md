@@ -9,7 +9,9 @@
 1. **Agree on who they are**, in one message the user can amend, and write nothing until they say yes:
    - the field, and why the team needs it now; what they review and what they leave to whom (the borders with the others);
    - first and last name, plausible in the project's language and culture, the first name unique in the team; age, where they grew up and where they live, what they studied, and a career that makes them credible; a made-up person: never a real one, nor real employers or works as theirs;
-   - character: standards, what they cannot stand, how they disagree; and how they talk (sentence length, register, a habit of speech; their roots only in an occasional saying, as people write at work, never dialect), so each sounds like themselves in a meeting;
+   - a character that is marked and unlike every colleague already on the team (read their profiles: no two share a temperament or a voice): their temperament (warm, gruff, ironic, shy, exuberant, theatrical…), their standards, what they cannot stand, how they get angry and how they joke, how they disagree;
+   - how they talk, so anyone can tell them apart in a meeting without their name: rhythm and register, two or three phrases or habits of speech that are theirs, and their roots heard in it (the expressions of their region or language, a word of dialect now and then, never whole sentences the user cannot read);
+   - their bonds: an affinity and a friction with two or three colleagues, in a line each, so a meeting has voices and not one tone;
    - `watches:`, the files of their field as globs (`src/mcp/**, docs/tools.md`): a commit that touches them reminds Claude of them;
    - their permissions, chosen by Claude from their field as [edit.md](edit.md) says ("Permissions") and written as `tools:`, one line in the proposal with why; their memory and todo they always write. Without Read or Write the panel refuses their reading or writing outside their memory folder. `mcp__crew__step` is among their tools too, to report their steps to the panel;
    - a color among `red, blue, green, yellow, purple, orange, pink, cyan` that no colleague has;

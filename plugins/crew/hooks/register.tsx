@@ -898,23 +898,31 @@ export const register: Register = (on, options) => {
                 const age = ageOf(task.date, today);
                 // A space that never breaks: "15 g" stays on one line.
                 const days = age === undefined ? "" : `${age}${say.units.gap.replace(" ", " ")}${say.units.day}`;
+                // A row opens in place to read the task whole, with who holds it, when it was written and the effort; no hint covers the row.
+                const taskKey = `${task.colleague}:${task.text}`;
+                const isOpen = panel.openTask === taskKey;
+                const toggleTask = () => update($, view, current => ({ ...current, openTask: current.openTask === taskKey ? undefined : taskKey }));
+                const details = [colleague?.fullName ?? "", task.priority ?? "", task.date ? `${task.date} (${days})` : "", effort ? say.effort(effort) : ""].filter(Boolean).join(" · ");
                 return colleague
                     ? (
-                        <Box key={`backlog-${index}`} flexDirection="row" flexWrap="nowrap" gap={1} alignItems="center" borderStyle="round" {...border} paddingX={1} {...(isDesktop ? { hover: { backgroundColor: stateLayer } } : {})}>
-                            {faceOf(ui, e.surface, colleague, 24, stamp, false, false, isBacklogLight ? "small" : "initials")}
-                            {task.priority ? <Box key={`backlog-priority-${index}`} flexShrink={0}>{priorityMark(`priority-${index}`, task.priority)}</Box> : null}
-                            <Box flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
-                                <Text wrap="truncate-end">{text}</Text>
+                        <Box key={`backlog-${index}`} flexDirection="column" borderStyle="round" {...border} paddingX={1} {...(isDesktop ? { hover: { backgroundColor: stateLayer } } : {})}>
+                            <Box flexDirection="row" flexWrap="nowrap" gap={1} alignItems="center">
+                                {faceOf(ui, e.surface, colleague, 24, stamp, false, false, isBacklogLight ? "small" : "initials")}
+                                {task.priority ? <Box key={`backlog-priority-${index}`} flexShrink={0}>{priorityMark(`priority-${index}`, task.priority)}</Box> : null}
+                                <Box flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
+                                    <Button key={`backlog-open-${index}`} plain onPress={toggleTask}>
+                                        <Text wrap="truncate-end">{`${isOpen ? "▾" : "▸"} ${text}`}</Text>
+                                    </Button>
+                                </Box>
+                                {days ? <Box key={`backlog-age-${index}`} flexShrink={0}><Text dimColor wrap="truncate">{days}</Text></Box> : null}
+                                {effortCell(`backlog-effort-${index}`, effort)}
+                                {isFree(colleague) ? <Button key={`backlog-start-${index}`} label="▶" plain dimColor onPress={() => startTask(colleague, task.text)} /> : null}
                             </Box>
-                            {days ? <Box key={`backlog-age-${index}`} flexShrink={0}><Text dimColor wrap="truncate">{days}</Text></Box> : null}
-                            {effortCell(`backlog-effort-${index}`, effort)}
-                            {isFree(colleague)
-                                ? tip(`backlog-start-${index}`, say.nextTip, <Button key={`backlog-start-${index}`} label="▶" plain dimColor onPress={() => startTask(colleague, task.text)} />, { isAbove: true })
-                                : null}
-                            {isDesktop
+                            {isOpen
                                 ? (
-                                    <Box position="absolute" bottom={1} left={4} right={0} display="none" hover={{ display: "flex" }} backgroundColor={tooltipBackground} borderStyle="round" borderColor={outline} paddingX={1}>
-                                        <Text color={tooltipText}>{[`${colleague.name}: ${text}`, task.priority ?? "", task.date ?? "", effort ? say.effort(effort) : ""].filter(Boolean).join(" · ")}</Text>
+                                    <Box key={`backlog-details-${index}`} flexDirection="column" gap={1} paddingLeft={4}>
+                                        <Text>{text}</Text>
+                                        <Text dimColor>{details}</Text>
                                     </Box>
                                 )
                                 : null}

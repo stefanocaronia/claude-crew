@@ -134,7 +134,7 @@ test("preview", { options: { language: "${language}" }, timeoutMs: 20000 }, asyn
     const pane = await $.ui.mount({ plugin: "crew", surface: "desktop", component: "Pane", requestId: "crew", props: { title: "Crew", isFocused: false, bodyColumns: 50, placement: "dock" } as never });
     ${card ? `await pane.press({ key: "open-${card}" });` : ""}
     ${pick ? `await pane.press({ key: "pick-${pick}" });` : ""}
-    ${isBacklogOpen ? `await pane.press({ key: "backlog-toggle" });` : ""}
+    ${isBacklogOpen ? `await pane.press({ key: "backlog-toggle" }); await pane.press({ key: "backlog-open-0" });` : ""}
     console.log("PREVIEW pane " + JSON.stringify(await pane.find({})));
     ${speakers.length ? `const band = await $.ui.mount({ plugin: "crew", surface: "desktop", component: "AbovePrompt", props: { hasSurvey: false, isWorking: false, maxRows: 8, bodyColumns: 100 } as never });
     console.log("PREVIEW band " + JSON.stringify(await band.find({})));` : ""}

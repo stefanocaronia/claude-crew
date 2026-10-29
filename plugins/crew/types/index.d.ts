@@ -95,6 +95,8 @@ export type PanelView = {
     autoOpened: boolean;
     /** Whether the backlog shows its tasks; closed until the user opens it. */
     isBacklogOpen?: boolean;
+    /** The backlog's task opened to read it whole, as "<colleague>:<its words>". */
+    openTask?: string;
     /** The colleagues picked on their cards for a meeting, by id. */
     picked?: string[];
     /** The colleague whose card the panel shows, by id. */

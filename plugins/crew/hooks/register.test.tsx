@@ -471,7 +471,12 @@ test("the backlog puts a P1 task first, with its priority and its age", async ($
     await ui.press({ key: "backlog-toggle" });
     expect((await ui.find({ type: "Text", text: "P1" }))?.props.color).toBe("#D9932B");
     expect(await ui.find({ type: "Text", text: "3d" })).toBeDefined();
-    expect(await ui.find({ type: "Text", text: "now" })).toBeDefined();
+    expect(await ui.find({ type: "Text", text: "▸ now" })).toBeDefined();
+    // A row opens in place: the task whole, who holds it, its priority, its date and age.
+    await ui.press({ key: "backlog-open-0" });
+    expect(await ui.find({ type: "Text", text: "Sara Lombardi · P1 · 2026-10-07 (3d)" })).toBeDefined();
+    await ui.press({ key: "backlog-open-0" });
+    expect(await ui.find({ type: "Text", text: /Sara Lombardi · P1/ })).toBeUndefined();
     await ui.unmount();
 });
 

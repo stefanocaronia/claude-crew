@@ -45,6 +45,7 @@ export function cardFrom(id: string, profile: string, todo: string, memory: stri
         description: field(profile.replace(/\r\n/g, "\n"), "description") ?? "",
         openTasks: openTasks(todo),
         memory: (sections.at(-1) ?? text.split("\n").slice(-12).join("\n")).trim(),
+        memorySize: memorySizeOf(memory),
         profile: profileSections(profile),
     };
 }
@@ -87,6 +88,21 @@ export function profileSections(profile: string): Card["profile"]
     }
 
     return sections.filter(section => section.text);
+}
+
+/** How long a colleague's MEMORY.md may grow: Claude Code hands them only its beginning, so past this it is compacted into notes. */
+export const memoryLimit = { lines: 80, bytes: 10 * 1024 };
+
+/** A memory's length, and whether it is past what it may hold. */
+export function memorySizeOf(memory: string): { lines: number; bytes: number; isLong: boolean }
+{
+    const lines = memory ? memory.replace(/\r\n/g, "\n").replace(/\n$/, "").split("\n").length : 0;
+    // Its bytes in UTF-8, as the file holds them: the panel's code has no encoder of its own.
+    const bytes = [...memory].reduce((sum, character) => {
+        const point = character.codePointAt(0) ?? 0;
+        return sum + (point < 0x80 ? 1 : point < 0x800 ? 2 : point < 0x10000 ? 3 : 4);
+    }, 0);
+    return { lines, bytes, isLong: lines > memoryLimit.lines || bytes > memoryLimit.bytes };
 }
 
 /** A colleague as an agent type the panel defines, for a profile Claude Code has not loaded: its frontmatter's description, tools,

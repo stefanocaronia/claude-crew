@@ -5,7 +5,7 @@ import { describe, it } from "node:test";
 import { segmentsOf, speakersOf } from "./meeting.ts";
 import { imagePathsIn, isInside, isOwnMemory, resolvedPath } from "./paths.ts";
 import { withCount } from "./progress.ts";
-import { ageOf, agentSpecFrom, backlogOf, cardFrom, colleagueFrom, colleagueOf, openTasks, permissionsOf, retestsOf, taskOf, withEffort, withPermissions } from "./team.ts";
+import { ageOf, agentSpecFrom, backlogOf, cardFrom, colleagueFrom, colleagueOf, memorySizeOf, openTasks, permissionsOf, retestsOf, taskOf, withEffort, withPermissions } from "./team.ts";
 import { dateOf, formatTokens, formatUntil, isoWeek, languageOf, listNames, modelName, slugOf, words } from "./text.ts";
 
 const profile = "---\r\nname: matteo-conti\r\ndescription: \"Matteo Conti, architetto TypeScript. Usalo per le revisioni.\"\r\ntools: Read\r\nmemory: project\r\neffort: high\r\ncolor: red\r\n---\r\n\r\n# Matteo Conti, architetto TypeScript\r\n\r\nChi sei.";
@@ -109,6 +109,15 @@ describe("colleagues from their files", () => {
         assert.equal(card.description, "Matteo Conti, architetto TypeScript. Usalo per le revisioni.");
         assert.deepEqual(card.openTasks, ["uno"]);
         assert.equal(card.memory, "## 9 ottobre\n- nuovo");
+        assert.deepEqual({ ...card.memorySize, bytes: undefined }, { lines: 7, bytes: undefined, isLong: false });
+    });
+
+    it("measures a memory: past 80 lines or 10 KB it is long, counting its bytes as UTF-8", () => {
+        assert.deepEqual(memorySizeOf(""), { lines: 0, bytes: 0, isLong: false });
+        assert.equal(memorySizeOf("è").bytes, 2);
+        assert.equal(memorySizeOf(Array.from({ length: 80 }, () => "riga").join("\n")).isLong, false);
+        assert.equal(memorySizeOf(Array.from({ length: 81 }, () => "riga").join("\n")).isLong, true);
+        assert.equal(memorySizeOf("x".repeat(10 * 1024 + 1)).isLong, true);
     });
 
     it("cuts a profile in sections: each bold-led paragraph of its opening, then each heading, without frontmatter or title", () => {

@@ -337,7 +337,8 @@ function dismiss(people)
         + "in a few lines and in their own voice, the memory (the date, what was discussed, what the user decided and why, what they "
         + `understood) and the todo (- [x] <the day> · what is done, - [ ] P1, P2 or P3 · <the day> · what remains), editing them, never rewriting them: ${files}. Then they tidy the todo: `
         + "remove the lines ticked [x], merge duplicates, keep at most 15 open lines, by priority, P1 first, and move the rest, and what no longer matters, "
-        + "to notes/todo-archive.md with the date: never deleted.";
+        + "to notes/todo-archive.md with the date: never deleted. Past 80 lines or 10 KB, the memory is compacted too: its oldest dated sections move whole "
+        + "to notes/diary-<year>-<month>.md, and the index keeps one line for each with its link.";
 }
 
 // The persona without the frontmatter and without the sections that only serve the rounds.

@@ -11,7 +11,7 @@ import { avatarSvg, barEndSvg, blankSvg, checkboxSvg, pickedTint, captionSvg, cl
 import { claudeId, segmentsOf, speakersOf } from "./meeting.ts";
 import { imagePathsIn, imageTypeOf, isInside, isOwnMemory, resolvedPath } from "./paths.ts";
 import { contextShare, progressOf, withCount } from "./progress.ts";
-import { ageOf, agentSpecFrom, backlogOf, cardFrom, colleagueFrom, colleagueOf, openTasks, retestsOf, taskOf as todoTask, withEffort, withPermissions } from "./team.ts";
+import { ageOf, agentSpecFrom, backlogOf, cardFrom, colleagueFrom, colleagueOf, memorySizeOf, openTasks, retestsOf, taskOf as todoTask, withEffort, withPermissions } from "./team.ts";
 import { contextWindowOf, dateOf, formatTime, formatTokens, isoWeek, languageNames, languageOf, listNames, modelName, slugOf, words } from "./text.ts";
 import type { Language, Words } from "./text.ts";
 
@@ -851,6 +851,9 @@ export const register: Register = (on, options) => {
                             ? (
                                 <Box key="card-memory" flexDirection="column">
                                     <Button key="card-memory-toggle" label={`${isMemoryOpen ? "▾" : "▸"} ${say.memory}${memoryTitle ? ` · ${memoryTitle}` : ""}`} plain onPress={() => update($, view, current => ({ ...current, isMemoryOpen: !current.isMemoryOpen }))} />
+                                    {details.memorySize.isLong
+                                        ? <Text key="card-memory-long" color={errorColor}>{say.memoryLong(details.memorySize.lines, Math.round(details.memorySize.bytes / 1024))}</Text>
+                                        : null}
                                     {isMemoryOpen ? outlined("card-memory-text", [<Markdown key="memory" text={clip(memoryBody, 1600)} dimColor />]) : null}
                                 </Box>
                             )
@@ -988,7 +991,7 @@ export const register: Register = (on, options) => {
             ];
             const backlog = backlogOf(latest.tasks, backlogSize);
             // The colleagues whose todo is past the 15 open lines it keeps: with nobody picked, the tidy button gives them the task.
-            const longTodos = latest.tasks.flatMap(group => (group.lines.length > todoLimit ? byId.get(group.colleague) ?? [] : []));
+            const longTodos = colleagues.filter(colleague => latest.tasks.some(group => group.colleague === colleague.id && group.lines.length > todoLimit) || (latest.longMemories ?? []).includes(colleague.id));
             // One weight for the whole panel: the team's portraits first, then one small portrait a row with what is left; past that,
             // initials.
             const portraitWeight = colleagues.reduce((sum, colleague) => sum + (portraits.get(colleague.id)?.length ?? 0), 0);
@@ -1319,6 +1322,7 @@ async function refresh($: EngineInterface): Promise<void>
     const found = new Map<string, string>();
     const small = new Map<string, string>();
     const tasks: { colleague: string; lines: string[] }[] = [];
+    const longMemories: string[] = [];
     const profiles = new Map<string, string>();
 
     for (const [name, profile] of (await $.fs.exists(agents)) ? await filesIn($, agents) : new Map<string, FileStamp>()) {
@@ -1350,6 +1354,13 @@ async function refresh($: EngineInterface): Promise<void>
             tasks.push({ colleague: id, lines });
         }
 
+        // A memory past what it may hold: Claude Code hands its colleague only the beginning.
+        const memoryFile = files.get("MEMORY.md");
+
+        if (memoryFile && memorySizeOf(await cached(`${folder}/MEMORY.md`, memoryFile, () => $.fs.read(`${folder}/MEMORY.md`))).isLong) {
+            longMemories.push(id);
+        }
+
         const text = await cached(`${agents}/${name}`, profile, () => $.fs.read(`${agents}/${name}`));
         loaded.push(colleagueFrom(id, text, todo, portrait?.stamp ?? 0));
         profiles.set(id, text);
@@ -1379,9 +1390,10 @@ async function refresh($: EngineInterface): Promise<void>
     const previous = await read($, board);
 
     // Every write redraws the panel, and a click that lands on a drawing already replaced is lost: write only what changed.
-    if (previous.hasCommands !== hasCommands || previous.error || JSON.stringify(previous.tasks) !== JSON.stringify(sortedTasks) || JSON.stringify(previous.heavy ?? []) !== JSON.stringify(heavy)) {
+    if (previous.hasCommands !== hasCommands || previous.error || JSON.stringify(previous.tasks) !== JSON.stringify(sortedTasks) || JSON.stringify(previous.heavy ?? []) !== JSON.stringify(heavy)
+        || JSON.stringify(previous.longMemories ?? []) !== JSON.stringify(longMemories)) {
         const checkedAt = await $.clock.now();
-        await update($, board, current => ({ ...current, hasCommands, tasks: sortedTasks, heavy, error: undefined, checkedAt }));
+        await update($, board, current => ({ ...current, hasCommands, tasks: sortedTasks, heavy, longMemories, error: undefined, checkedAt }));
     }
 
     const signature = [...kept, ...small].map(([id, uri]) => `${id}:${uri.length}`).join("|");

@@ -1,6 +1,6 @@
 {
   "name": "crew",
-  "version": "0.11.5",
+  "version": "0.11.6",
   "description": "A standing team of expert colleagues for a project: subagents with a profile, a memory and a todo, who review the work at milestones and talk with you one-to-one or in meetings; with the Crew panel: the team with portraits, who is at work and the steps they report, the reports, and meetings drawn as a group chat.",
   "author": {
     "name": "Stefano Caronia",

@@ -507,6 +507,18 @@ test("a colleague's card: their tasks as rows, the first ten until all are asked
     await ui.unmount();
 });
 
+test("a memory past 80 lines says so on its card in red, and Tidy with nobody picked compacts it", async ($, on) => {
+    const sent = world(on, []);
+    sent.files["/p/.claude/agent-memory/giulia-ferri/MEMORY.md"] = Array.from({ length: 90 }, (_, index) => `- line ${index + 1}`).join("\n");
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+    const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
+    await ui.press({ key: "act-tidy" });
+    expect(sent.at(-1)).toBe("/crew:tidy Giulia");
+    await ui.press({ key: "open-giulia-ferri" });
+    expect((await ui.find({ type: "Text", text: /^Too long: 90 lines, 1 KB\./ }))?.props.color).toBe("#D0453F");
+    await ui.unmount();
+});
+
 test("▶ on a backlog row starts that task; Next task starts the next one of the colleagues picked, or of those free", async ($, on) => {
     const sent = world(on, []);
     sent.files["/p/.claude/agent-memory/sara-lombardi/todo.md"] = "- [ ] P3 · 2026-10-01 · later\n- [ ] P1 · 2026-10-07 · now\n";

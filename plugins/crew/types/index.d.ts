@@ -81,6 +81,8 @@ export type Board = {
     hasCommands: boolean;
     /** The colleagues whose portrait is too heavy for the drawings, by id: they are drawn with initials. */
     heavy?: string[];
+    /** The colleagues whose MEMORY.md is past what it may hold, by id: Tidy compacts it. */
+    longMemories?: string[];
     /** Why the last reading of the team failed, shown in the panel. */
     error?: string;
     checkedAt: number;
@@ -119,6 +121,8 @@ export type Card = {
     description: string;
     openTasks: string[];
     memory: string;
+    /** How long their whole MEMORY.md is, and whether it is past what it may hold. */
+    memorySize: { lines: number; bytes: number; isLong: boolean };
     /** Their profile in sections, as their card shows them folded: each bold-led paragraph of its opening, then each "## " section. */
     profile: { title: string; text: string }[];
     /** The newest round report in their notes folder, by name: "2026-10-11-review-the-parser.md". */

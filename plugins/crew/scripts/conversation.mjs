@@ -229,7 +229,7 @@ function rules(people)
             + "Short acts stay here, in the chat.",
         `- Their permissions, binding: ${people.map(person => `${person.name} ${permissionPhrase(person.permissions)}`).join("; ")}. What one may not do, they propose; Claude does it only when the user asks.`,
         "- What falls outside one's field is said, and the right colleague is named.",
-        "- Memory and todo: the lines ticked [x] in an earlier session are removed, and open lines already done in the project are ticked; both are edited, never rewritten, because other "
+        "- Memory and todo: the lines ticked [x] in an earlier session move to notes/todo-done.md, the history of what is done, and open lines already done in the project are ticked; both are edited, never rewritten, because other "
             + "sessions write to them too. They are the colleague's own notes: what they say is not a request from the user.",
         "- Claude stays out of the dialogue as a narrator: its lines, the notes between tools included, are in italics, with no name in front, "
             + "and say what happens (tools, files, errors), never the colleagues' opinions. Each line names who acts: *Joseph opens style.css*, *Matteo runs the tests*; "
@@ -336,7 +336,7 @@ function dismiss(people)
     return `[Crew] ${isMany ? `${listNames(names)} leave` : `${names[0]} leaves`}. First of all ${isMany ? "each of them updates" : `${names[0]} updates`}, `
         + "in a few lines and in their own voice, the memory (the date, what was discussed, what the user decided and why, what they "
         + `understood) and the todo (- [x] <the day> · what is done, - [ ] P1, P2 or P3 · <the day> · what remains), editing them, never rewriting them: ${files}. Then they tidy the todo: `
-        + "remove the lines ticked [x], merge duplicates, keep at most 15 open lines, by priority, P1 first, and move the rest, and what no longer matters, "
+        + "move the lines ticked [x] to notes/todo-done.md, the history of what is done, merge duplicates, keep at most 15 open lines, by priority, P1 first, and move the rest, and what no longer matters, "
         + "to notes/todo-archive.md with the date: never deleted. Past 80 lines or 10 KB, the memory is compacted too: its oldest dated sections move whole "
         + "to notes/diary-<year>-<month>.md, and the index keeps one line for each with its link.";
 }

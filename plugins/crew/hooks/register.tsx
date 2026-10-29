@@ -86,7 +86,7 @@ const effortLevels = ["inherit", "low", "medium", "high", "xhigh", "max"] as con
 const reportLimit = 40_000;
 // How many open tasks the backlog shows; its effort column and a colleague's card at its narrowest, in cells.
 const backlogSize = 20;
-// The open lines a colleague's todo keeps, as the skill says; past them, the backlog offers to tidy it.
+// The open lines a colleague's todo keeps, as the skill says; past them, the tidy button picks it when nobody is picked.
 const todoLimit = 15;
 const effortWidth = 4;
 const cardWidth = 30;
@@ -876,7 +876,7 @@ export const register: Register = (on, options) => {
                 </Box>
             );
             const backlog = backlogOf(latest.tasks, backlogSize);
-            // The colleagues whose todo is past the 15 open lines it keeps: the backlog's tidy button gives them the task.
+            // The colleagues whose todo is past the 15 open lines it keeps: with nobody picked, the tidy button gives them the task.
             const longTodos = latest.tasks.flatMap(group => (group.lines.length > todoLimit ? byId.get(group.colleague) ?? [] : []));
             // One weight for the whole panel: the team's portraits first, then one small portrait a row with what is left; past that,
             // initials.
@@ -934,6 +934,7 @@ export const register: Register = (on, options) => {
                         {pickedNames ? null : <Button key="act-hire" label={`+ ${say.hire}`} onPress={() => runCommand("crew:hire", [])} />}
                         {pickedNames ? fireButton("act-fire", pickedTeam) : null}
                         {portraitButton("act-portraits", say.portraits, pickedTeam)}
+                        <Button key="act-tidy" label={`✦ ${pickedNames ? say.tidyWith(pickedNames) : say.tidy}`} onPress={() => runCommand("crew:tidy", pickedTeam.length ? pickedTeam : longTodos)} />
                         {tip("open-settings", say.panelSettings, <Button key="open-settings" label={"⚙︎"} onPress={openSettings} />)}
                     </Box>
                     {backlogRows.length
@@ -941,10 +942,7 @@ export const register: Register = (on, options) => {
                             <Box key="backlog" flexDirection="column" gap={1}>
                                 <Box flexDirection="row" justifyContent="space-between" alignItems="center">
                                     <Button key="backlog-toggle" label={`${panel.isBacklogOpen ? "▾" : "▸"} ${say.backlog}`} plain onPress={() => update($, view, current => ({ ...current, isBacklogOpen: !current.isBacklogOpen }))} />
-                                    <Box flexDirection="row" gap={1} alignItems="center">
-                                        {longTodos.length ? <Button key="act-tidy" label={`✦ ${say.tidy}`} plain dimColor onPress={() => runCommand("crew:tidy", longTodos)} /> : null}
-                                        <Text dimColor>{`${Math.min(backlogSize, openCount)}/${openCount}`}</Text>
-                                    </Box>
+                                    <Text dimColor>{`${Math.min(backlogSize, openCount)}/${openCount}`}</Text>
                                 </Box>
                                 {panel.isBacklogOpen ? backlogRows : null}
                             </Box>

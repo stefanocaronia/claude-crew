@@ -447,7 +447,7 @@ test("the colleagues' week: their tasks and tokens, who worked most, at the top 
     }
 });
 
-test("a todo past 15 open lines brings a Tidy button to the backlog, which runs /crew:tidy with its colleague", async ($, on) => {
+test("the Tidy button runs /crew:tidy with the colleagues picked, or with nobody picked, with those whose todo is past 15 open lines", async ($, on) => {
     const sent = world(on, []);
     sent.files["/p/.claude/agent-memory/sara-lombardi/todo.md"] = Array.from({ length: 16 }, (_, index) => `- [ ] line ${index + 1}`).join("\n");
     await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
@@ -456,6 +456,10 @@ test("a todo past 15 open lines brings a Tidy button to the backlog, which runs 
         const ui = await $.ui.mount({ plugin, surface, component: "Pane", requestId: "crew", props: pane });
         await ui.press({ key: "act-tidy" });
         expect(sent.at(-1)).toBe("/crew:tidy Sara");
+        await ui.press({ key: "pick-matteo-conti" });
+        expect((await ui.find({ key: "act-tidy" }))?.props.label).toBe("✦ Tidy the todos of Matteo");
+        await ui.press({ key: "act-tidy" });
+        expect(sent.at(-1)).toBe("/crew:tidy Matteo");
     }
 });
 

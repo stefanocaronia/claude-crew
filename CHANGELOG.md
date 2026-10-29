@@ -2,7 +2,7 @@
 
 What changes for whoever uses Crew, version by version. Plugins update in a new chat: `/plugin`, Marketplaces, claude-crew, Update marketplace, or turn its auto-update on there.
 
-## 0.10.0 – 0.10.10
+## 0.10.0 – 0.10.11
 
 - The panel shows the colleagues at work in the project's other chats too, under At work with «in another chat» beside their role: each panel shares who works in its chat every 5 seconds: who starts, stops or changes step shows at once, what they are doing and their tokens every 15 seconds, as for one's own colleagues; a chat that closes stops showing within a minute.
 - The bar's filled part is rounded at both ends too, at any width.
@@ -12,7 +12,7 @@ What changes for whoever uses Crew, version by version. Plugins update in a new 
 - In a conversation, long work asked of a colleague goes in the background: they say so in their turn, leave the conversation (the others stay) and take it as a task, with its steps and report in the panel. A colleague's plans are always their own turn, under their name.
 - The cards of the plan's limits are gone: their figures could be old, and the app shows them. At the top of the panel instead, the colleagues' week: their tasks, their tokens and who worked most.
 - A colleague no longer shows twice at work when their first step comes while their start is still being recorded.
-- Todos stay short: at the end of every task, round or conversation each colleague tidies theirs, removing what is done, merging duplicates and keeping at most 15 open lines, the most important first; the rest, and what no longer matters, goes to `notes/todo-archive.md`, never deleted.
+- Todos stay short: at the end of every task, round or conversation each colleague tidies theirs, removing what is done, merging duplicates and keeping at most 15 open lines, the most important first; the rest, and what no longer matters, goes to `notes/todo-archive.md`, never deleted. `/crew:tidy`, or the backlog's Tidy button when a todo is past 15 lines, has the colleagues tidy theirs now, checking each line against the project.
 
 ## 0.9.0 – 0.9.8
 

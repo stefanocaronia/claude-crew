@@ -86,6 +86,8 @@ const effortLevels = ["inherit", "low", "medium", "high", "xhigh", "max"] as con
 const reportLimit = 40_000;
 // How many open tasks the backlog shows; its effort column and a colleague's card at its narrowest, in cells.
 const backlogSize = 20;
+// The open lines a colleague's todo keeps, as the skill says; past them, the backlog offers to tidy it.
+const todoLimit = 15;
 const effortWidth = 4;
 const cardWidth = 30;
 // A tooltip in Material's inverse colors, which read on both themes.
@@ -874,6 +876,8 @@ export const register: Register = (on, options) => {
                 </Box>
             );
             const backlog = backlogOf(latest.tasks, backlogSize);
+            // The colleagues whose todo is past the 15 open lines it keeps: the backlog's tidy button gives them the task.
+            const longTodos = latest.tasks.flatMap(group => (group.lines.length > todoLimit ? byId.get(group.colleague) ?? [] : []));
             // One weight for the whole panel: the team's portraits first, then one small portrait a row with what is left; past that,
             // initials.
             const portraitWeight = colleagues.reduce((sum, colleague) => sum + (portraits.get(colleague.id)?.length ?? 0), 0);
@@ -937,7 +941,10 @@ export const register: Register = (on, options) => {
                             <Box key="backlog" flexDirection="column" gap={1}>
                                 <Box flexDirection="row" justifyContent="space-between" alignItems="center">
                                     <Button key="backlog-toggle" label={`${panel.isBacklogOpen ? "▾" : "▸"} ${say.backlog}`} plain onPress={() => update($, view, current => ({ ...current, isBacklogOpen: !current.isBacklogOpen }))} />
-                                    <Text dimColor>{`${Math.min(backlogSize, openCount)}/${openCount}`}</Text>
+                                    <Box flexDirection="row" gap={1} alignItems="center">
+                                        {longTodos.length ? <Button key="act-tidy" label={`✦ ${say.tidy}`} plain dimColor onPress={() => runCommand("crew:tidy", longTodos)} /> : null}
+                                        <Text dimColor>{`${Math.min(backlogSize, openCount)}/${openCount}`}</Text>
+                                    </Box>
                                 </Box>
                                 {panel.isBacklogOpen ? backlogRows : null}
                             </Box>

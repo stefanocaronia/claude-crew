@@ -63,6 +63,9 @@ const sectionIcons = { meeting: "☰", working: "⚒\uFE0E", finished: "✓", re
 const errorColor = "#D0453F";
 // A task's priority on the terminal, as the desktop draws it: two arrows up in red, an equals in orange, an arrow down in blue.
 const priorityGlyphs: Record<string, { glyph: string; color: string }> = { P1: { glyph: "⇈", color: "#E5493A" }, P2: { glyph: "=", color: "#E2852B" }, P3: { glyph: "↓", color: "#4C8FE0" } };
+// The dashboard's tiles of who is at work and of the week.
+const workingColor = "#4E9A6B";
+const weekColor = "#8A63C9";
 const outline = "#8080803d";
 const stateLayer = "#80808014";
 // The name 2 px larger than the panel's text (13 px), and larger still in a colleague's own card.
@@ -955,13 +958,34 @@ export const register: Register = (on, options) => {
                     </Box>
                 )
                 : null);
-            // The colleagues' week, which the plan's limits do not tell: their tasks and tokens, and who worked most. The limits
-            // themselves are the app's to show.
-            const thisWeek = (await weeklyCounts($))[isoWeek(await $.clock.now())] ?? {};
-            const weekRows = colleagues.flatMap(colleague => (thisWeek[colleague.id]?.tasks ? [{ colleague, tasks: thisWeek[colleague.id]?.tasks ?? 0, tokens: thisWeek[colleague.id]?.tokens ?? 0 }] : []))
-                .sort((first, second) => second.tasks - first.tasks || first.colleague.name.localeCompare(second.colleague.name));
-            const weekTokens = weekRows.reduce((sum, row) => sum + row.tokens, 0);
-            const weekValue = [say.tasksCount(weekRows.reduce((sum, row) => sum + row.tasks, 0)), weekTokens ? say.tokens(formatTokens(weekTokens, say.units)) : ""].filter(Boolean).join(" · ");
+            // The team at a glance, in a few colored tiles: who is at work, the open tasks by priority, the week's tasks and tokens. The
+            // plan's limits are the app's to show.
+            const thisWeek = (await weeklyCounts($))[isoWeek(today)] ?? {};
+            const weekCounts = colleagues.map(colleague => thisWeek[colleague.id]);
+            const weekTasks = weekCounts.reduce((sum, counts) => sum + (counts?.tasks ?? 0), 0);
+            const weekTokens = weekCounts.reduce((sum, counts) => sum + (counts?.tokens ?? 0), 0);
+            const openByPriority = new Map<string, number>();
+
+            for (const line of latest.tasks.flatMap(group => group.lines)) {
+                const priority = todoTask("", line).priority ?? "";
+                openByPriority.set(priority, (openByPriority.get(priority) ?? 0) + 1);
+            }
+
+            const tile = (key: string, value: number, label: string, color: string, mark: JSX.Element | null = null) => (
+                <Box key={key} flexDirection="column" flexGrow={1} borderStyle="round" paddingX={1} {...(isDesktop ? { borderColor: `${color}66`, backgroundColor: `${color}1a` } : { borderDimColor: true })}>
+                    <Box flexDirection="row" alignItems="center" columnGap={1}>
+                        {mark}
+                        <Text bold color={color}>{String(value)}</Text>
+                    </Box>
+                    <Text dimColor wrap="truncate-end">{label}</Text>
+                </Box>
+            );
+            const tiles = [
+                tile("dash-working", running.length, say.working, workingColor, isDesktop ? <Text color={workingColor}>●</Text> : null),
+                ...["P1", "P2", "P3"].map(priority => tile(`dash-${priority}`, openByPriority.get(priority) ?? 0, say.priorityNames[priority as "P1"], priorityGlyphs[priority]?.color ?? "#888780", priorityMark(`dash-mark-${priority}`, priority))),
+                ...(openByPriority.get("") ? [tile("dash-unranked", openByPriority.get("") ?? 0, say.unranked, "#888780")] : []),
+                tile("dash-week", weekTasks, weekTokens ? `${say.thisWeekShort} · ${formatTokens(weekTokens, say.units)}` : say.thisWeekShort, weekColor),
+            ];
             const backlog = backlogOf(latest.tasks, backlogSize);
             // The colleagues whose todo is past the 15 open lines it keeps: with nobody picked, the tidy button gives them the task.
             const longTodos = latest.tasks.flatMap(group => (group.lines.length > todoLimit ? byId.get(group.colleague) ?? [] : []));
@@ -980,18 +1004,7 @@ export const register: Register = (on, options) => {
                     {latest.error ? <Text key="error" dimColor>{say.readError(latest.error)}</Text> : null}
                     {heavy.length ? <Text key="heavy" dimColor>{say.heavyPortraits(listNames(heavy, say.and, say.comma))}</Text> : null}
                     {latest.hasCommands ? null : <Text key="install" dimColor>{say.installSkill}</Text>}
-                    {weekRows.length
-                        ? outlined("week", [
-                            <Box key="week-head" flexDirection="row" columnGap={1} alignItems="center">
-                                {isDesktop ? <ui.Svg source={iconSvg("bolt", 16)} alt={say.teamWeek} width={16} height={16} /> : null}
-                                <Text dimColor wrap="truncate-end">{say.teamWeek}</Text>
-                            </Box>,
-                            <Text key="week-value" bold wrap="truncate-end">
-                                {weekValue}
-                                <Text dimColor>{` · ${weekRows.slice(0, 3).map(row => `${row.colleague.name} ${row.tasks}`).join(say.comma)}`}</Text>
-                            </Text>,
-                        ])
-                        : null}
+                    {colleagues.length ? <Box key="dash" flexDirection="row" flexWrap="wrap" gap={1}>{tiles}</Box> : null}
                     {fold("meeting", sectionIcons.meeting, say.inMeetingSection, meetingMembers.map(colleague => teamRow(colleague, false)), Boolean(panel.isMeetingCollapsed), current => ({ ...current, isMeetingCollapsed: !current.isMeetingCollapsed }))}
                     {fold("working", sectionIcons.working, say.working, running.map(runRow), Boolean(panel.isWorkingCollapsed), current => ({ ...current, isWorkingCollapsed: !current.isWorkingCollapsed }))}
                     {fold("finished-section", sectionIcons.finished, say.finished, finished.map(runRow), panel.isFinishedCollapsed, current => ({ ...current, isFinishedCollapsed: !current.isFinishedCollapsed }), <Button key="all-back" label={`↩ ${say.allBack}`} plain dimColor onPress={() => sendBack(finished.map(run => run.colleague))} />)}

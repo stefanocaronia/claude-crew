@@ -61,7 +61,7 @@ The panel opens by itself at the start of a session in a project with colleagues
 
 Each colleague has four permissions, set in their card or by Claude at hiring from their field: **Read** the project, **Write** its files, **Testing** (run commands, which brings Write, since a command can change files), **Web**. A reviewer starts with Read only: they give opinions and touch nothing but their own notes. Without Read or Write, the panel refuses their reading or writing outside their own memory. Claude hands a colleague a check, a test or a change in their field whenever it helps, within those permissions; a colleague at work or in a meeting takes no other task.
 
-**Cost.** Each colleague at work is a subagent and spends your plan's usage like Claude does: a review round with five colleagues costs about five tasks. Fewer colleagues, narrower rounds, lower effort in their card: all spend less. The top of the panel shows the colleagues' week: their tasks, their tokens and who worked most.
+**Cost.** Each colleague at work is a subagent and spends your plan's usage like Claude does: a review round with five colleagues costs about five tasks. Fewer colleagues, narrower rounds, lower effort in their card: all spend less. The top of the panel is a small dashboard of colored tiles: who is at work, the open tasks of each priority, and the week's tasks and tokens.
 
 A meeting can open on a topic: `/crew:meeting Matteo Giulia -- the parser`, or in words. Each version's changes are in [CHANGELOG.md](CHANGELOG.md).
 

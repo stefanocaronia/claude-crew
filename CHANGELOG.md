@@ -2,13 +2,14 @@
 
 What changes for whoever uses Crew, version by version. Plugins update in a new chat: `/plugin`, Marketplaces, claude-crew, Update marketplace, or turn its auto-update on there.
 
-## 0.11.0 – 0.11.4
+## 0.11.0 – 0.11.5
 
 - Every todo line carries a priority and the day it was written: `- [ ] P2 · 2026-10-29 · task` (P1 now, P2 in the plan, P3 later); done, `- [x] 2026-10-30 · task`. The colleagues write it so, tidying keeps the 15 open lines by priority and gives a priority and a date to the lines without, and the backlog puts P1 first, with the priority as a mark and the task's age. Lines in the old form still read.
 - The backlog orders the tasks by priority, then the oldest first. `/crew:next`, the panel's Next task button, starts the next task of the colleagues picked, or of everyone free: the highest priority and the oldest, skipping those waiting for the user, for an event or for a permission the colleague lacks. A ▶ on a backlog row starts that very task.
 - A backlog row opens in place with a click, to read the task whole with who holds it, its priority, date, age and effort; the hint that covered the row's buttons is gone.
 - The backlog draws a task's priority as an issue tracker does: P1 two red arrows up, P2 an orange equals, P3 a blue arrow down.
 - A colleague's card is lighter: their tasks are rows as in the backlog, by priority and age, the first ten until you ask for all; how many they have of each priority shows beside their name; their memory opens under its heading; Next task and Tidy are there for them; portrait and firing move to the foot, under the settings.
+- The top of the panel is a small dashboard of colored tiles in place of the week's card: who is at work, the team's open tasks of each priority (and those without one), and the week's tasks and tokens.
 
 ## 0.10.0 – 0.10.14
 

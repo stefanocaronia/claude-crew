@@ -204,7 +204,7 @@ test("under the team: the backlog, each task with who holds it and its effort; t
         const ui = await $.ui.mount({ plugin, surface, component: "Pane", requestId: "crew", props: { title: "Crew", isFocused: false, bodyColumns: 50, placement: "dock" } as never });
         // The plan's limits are the app's to show; the colleagues' week shows once they work.
         expect(await ui.find({ type: "Text", text: /% used/ })).toBeUndefined();
-        expect(await ui.find({ type: "Text", text: "Colleagues this week" })).toBeUndefined();
+        expect(await ui.find({ type: "Text", text: "no priority" })).toBeDefined();
         expect((await ui.find({ key: "backlog-toggle" }))?.props.label).toBe("▸ Backlog");
         expect(await ui.find({ type: "Text", text: "retest the parser" })).toBeUndefined();
         await ui.press({ key: "backlog-toggle" });
@@ -432,7 +432,7 @@ test("a colleague who starts a task or joins a meeting opens the panel when it i
     expect(opens).toBe(before + 2);
 });
 
-test("the colleagues' week: their tasks and tokens, who worked most, at the top of the panel", async ($, on) => {
+test("the dashboard at the top: who is at work, the open tasks by priority, the week's tasks", async ($, on) => {
     world(on, []);
     on("turn.complete", () => ({ text: "" }) as never);
     await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
@@ -443,8 +443,12 @@ test("the colleagues' week: their tasks and tokens, who worked most, at the top 
 
     for (const surface of surfaces) {
         const ui = await $.ui.mount({ plugin, surface, component: "Pane", requestId: "crew", props: pane });
-        expect(await ui.find({ type: "Text", text: "Colleagues this week" })).toBeDefined();
-        expect(await ui.find({ type: "Text", text: /^3 tasks · Sara 2, Matteo 1$/ })).toBeDefined();
+        // Two at work, three tasks this week, the two open lines without a priority; no tile counts what the plan's limits say.
+        expect(await ui.find({ type: "Text", text: "this week" })).toBeDefined();
+        expect(await ui.find({ type: "Text", text: "no priority" })).toBeDefined();
+        expect(await ui.find({ type: "Text", text: "now" })).toBeDefined();
+        expect(await ui.find({ type: "Text", text: "3" })).toBeDefined();
+        expect(await ui.find({ type: "Text", text: /% used/ })).toBeUndefined();
     }
 });
 

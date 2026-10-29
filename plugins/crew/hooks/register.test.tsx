@@ -469,8 +469,13 @@ test("the backlog puts a P1 task first, with its priority and its age", async ($
     await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
     const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
     await ui.press({ key: "backlog-toggle" });
-    expect((await ui.find({ type: "Text", text: "P1" }))?.props.color).toBe("#D9932B");
+    // The desktop draws the priority as an issue tracker's mark, never its letters; the terminal, as two red arrows up.
+    expect(await ui.find({ type: "Text", text: "P1" })).toBeUndefined();
     expect(await ui.find({ type: "Text", text: "3d" })).toBeDefined();
+    const terminal = await $.ui.mount({ plugin, surface: "terminal", component: "Pane", requestId: "crew", props: pane });
+    expect((await terminal.find({ type: "Text", text: "⇈" }))?.props.color).toBe("#E5493A");
+    expect((await terminal.find({ type: "Text", text: "↓" }))?.props.color).toBe("#4C8FE0");
+    await terminal.unmount();
     expect(await ui.find({ type: "Text", text: "▸ now" })).toBeDefined();
     // A row opens in place: the task whole, who holds it, its priority, its date and age.
     await ui.press({ key: "backlog-open-0" });

@@ -6,7 +6,7 @@ import type { EngineInterface, Register } from "claude-code";
 
 import type { Activity, Colleague, Meeting, Permissions, Preferences, Run, Speaker, WeeklyCounts } from "../types";
 
-import { avatarSvg, barEndSvg, blankSvg, checkboxSvg, pickedTint, captionSvg, claudeSvg, effortSvg, iconSvg, nameSvg, thumbnailSvg, wideBarSvg } from "./draw.ts";
+import { avatarSvg, barEndSvg, blankSvg, checkboxSvg, pickedTint, captionSvg, claudeSvg, effortSvg, iconSvg, nameSvg, prioritySvg, thumbnailSvg, wideBarSvg } from "./draw.ts";
 import { claudeId, segmentsOf, speakersOf } from "./meeting.ts";
 import { imagePathsIn, imageTypeOf, isInside, isOwnMemory, resolvedPath } from "./paths.ts";
 import { contextShare, progressOf, withCount } from "./progress.ts";
@@ -60,8 +60,8 @@ const restAfter = 5 * 60_000;
 const sectionIcons = { meeting: "☰", working: "⚒\uFE0E", finished: "✓", resting: "☕\uFE0E" };
 // The error color, readable on both themes: the firing buttons.
 const errorColor = "#D0453F";
-// The amber of what comes first: a task of priority P1.
-const priorityColor = "#D9932B";
+// A task's priority on the terminal, as the desktop draws it: two arrows up in red, an equals in orange, an arrow down in blue.
+const priorityGlyphs: Record<string, { glyph: string; color: string }> = { P1: { glyph: "⇈", color: "#E5493A" }, P2: { glyph: "=", color: "#E2852B" }, P3: { glyph: "↓", color: "#4C8FE0" } };
 const outline = "#8080803d";
 const stateLayer = "#80808014";
 // The name 2 px larger than the panel's text (13 px), and larger still in a colleague's own card.
@@ -882,7 +882,13 @@ export const register: Register = (on, options) => {
                 </Box>
             );
             // A task's priority as a short mark: P1 in amber, P2 plain, P3 dim.
-            const priorityMark = (key: string, priority: string) => <Text key={key} bold={priority !== "P3"} color={priority === "P1" ? priorityColor : undefined} dimColor={priority === "P3"}>{priority}</Text>;
+            const priorityMark = (key: string, priority: string) => {
+                const drawn = isDesktop ? prioritySvg(priority) : undefined;
+                const glyph = priorityGlyphs[priority];
+                return drawn && "Svg" in ui
+                    ? <ui.Svg key={key} source={drawn} alt={priority} width={14} height={14} />
+                    : <Text key={key} bold color={glyph?.color}>{glyph?.glyph ?? priority}</Text>;
+            };
             const backlog = backlogOf(latest.tasks, backlogSize);
             // The colleagues whose todo is past the 15 open lines it keeps: with nobody picked, the tidy button gives them the task.
             const longTodos = latest.tasks.flatMap(group => (group.lines.length > todoLimit ? byId.get(group.colleague) ?? [] : []));

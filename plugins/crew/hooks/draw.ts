@@ -76,6 +76,20 @@ export function checkboxSvg(isChecked: boolean, color: string): string
     return `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14">${box}</svg>`;
 }
 
+/** A task's priority as an issue tracker draws it: P1 two red chevrons up, P2 an orange equals, P3 a blue chevron down; undefined
+ * for a priority it does not know. */
+export function prioritySvg(priority: string): string | undefined
+{
+    const stroke = (color: string) => `fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"`;
+    const marks: Record<string, string> = {
+        P1: `<path d="M3.5 7.5L7 4l3.5 3.5M3.5 11L7 7.5l3.5 3.5" ${stroke("#E5493A")}/>`,
+        P2: `<path d="M3 5.5h8M3 8.5h8" ${stroke("#E2852B")}/>`,
+        P3: `<path d="M3.5 5.5L7 9l3.5-3.5" ${stroke("#4C8FE0")}/>`,
+    };
+    const mark = marks[priority];
+    return mark ? `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14">${mark}</svg>` : undefined;
+}
+
 /** A colleague's color as a faint background, for a card that is picked: its light tint at a tenth, readable in either theme. */
 export function pickedTint(color: string): string
 {

@@ -519,9 +519,28 @@ test("a memory past 80 lines says so on its card in red, and Tidy with nobody pi
     await ui.unmount();
 });
 
-test("a press on a task's priority turns it in its todo, and Remove moves the task to the archive", async ($, on) => {
+test("a task's words are written again in place, and a new task written in a colleague's card goes after their open lines", async ($, on) => {
     const sent = world(on, []);
     const { files } = sent;
+    const todo = "/p/.claude/agent-memory/sara-lombardi/todo.md";
+    files[todo] = "# Sara: todo\n\n- [ ] P1 · 2026-10-07 · #sara-1 · now (effort: high)\n\n## Notes\n";
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+    const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
+    await ui.press({ key: "backlog-toggle" });
+    await ui.press({ key: "backlog-open-0" });
+    await ui.press({ key: "backlog-edit-text-0" });
+    await ui.input({ key: "backlog-edit-0", text: "now  and · then" });
+    expect(files[todo]).toBe("# Sara: todo\n\n- [ ] P1 · 2026-10-07 · #sara-1 · now and - then (effort: high)\n\n## Notes\n");
+    await ui.press({ key: "open-sara-lombardi" });
+    await ui.press({ key: "card-new-task" });
+    await ui.input({ key: "card-new-task", text: "the map" });
+    expect(files[todo]).toBe("# Sara: todo\n\n- [ ] P1 · 2026-10-07 · #sara-1 · now and - then (effort: high)\n- [ ] P2 · 2026-10-10 · the map\n\n## Notes\n");
+    await ui.unmount();
+});
+
+test("a press on a task's priority turns it in its todo, and Remove moves the task to the archive", async ($, on) => {
+    const sent = world(on, []);
+    const { files, clock } = sent;
     const todo = "/p/.claude/agent-memory/sara-lombardi/todo.md";
     files[todo] = "# Sara: todo\n\n- [ ] P1 · 2026-10-07 · now\n- [ ] later\n";
     await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
@@ -534,9 +553,16 @@ test("a press on a task's priority turns it in its todo, and Remove moves the ta
     const again = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
     await again.press({ key: "backlog-cycle-2" });
     expect(files[todo]).toContain("- [ ] P1 · 2026-10-10 · later");
+    // The rows keep their places for a few seconds, the turned one under the pointer; then they take their order.
+    expect((await again.find({ key: "backlog-open-2" }))?.text).toBe("▸ later");
     await again.unmount();
+    await clock.advance(5_000);
     const last = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
     await last.press({ key: "backlog-open-0" });
+    // Remove asks first; the second press removes.
+    await last.press({ key: "backlog-remove-0" });
+    expect(await last.find({ type: "Text", text: "✕ Remove? Press again" })).toBeDefined();
+    expect(files[todo]).toContain("later");
     await last.press({ key: "backlog-remove-0" });
     expect(files[todo]).not.toContain("later");
     expect(files["/p/.claude/agent-memory/sara-lombardi/notes/todo-archive.md"]).toContain("- 2026-10-10 · removed from the panel: P1 · 2026-10-10 · later");
@@ -602,13 +628,16 @@ test("a colleague's tasks of the project's backlog are theirs: counted once, sho
     const asked: string[][] = [];
     on("process.run", (_, e) => {
         asked.push([...e.argv]);
-        const open = [{ id: 61, to: "Sara", priority: "P1", created: "2026-10-08", text: "the board", after: [] }, { id: 70, to: "Sara", priority: "P2", created: "2026-10-09", text: "the guide", after: [] }];
+        const open = [
+            { id: 61, to: "Sara", priority: "P1", created: "2026-10-08", text: "the board", after: [] },
+            { id: 70, to: "Sara", priority: "P2", created: "2026-10-09", text: "the guide", after: [], type: "bug", due: "2026-10-12", by: "Stefano", started: null, state: "todo" },
+        ];
         return { value: { exitCode: 0, stdout: e.argv.includes("list") ? JSON.stringify(open) : "", stderr: "" } } as never;
     });
     on("turn.complete", () => ({ text: "" }) as never);
     files["/home/.claude/plugins/installed_plugins.json"] = JSON.stringify({ plugins: { "project@claude-project": [{ installPath: "/plugins/project" }] } });
     files["/plugins/project/scripts/backlog.mjs"] = "";
-    files["/p/.claude/project.yaml"] = "docs: project\n";
+    files["/p/.claude/project.yaml"] = "docs: project\npeople: [Claude, Stefano]\n";
     files["/p/project/TASKS.md"] = "- T-61\n- T-70";
     // Sara's todo carries T-61: one task, her line.
     files["/p/.claude/agent-memory/sara-lombardi/todo.md"] = "- [ ] P1 · 2026-10-07 · T-61 · her part of the board\n";
@@ -616,18 +645,35 @@ test("a colleague's tasks of the project's backlog are theirs: counted once, sho
     const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
     expect(await ui.find({ type: "Text", text: "2 to do" })).toBeDefined();
     await ui.press({ key: "backlog-toggle" });
-    expect(await ui.find({ type: "Text", text: "▸ T-61 · her part of the board" })).toBeDefined();
-    expect(await ui.find({ type: "Text", text: "▸ T-70 · the guide" })).toBeDefined();
-    expect(await ui.find({ type: "Text", text: "▸ T-61 · the board" })).toBeUndefined();
+    // The number in its own color, beside the words; the type, and a due day near in place of the age.
+    expect((await ui.find({ type: "Text", text: "T-61" }))?.props.color).toBe("#2E9AA6");
+    expect(await ui.find({ type: "Text", text: "▸ her part of the board" })).toBeDefined();
+    expect(await ui.find({ type: "Text", text: "▸ the guide" })).toBeDefined();
+    expect(await ui.find({ type: "Text", text: "▸ the board" })).toBeUndefined();
+    expect(await ui.find({ type: "Text", text: "bug" })).toBeDefined();
+    expect(await ui.find({ type: "Text", text: "⏰ due in 2 d" })).toBeDefined();
     await ui.press({ key: "backlog-start-1" });
     expect(sent.at(-1)).toBe("/crew:next Sara -- T-70 · the guide");
-    // Its priority and its removal go to the backlog's command; her own line stays in her todo.
+    // Its priority, its words and its removal go to the backlog's command; her own line stays in her todo.
     await ui.press({ key: "backlog-cycle-1" });
     expect(asked).toContainEqual(["node", "/plugins/project/scripts/backlog.mjs", "set", "T-70", "--p", "P3"]);
     await ui.press({ key: "backlog-open-1" });
+    expect(await ui.find({ type: "Text", text: /created by Stefano on 2026-10-09/ })).toBeDefined();
+    await ui.press({ key: "backlog-edit-text-1" });
+    await ui.input({ key: "backlog-edit-1", text: "the whole guide" });
+    expect(asked).toContainEqual(["node", "/plugins/project/scripts/backlog.mjs", "set", "T-70", "--text", "the whole guide"]);
+    await ui.press({ key: "backlog-open-1" });
+    await ui.press({ key: "backlog-remove-1" });
+    expect(await ui.find({ type: "Text", text: "✕ Archive T-70? Press again" })).toBeDefined();
+    expect(asked).not.toContainEqual(["node", "/plugins/project/scripts/backlog.mjs", "archive", "T-70"]);
     await ui.press({ key: "backlog-remove-1" });
     expect(asked).toContainEqual(["node", "/plugins/project/scripts/backlog.mjs", "archive", "T-70"]);
     expect(files["/p/.claude/agent-memory/sara-lombardi/todo.md"]).toBe("- [ ] P1 · 2026-10-07 · T-61 · her part of the board\n");
+    // A new task in her card is the backlog's, held by her, created by the project's owner.
+    await ui.press({ key: "open-sara-lombardi" });
+    await ui.press({ key: "card-new-task" });
+    await ui.input({ key: "card-new-task", text: "the legend" });
+    expect(asked).toContainEqual(["node", "/plugins/project/scripts/backlog.mjs", "add", "the legend", "--to", "Sara", "--by", "Stefano"]);
     await ui.unmount();
 });
 
@@ -1103,6 +1149,9 @@ test("a colleague at work shows what they are doing now, on their row and in the
     await ui.press({ key: "open-matteo-conti" });
     expect(await ui.find({ type: "Text", text: "Working" })).toBeDefined();
     expect(await ui.find({ type: "Text", text: "Review the parser" })).toBeDefined();
+    // His tasks keep their ▶ in place, gray, with why under the pointer.
+    expect(await ui.find({ key: "card-task-start-0" })).toBeUndefined();
+    expect(await ui.find({ type: "Text", text: /^Matteo is at work on: / })).toBeDefined();
     // One step done: the second is in progress.
     expect(await ui.find({ type: "Text", text: "Step 2 of 3" })).toBeDefined();
     expect(await ui.find({ type: "Text", text: "reading my notes" })).toBeDefined();

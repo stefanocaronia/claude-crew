@@ -5,7 +5,7 @@ import { describe, it } from "node:test";
 import { segmentsOf, speakersOf } from "./meeting.ts";
 import { imagePathsIn, isInside, isOwnMemory, resolvedPath } from "./paths.ts";
 import { withCount } from "./progress.ts";
-import { ageOf, agentSpecFrom, backlogLinesOf, backlogOf, blockersOf, cardFrom, colleagueFrom, colleagueOf, memorySizeOf, openIdsOf, openTasks, permissionsOf, retestsOf, taskOf, withEffort, withNextPriority, withPermissions } from "./team.ts";
+import { ageOf, agentSpecFrom, backlogLinesOf, backlogOf, blockersOf, daysBetween, cardFrom, colleagueFrom, colleagueOf, memorySizeOf, openIdsOf, openTasks, permissionsOf, retestsOf, taskOf, withEffort, withNextPriority, withPermissions, withText } from "./team.ts";
 import { dateOf, formatTokens, formatUntil, isoWeek, languageOf, listNames, modelName, slugOf, words } from "./text.ts";
 
 const profile = "---\r\nname: matteo-conti\r\ndescription: \"Matteo Conti, architetto TypeScript. Usalo per le revisioni.\"\r\ntools: Read\r\nmemory: project\r\neffort: high\r\ncolor: red\r\n---\r\n\r\n# Matteo Conti, architetto TypeScript\r\n\r\nChi sei.";
@@ -41,6 +41,9 @@ describe("colleagues from their files", () => {
         assert.deepEqual(backlogOf(tasks, 10).map(task => task.text), ["m1", "g1", "s1", "m2", "s2", "m3"]);
         assert.equal(backlogOf(tasks, 10)[4]?.effort, "low");
         assert.deepEqual(backlogOf([], 10), []);
+        // A priority just turned leaves the tasks where they were drawn.
+        const held = new Map(backlogOf(tasks, 10).map((task, index) => [`${task.colleague}:${task.text}`, 9 - index]));
+        assert.deepEqual(backlogOf(tasks, 10, held).map(task => task.text), ["m3", "s2", "m2", "s1", "g1", "m1"]);
     });
 
     it("reads a task's priority and date, and puts P1 first, then P2, P3 and the lines without a priority", () => {
@@ -298,5 +301,17 @@ describe("the week's counts", () => {
         assert.equal(slugOf("a".repeat(48) + " bcd"), `${"a".repeat(48)}-b`);
         assert.equal(slugOf("a".repeat(49) + " bcd"), "a".repeat(49));
         assert.equal(slugOf("!!!"), "report");
+    });
+});
+
+describe("a task's words and days", () => {
+    it("writes new words in a todo line, keeping its head and suffixes", () => {
+        assert.equal(withText("P1 · 2026-10-07 · #sara-1 · now (after: T-62) (effort: high)", "then"), "P1 · 2026-10-07 · #sara-1 · then (after: T-62) (effort: high)");
+        assert.equal(withText("plain words", "new words"), "new words");
+    });
+    it("counts the days between two dates, negative backwards", () => {
+        assert.equal(daysBetween("2026-10-10", "2026-10-12"), 2);
+        assert.equal(daysBetween("2026-10-12", "2026-10-10"), -2);
+        assert.equal(daysBetween("2026-10-31", "2026-11-01"), 1);
     });
 });

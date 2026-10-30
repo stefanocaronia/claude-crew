@@ -85,7 +85,7 @@ export type Board = {
     longMemories?: string[];
     /** The open tasks of the project's backlog (the project plugin's), by number with who holds each: a task that waits for `T-62` is
      * blocked while it is open there. */
-    backlog?: { id: string; to: string; priority?: string; date?: string; text?: string; after?: string[] }[];
+    backlog?: { id: string; to: string; priority?: string; date?: string; text?: string; after?: string[]; type?: string; due?: string; by?: string; started?: string; state?: string }[];
     /** The lines of `tasks` that are backlog tasks a colleague holds, not lines of their todo, as "<colleague id>:<line>": the backlog's
      * own commands change them. */
     fromBacklog?: string[];
@@ -109,6 +109,12 @@ export type PanelView = {
     isMemoryOpen?: boolean;
     /** The backlog's task opened to read it whole, as "<colleague>:<its words>". */
     openTask?: string;
+    /** The task whose Remove was pressed once, as "<colleague>:<its words>": a second press within a few seconds removes it. */
+    removing?: string;
+    /** What the user is writing: "new:<colleague id>" for a new task, a task as "<colleague>:<its words>" for its text. */
+    editing?: string;
+    /** The tasks' places kept for a moment after a priority turned, by "<colleague>:<its words>", until `until`. */
+    frozen?: { until: number; rank: Record<string, number> };
     /** What the user just asked to start, by key (a task as "<colleague>:<its words>", or "next:<colleague ids>"), with when: its
      * button says it is starting until the colleague is at work, or for two minutes. */
     starting?: Record<string, number>;

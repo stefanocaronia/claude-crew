@@ -222,12 +222,15 @@ export function retestsOf(tasks: string[]): string[]
 }
 
 /** Up to `limit` open tasks, by priority (P1, P2, P3, then those without), the oldest first within one, those without a date
- * last; where all that is equal, every colleague's next one in turn. */
-export function backlogOf(tasks: { colleague: string; lines: string[] }[], limit: number): Task[]
+ * last; where all that is equal, every colleague's next one in turn. With `held`, the places the tasks had a moment ago, by
+ * "<colleague>:<words>", come first: a priority just turned leaves its task under the pointer. */
+export function backlogOf(tasks: { colleague: string; lines: string[] }[], limit: number, held?: Map<string, number>): Task[]
 {
     const ranked = tasks.flatMap((group, groupIndex) => group.lines.map((line, index) => ({ task: taskOf(group.colleague, line), index, groupIndex })));
     const rank = (task: Task) => (task.priority ? priorities.indexOf(task.priority) : priorities.length);
-    ranked.sort((first, second) => rank(first.task) - rank(second.task)
+    const place = (task: Task) => held?.get(`${task.colleague}:${task.text}`) ?? Number.MAX_SAFE_INTEGER;
+    ranked.sort((first, second) => (held ? place(first.task) - place(second.task) : 0)
+        || rank(first.task) - rank(second.task)
         || (first.task.date ?? "9999").localeCompare(second.task.date ?? "9999")
         || first.index - second.index
         || first.groupIndex - second.groupIndex);
@@ -298,7 +301,19 @@ export function openIdsOf(tasks: { colleague: string; lines: string[] }[], backl
 
 /** An open task of the project's backlog, the project plugin's: its number (`T-61`), who holds it (a colleague's first name or a
  * person), and what a todo line says of a task. */
-export type BacklogTask = { id: string; to: string; priority?: string; date?: string; text?: string; after?: string[] };
+export type BacklogTask = {
+    id: string;
+    to: string;
+    priority?: string;
+    date?: string;
+    text?: string;
+    after?: string[];
+    type?: string;
+    due?: string;
+    by?: string;
+    started?: string;
+    state?: string;
+};
 
 /** The backlog's tasks each colleague holds, by their first name, written as todo lines (`P1 · 2026-10-28 · T-61 · the board
  * (after: T-62)`), by colleague id; a task some todo line already carries (its id `T-61`) is that line, and is left out. */
@@ -336,6 +351,19 @@ export function withNextPriority(line: string, today: string): string
     const next = task.priority ? priorities[(priorities.indexOf(task.priority) + 1) % priorities.length] : priorities[0];
     const head = /^(?:P[1-3] · )?(?:\d{4}-\d{2}-\d{2} · )?/.exec(line)?.[0] ?? "";
     return `${next} · ${task.date ?? today} · ${line.slice(head.length)}`;
+}
+
+/** A todo line with new words, its priority, date, id and suffixes kept. */
+export function withText(line: string, text: string): string
+{
+    const head = /^(?:P[1-3] · )?(?:\d{4}-\d{2}-\d{2} · )?(?:(?:#[\w-]+|[A-Z]+-\d+) · )?/.exec(line)?.[0] ?? "";
+    return `${head}${text}${line.slice(head.length + taskOf("", line).text.length)}`;
+}
+
+/** Whole days from one day to another, both YYYY-MM-DD: negative when `to` comes first. */
+export function daysBetween(from: string, to: string): number
+{
+    return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
 }
 
 /** Whole days from a task's date to `now`; undefined without a date. */

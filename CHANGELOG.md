@@ -2,6 +2,15 @@
 
 What changes for whoever uses Crew, version by version. Plugins update in a new chat: `/plugin`, Marketplaces, claude-crew, Update marketplace, or turn its auto-update on there.
 
+## 0.13.0
+
+- Remove asks first: the first press says «Remove? Press again» («Archive T-61? Press again» for a backlog task), and only a second press within four seconds removes it, as in the project plugin's panel.
+- After a press on a task's priority, the lists keep their order for four seconds, so the row stays under the pointer.
+- A colleague's card has «＋ New task»: with the project plugin, a backlog task held by them and created by the project's owner (`add … --to <name> --by <owner>`); without it, a line of their todo. An opened task has «✎ Edit the text», through the backlog's `set --text` or in the todo line, its priority, date, id and suffixes kept.
+- A backlog task shows its type as Jira draws it, beside its priority; in place of its age, a due day within a week («⏰ due in 2 d», red when late) or a task stuck in progress («⏸ 4 d»); its details say who created it and when, its due day and since when it is in progress. Its number is drawn in its own color.
+- While a colleague is at work or in the meeting, the ▶ of their tasks stays in place, gray, saying why under the pointer.
+- With the project plugin, real work a round or a task gives a colleague becomes a backlog task held by them, `--by` the colleague whose review brought it or the user who asked; their todo keeps reminders, checks and proposals. The crew, task, round and tidy instructions say so.
+
 ## 0.12.0 – 0.12.8
 
 - The panel reads only the backlog tasks done in one go (`list --atomic`): the parts of a large task, never the large task itself.

@@ -7,11 +7,11 @@ import type { EngineInterface, Register } from "claude-code";
 import type { Activity, Colleague, Meeting, Permissions, Preferences, Run, Speaker, WeeklyCounts } from "../types";
 import type { Task } from "./team.ts";
 
-import { avatarSvg, barEndSvg, blankSvg, checkboxSvg, pickedTint, captionSvg, claudeSvg, effortSvg, iconSvg, nameSvg, prioritySvg, thumbnailSvg, wideBarSvg } from "./draw.ts";
+import { avatarSvg, barEndSvg, blankSvg, checkboxSvg, pickedTint, captionSvg, claudeSvg, effortSvg, iconSvg, nameSvg, prioritySvg, thumbnailSvg, typeColor, typeSvg, wideBarSvg } from "./draw.ts";
 import { claudeId, segmentsOf, speakersOf } from "./meeting.ts";
 import { imagePathsIn, imageTypeOf, isInside, isOwnMemory, resolvedPath } from "./paths.ts";
 import { contextShare, progressOf, withCount } from "./progress.ts";
-import { ageOf, agentSpecFrom, backlogLinesOf, backlogOf, type BacklogTask, blockersOf, cardFrom, colleagueFrom, colleagueOf, isBacklogId, memorySizeOf, openIdsOf, openTasks, retestsOf, taskOf as todoTask, withEffort, withNextPriority, withPermissions } from "./team.ts";
+import { ageOf, agentSpecFrom, backlogLinesOf, backlogOf, type BacklogTask, blockersOf, cardFrom, colleagueFrom, colleagueOf, daysBetween, isBacklogId, memorySizeOf, openIdsOf, openTasks, retestsOf, taskOf as todoTask, withEffort, withNextPriority, withPermissions, withText } from "./team.ts";
 import { contextWindowOf, dateOf, formatTime, formatTokens, isoWeek, languageNames, languageOf, listNames, modelName, slugOf, words } from "./text.ts";
 import type { Language, Words } from "./text.ts";
 
@@ -67,6 +67,16 @@ const errorColor = "#D0453F";
 const priorityGlyphs: Record<string, { glyph: string; color: string }> = { P1: { glyph: "⇈", color: "#E5493A" }, P2: { glyph: "=", color: "#E2852B" }, P3: { glyph: "↓", color: "#4C8FE0" } };
 // The priority after each, as a press on the mark turns it.
 const nextPriorities: Record<string, string> = { P1: "P2", P2: "P3", P3: "P1" };
+// How long the lists keep their order after a priority turns, and how long Remove waits for its second press.
+const frozenFor = 4000;
+const removeAskFor = 4000;
+// A backlog task's number in its own color, as the project plugin draws it; a due day near or a task stuck in progress, in a warning's.
+const taskColor = "#2E9AA6";
+const warningColor = "#E2852B";
+// A ▶ that cannot be pressed now: gray, fainter than a dim one.
+const idleColor = "#80808040";
+// Days in progress with nobody at work on it after which a backlog task is stuck, as the project plugin's default.
+const staleDays = 3;
 // The dashboard's tiles of who is at work and of the week.
 const workingColor = "#4E9A6B";
 const weekColor = "#8A63C9";
@@ -757,14 +767,17 @@ export const register: Register = (on, options) => {
                     : <Text key={key} bold color={glyph?.color}>{glyph?.glyph ?? priority}</Text>;
             };
             const today = await $.clock.now();
-            // The panel changes a todo itself, at once, without Claude: a task's priority turned, a task removed to the archive.
-            const cyclePriority = async (colleague: Colleague, line: string) => {
-                const day = dateOf(await $.clock.now());
-                await changeTodoLine($, colleague.id, line, current => withNextPriority(current, day));
+            // The panel changes a todo itself, at once, without Claude: a task's priority turned or its words, a task removed to the archive.
+            const changeTodo = async (colleague: Colleague, line: string, change: (line: string) => string) => {
+                await changeTodoLine($, colleague.id, line, change);
                 await safeRefresh($);
                 if ((await read($, view)).selected === colleague.id) {
                     await readCard($, colleague.id);
                 }
+            };
+            const cyclePriority = async (colleague: Colleague, line: string) => {
+                const day = dateOf(await $.clock.now());
+                await changeTodo(colleague, line, current => withNextPriority(current, day));
             };
             const removeTask = async (colleague: Colleague, line: string) => {
                 await removeTodoLine($, colleague.id, line);
@@ -774,7 +787,27 @@ export const register: Register = (on, options) => {
                     await readCard($, colleague.id);
                 }
             };
-            // A task of the project's backlog is changed by the backlog's own command: its priority turned, or archived.
+            // A new task written in a colleague's card: a task of the project's backlog held by them, created by the project's owner, or
+            // without a backlog a line of their todo.
+            const addTask = async (colleague: Colleague, value: string) => {
+                const written = value.replace(/\s+/g, " ").trim().replaceAll(" · ", " - ");
+                await update($, view, now => ({ ...now, editing: undefined }));
+
+                if (!written) {
+                    return;
+                }
+
+                if (latest.backlog) {
+                    const owner = await projectOwner($);
+                    await changeBacklogTask(colleague, ["add", written, "--to", colleague.name, ...(owner ? ["--by", owner] : [])]);
+                    return;
+                }
+
+                await addTodoLine($, colleague.id, `P2 · ${dateOf(await $.clock.now())} · ${written}`);
+                await safeRefresh($);
+                await readCard($, colleague.id);
+            };
+            // A task of the project's backlog is changed by the backlog's own command: its priority turned, its words, or archived.
             const changeBacklogTask = async (colleague: Colleague, args: string[]) => {
                 try {
                     await changeBacklog($, args);
@@ -789,6 +822,21 @@ export const register: Register = (on, options) => {
                     await readCard($, colleague.id);
                 }
             };
+            // The tasks' places as drawn, by "<colleague>:<its words>": after a priority turns they stay for a moment, the row under the pointer.
+            const held = panel.frozen && drawnAt < panel.frozen.until ? new Map(Object.entries(panel.frozen.rank)) : undefined;
+            const shownRank = new Map<string, number>();
+            const shown = (tasks: Task[]) => {
+                tasks.forEach((task, index) => shownRank.set(`${task.colleague}:${task.text}`, index));
+                return tasks;
+            };
+            const freeze = async () => {
+                const until = (await $.clock.now()) + frozenFor;
+                await update($, view, current => ({ ...current, frozen: { until, rank: Object.fromEntries(shownRank) } }));
+                $.clock.after(frozenFor, () => void update($, view, current => (current.frozen && current.frozen.until <= until ? { ...current, frozen: undefined } : current)));
+            };
+            // A day count with a space that never breaks: "15 g" stays on one line.
+            const dayCount = (count: number) => `${count}${say.units.gap.replace(" ", " ")}${say.units.day}`;
+            const todayDate = dateOf(today);
             // Every open task with an id, by who holds it: what a task waits for is found there, without asking anyone.
             const openIds = openIdsOf(latest.tasks, latest.backlog);
             const taskRow = (prefix: string, index: number, task: Task, colleague: Colleague, face: JSX.Element | null) => {
@@ -796,49 +844,104 @@ export const register: Register = (on, options) => {
                 const text = plainText(task.text);
                 const effort = task.effort ?? colleague.effort ?? "";
                 const age = ageOf(task.date, today);
-                // A space that never breaks: "15 g" stays on one line.
-                const days = age === undefined ? "" : `${age}${say.units.gap.replace(" ", " ")}${say.units.day}`;
+                const days = age === undefined ? "" : dayCount(age);
                 const taskKey = `${colleague.id}:${task.text}`;
                 const isOpen = panel.openTask === taskKey;
-                const toggleTask = () => update($, view, current => ({ ...current, openTask: current.openTask === taskKey ? undefined : taskKey }));
+                const toggleTask = () => update($, view, current => ({ ...current, openTask: current.openTask === taskKey ? undefined : taskKey, editing: undefined }));
                 // The tasks it still waits for, from their ids: who holds them, in place of its age.
                 const blockers = blockersOf(task, openIds);
                 const waits = blockers.length ? say.waitsFor(listNames([...new Set(blockers.map(blocker => byId.get(blocker.colleague)?.name ?? blocker.colleague))], say.and, say.comma)) : "";
+                // A task of the project's backlog, as the backlog says it: its type, its due day, who created it, since when it is in progress.
+                const number = task.id && isBacklogId(task.id) ? task.id : undefined;
+                const listed = number ? latest.backlog?.find(one => one.id === number) : undefined;
+                const dueDays = listed?.due ? daysBetween(todayDate, listed.due) : undefined;
+                const isDueNear = dueDays !== undefined && dueDays <= 7;
+                const isInProgress = Boolean(listed?.started && listed.state === "doing");
+                const stuckDays = isInProgress && listed?.started && isFree(colleague) ? daysBetween(listed.started, todayDate) : 0;
+                const isStalled = stuckDays > staleDays;
                 const priorityName = task.priority ? `${task.priority} ${say.priorityNames[task.priority as "P1"] ?? ""}`.trim() : "";
-                const facts = [face ? colleague.fullName : "", priorityName, task.id ?? "", task.date ? `${task.date} (${days})` : "", effort ? say.effort(effort) : ""].filter(Boolean).join(" · ");
+                const born = task.date ? `${task.date} (${days})` : "";
+                const facts = [
+                    face ? colleague.fullName : "",
+                    listed?.type ?? "",
+                    priorityName,
+                    task.id ?? "",
+                    listed?.by && task.date ? say.createdBy(listed.by, born) : born,
+                    listed?.due ? (isDueNear && dueDays !== undefined ? `${say.dueOn(listed.due)} (${say.due(dueDays)})` : say.dueOn(listed.due)) : "",
+                    isInProgress && listed?.started ? say.inProgress(listed.started, isStalled) : "",
+                    effort ? say.effort(effort) : "",
+                ].filter(Boolean).join(" · ");
                 // A task of the project's backlog, not a line of the todo: the backlog's command changes it, and ▶ names its number.
                 const backlogId = line && latest.fromBacklog?.includes(`${colleague.id}:${line}`) ? task.id : undefined;
-                const startText = task.id && isBacklogId(task.id) ? `${task.id} · ${task.text}` : task.text;
-                const cycle = (current: string) => (backlogId ? changeBacklogTask(colleague, ["set", backlogId, "--p", nextPriorities[task.priority ?? ""] ?? "P1"]) : cyclePriority(colleague, current));
-                const remove = (current: string) => (backlogId ? changeBacklogTask(colleague, ["archive", backlogId]) : removeTask(colleague, current));
+                const startText = number ? `${number} · ${task.text}` : task.text;
+                const cycle = async (current: string) => {
+                    await freeze();
+                    await (backlogId ? changeBacklogTask(colleague, ["set", backlogId, "--p", nextPriorities[task.priority ?? ""] ?? "P1"]) : cyclePriority(colleague, current));
+                };
+                // Remove asks first: a second press within a few seconds removes the task, archives it when it is the backlog's.
+                const isRemoving = panel.removing === taskKey;
+                const askRemove = async () => {
+                    await update($, view, current => ({ ...current, removing: taskKey }));
+                    $.clock.after(removeAskFor, () => void update($, view, current => (current.removing === taskKey ? { ...current, removing: undefined } : current)));
+                };
+                const remove = async (current: string) => {
+                    await update($, view, now => ({ ...now, removing: undefined }));
+                    await (backlogId ? changeBacklogTask(colleague, ["archive", backlogId]) : removeTask(colleague, current));
+                };
+                // Its words written again, in the open task: by the backlog's command, or in the todo line, its other parts kept.
+                const isEditing = panel.editing === taskKey;
+                const saveText = async (current: string, value: string) => {
+                    const written = value.replace(/\s+/g, " ").trim().replaceAll(" · ", " - ");
+                    const isChanged = Boolean(written) && written !== task.text;
+                    await update($, view, now => ({ ...now, editing: undefined, openTask: isChanged ? `${colleague.id}:${written}` : now.openTask }));
+
+                    if (isChanged) {
+                        await (backlogId ? changeBacklogTask(colleague, ["set", backlogId, "--text", written]) : changeTodo(colleague, current, now => withText(now, written)));
+                    }
+                };
+                const runningTask = running.find(run => run.colleague === colleague.id)?.task ?? "";
+                const idleReason = busy.has(colleague.id) ? say.busyTip(colleague.name, plainText(runningTask)) : say.meetingTip(colleague.name);
+                const status = waits
+                    ? <Box key={`${prefix}-waits-${index}`} flexShrink={0}><Text color={blockedColor} wrap="truncate">{`⛓︎ ${waits}`}</Text></Box>
+                    : isDueNear && dueDays !== undefined && listed?.due
+                    ? tip(`${prefix}-due-${index}`, say.dueOn(listed.due), <Box key={`${prefix}-due-${index}`} flexShrink={0}><Text color={dueDays < 0 ? errorColor : warningColor} wrap="truncate">{`⏰ ${say.due(dueDays)}`}</Text></Box>, { isAbove: true })
+                    : isStalled && listed?.started
+                    ? tip(`${prefix}-stuck-${index}`, say.inProgress(listed.started, true), <Box key={`${prefix}-stuck-${index}`} flexShrink={0}><Text color={warningColor} wrap="truncate">{`⏸ ${dayCount(stuckDays)}`}</Text></Box>, { isAbove: true })
+                    : days
+                    ? <Box key={`${prefix}-age-${index}`} flexShrink={0}><Text dimColor wrap="truncate">{days}</Text></Box>
+                    : null;
+                const typeMark = listed?.type
+                    ? tip(`${prefix}-type-${index}`, listed.type, isDesktop && "Svg" in ui
+                        ? <ui.Svg key={`${prefix}-type-${index}`} source={typeSvg(listed.type)} alt={listed.type} width={14} height={14} />
+                        : <Text key={`${prefix}-type-${index}`} color={typeColor(listed.type)}>■</Text>, { isAbove: true, isFromLeft: true })
+                    : null;
                 return (
                     <Box key={`${prefix}-${index}`} flexDirection="column" borderStyle="round" {...border} paddingX={1} {...(isDesktop ? tinted() : {})}>
                         <Box flexDirection="row" flexWrap="nowrap" gap={1} alignItems="center">
                             {face}
+                            {typeMark}
                             {line
                                 ? (
                                     // A press on the mark turns the priority, P1, P2, P3 and P1 again; a task without one shows a dim circle to start from.
                                     <Box key={`${prefix}-priority-${index}`} flexShrink={0}>
                                         {task.priority ? priorityMark(`priority-${index}`, task.priority) : <Text dimColor>○</Text>}
                                         <Box position="absolute" top={0} left={0}>
-                                            <Button key={`${prefix}-cycle-${index}`} label={" "} plain onPress={() => cycle(line)} />
+                                            <Button key={`${prefix}-cycle-${index}`} label={" "} plain onPress={() => cycle(line)} />
                                         </Box>
                                     </Box>
                                 )
                                 : null}
+                            {number ? <Box key={`${prefix}-number-${index}`} flexShrink={0}><Text color={taskColor} bold>{number}</Text></Box> : null}
                             <Box flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
                                 <Button key={`${prefix}-open-${index}`} plain onPress={toggleTask}>
-                                    <Text wrap="truncate-end">{`${isOpen ? "▾" : "▸"} ${task.id && isBacklogId(task.id) ? `${task.id} · ` : ""}${text}`}</Text>
+                                    <Text wrap="truncate-end">{`${isOpen ? "▾" : "▸"} ${text}`}</Text>
                                 </Button>
                             </Box>
-                            {waits
-                                ? <Box key={`${prefix}-waits-${index}`} flexShrink={0}><Text color={blockedColor} wrap="truncate">{`⛓︎ ${waits}`}</Text></Box>
-                                : days
-                                ? <Box key={`${prefix}-age-${index}`} flexShrink={0}><Text dimColor wrap="truncate">{days}</Text></Box>
-                                : null}
+                            {status}
                             {effortCell(`${prefix}-effort-${index}`, effort)}
                             {!isFree(colleague)
-                                ? null
+                                // A ▶ that cannot be pressed now keeps its place, gray, its reason under the pointer.
+                                ? tip(`${prefix}-idle-${index}`, idleReason, <Box key={`${prefix}-idle-${index}`} flexShrink={0}><Text color={isDesktop ? idleColor : undefined} dimColor={!isDesktop}>▶</Text></Box>, { isAbove: true })
                                 : isStarting(`${colleague.id}:${startText}`, [colleague.id])
                                 ? <Box key={`${prefix}-starting-${index}`} flexShrink={0}><Text dimColor wrap="truncate">{`⏳ ${say.starting}`}</Text></Box>
                                 : <Button key={`${prefix}-start-${index}`} label="▶" plain dimColor onPress={() => startTask(colleague, startText)} />}
@@ -846,16 +949,23 @@ export const register: Register = (on, options) => {
                         {isOpen
                             ? (
                                 <Box key={`${prefix}-details-${index}`} flexDirection="column" gap={1} paddingLeft={face ? 4 : 2}>
-                                    <Text>{text}</Text>
+                                    {isEditing && line && "Input" in ui
+                                        ? <ui.Input key={`${prefix}-edit-${index}`} value={task.text} rows={2} autoFocus submitLabel={say.save} onSubmit={(value: string) => saveText(line, value)} />
+                                        : <Text>{text}</Text>}
                                     <Text dimColor>{facts}</Text>
                                     {blockers.length
                                         ? <Text key={`${prefix}-blockers-${index}`} color={blockedColor}>{`⛓︎ ${say.waitsFor(blockers.map(blocker => `${blocker.id} (${byId.get(blocker.colleague)?.name ?? blocker.colleague})`).join(say.comma))}`}</Text>
                                         : null}
                                     {line
                                         ? (
-                                            <Button key={`${prefix}-remove-${index}`} plain onPress={() => remove(line)}>
-                                                <Text color={errorColor}>{`✕ ${say.removeTask}`}</Text>
-                                            </Button>
+                                            <Box key={`${prefix}-actions-${index}`} flexDirection="row" flexWrap="wrap" columnGap={2}>
+                                                {"Input" in ui
+                                                    ? <Button key={`${prefix}-edit-text-${index}`} label={isEditing ? say.cancel : `✎ ${say.editText}`} plain dimColor onPress={() => update($, view, now => ({ ...now, editing: now.editing === taskKey ? undefined : taskKey }))} />
+                                                    : null}
+                                                <Button key={`${prefix}-remove-${index}`} plain onPress={() => (isRemoving ? remove(line) : askRemove())}>
+                                                    <Text color={errorColor}>{`✕ ${isRemoving ? say.removeSure(backlogId ?? "") : say.removeTask}`}</Text>
+                                                </Button>
+                                            </Box>
                                         )
                                         : null}
                                 </Box>
@@ -875,7 +985,7 @@ export const register: Register = (on, options) => {
                 const week = (await weeklyCounts($))[isoWeek(at)]?.[selected.id];
                 // Their tasks as the backlog draws them, by priority and age: the first ones, or all of them when the user asks.
                 const isCardTasksOpen = Boolean(panel.isCardTasksOpen);
-                const cardTasks = details ? backlogOf([{ colleague: selected.id, lines: details.openTasks }], isCardTasksOpen ? details.openTasks.length : cardTaskLimit) : [];
+                const cardTasks = details ? shown(backlogOf([{ colleague: selected.id, lines: details.openTasks }], isCardTasksOpen ? details.openTasks.length : cardTaskLimit, held)) : [];
                 // How many open tasks of each priority, beside their name.
                 const priorityCounts = ["P1", "P2", "P3"].flatMap(priority => {
                     const count = (details?.openTasks ?? []).filter(line => todoTask("", line).priority === priority).length;
@@ -949,6 +1059,11 @@ export const register: Register = (on, options) => {
                                         <Text bold>{say.tasks}</Text>
                                         {isBusy ? null : <Button key="card-tidy" label={`✦ ${say.tidy}`} plain dimColor onPress={() => runCommand("crew:tidy", [selected])} />}
                                     </Box>
+                                    {"Input" in ui
+                                        ? panel.editing === `new:${selected.id}`
+                                            ? <ui.Input key="card-new-task" placeholder={say.newTaskHint} autoFocus submitLabel={say.add} onSubmit={(value: string) => addTask(selected, value)} />
+                                            : <Button key="card-new-task" label={`＋ ${say.newTask}`} plain dimColor onPress={() => update($, view, now => ({ ...now, editing: `new:${selected.id}` }))} />
+                                        : null}
                                     {cardTasks.length ? cardTasks.map((task, index) => taskRow("card-task", index, task, selected, null)) : <Text key="card-no-tasks" dimColor>{say.toDo(0)}</Text>}
                                     {details.openTasks.length > cardTaskLimit
                                         ? <Button key="card-tasks-all" label={isCardTasksOpen ? say.showFewer : say.showAll(details.openTasks.length)} plain dimColor onPress={() => update($, view, current => ({ ...current, isCardTasksOpen: !current.isCardTasksOpen }))} />
@@ -1100,7 +1215,7 @@ export const register: Register = (on, options) => {
                 ...(blockedCount ? [tile("dash-blocked", blockedCount, say.blockedTasks, blockedColor, <Text color={blockedColor}>⛓︎</Text>)] : []),
                 tile("dash-week", weekTasks, say.thisWeekShort, weekColor, isDesktop ? <ui.Svg key="dash-week-mark" source={iconSvg("calendar", 14, 0, weekColor)} alt={say.thisWeekShort} width={14} height={14} /> : null),
             ];
-            const backlog = backlogOf(latest.tasks, backlogSize);
+            const backlog = shown(backlogOf(latest.tasks, backlogSize, held));
             // The colleagues whose todo is past the 15 open lines it keeps: with nobody picked, the tidy button gives them the task.
             const longTodos = colleagues.filter(colleague => latest.tasks.some(group => group.colleague === colleague.id && group.lines.length > todoLimit) || (latest.longMemories ?? []).includes(colleague.id));
             // Who the team's Next task button starts: the colleagues picked, or everyone free with something to do.
@@ -1602,8 +1717,21 @@ async function projectBacklog($: EngineInterface, root: string): Promise<Backlog
         let open: BacklogTask[] | undefined;
 
         try {
-            const listedTasks = listed?.exitCode === 0 ? (JSON.parse(listed.stdout) as { id: number | string; to?: string; priority?: string; created?: string; text?: string; after?: string[] }[]) : undefined;
-            open = listedTasks?.map(task => ({ id: `${prefix}-${task.id}`, to: task.to ?? "", priority: task.priority, date: task.created, text: task.text, after: task.after }));
+            type Listed = { id: number | string; to?: string; priority?: string; created?: string; text?: string; after?: string[]; type?: string | null; due?: string | null; by?: string | null; started?: string | null; state?: string };
+            const listedTasks = listed?.exitCode === 0 ? (JSON.parse(listed.stdout) as Listed[]) : undefined;
+            open = listedTasks?.map(task => ({
+                id: `${prefix}-${task.id}`,
+                to: task.to ?? "",
+                priority: task.priority,
+                date: task.created,
+                text: task.text,
+                after: task.after,
+                ...(task.type ? { type: task.type } : {}),
+                ...(task.due ? { due: task.due } : {}),
+                ...(task.by ? { by: task.by } : {}),
+                ...(task.started ? { started: task.started } : {}),
+                ...(task.state ? { state: task.state } : {}),
+            }));
         } catch {
             open = undefined;
         }
@@ -2270,6 +2398,26 @@ async function removeTodoLine($: EngineInterface, colleague: string, line: strin
     const entry = `- ${today} · removed from the panel: ${line}`;
     await $.fs.write(archive, kept ? `${kept.replace(/\s*$/, "")}\n${entry}\n` : `# Todo archive\n\n${entry}\n`).catch(() => undefined);
     await changeTodoLine($, colleague, line, () => undefined);
+}
+
+// A new open line in a colleague's todo, after its other open lines; the file keeps its line ends.
+async function addTodoLine($: EngineInterface, colleague: string, line: string): Promise<void>
+{
+    const path = `${await projectRoot($)}/.claude/agent-memory/${colleague}/todo.md`;
+    const text = await $.fs.read(path).catch(() => "");
+    const lines = text.trim() ? text.replace(/\r\n/g, "\n").replace(/\n*$/, "").split("\n") : [];
+    const last = lines.reduce((found, entry, index) => (/^\s*- \[ \]/.test(entry) ? index : found), -1);
+    lines.splice(last < 0 ? lines.length : last + 1, 0, `- [ ] ${line}`);
+    await $.fs.write(path, `${lines.join(text.includes("\r\n") ? "\r\n" : "\n")}${text.includes("\r\n") ? "\r\n" : "\n"}`);
+}
+
+// The project's owner as its backlog names people, `people` of .claude/project.yaml: the first who is not Claude; undefined without one.
+async function projectOwner($: EngineInterface): Promise<string | undefined>
+{
+    const config = await $.fs.read(`${await projectRoot($)}/.claude/project.yaml`).catch(() => "");
+    const inline = /^people:\s*\[([^\]]*)\]/m.exec(config)?.[1]?.split(",");
+    const listed = inline ?? [.../^people:\s*\n((?:[ \t]+-.*\n?)*)/m.exec(config)?.[1]?.matchAll(/^[ \t]+-\s*(.+)$/gm) ?? []].map(match => match[1] ?? "");
+    return listed.map(name => name.trim().replace(/^["']|["']$/g, "")).find(name => name && name !== "Claude");
 }
 
 async function projectRoot($: EngineInterface): Promise<string>

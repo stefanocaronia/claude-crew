@@ -69,6 +69,16 @@ describe("colleagues from their files", () => {
         assert.deepEqual(blockersOf(taskOf("elena", "run it"), open), []);
     });
 
+    it("reads a backlog task's number in the id's place and in after, open as the backlog says or, without it, as the todos do", () => {
+        assert.deepEqual(taskOf("matteo", "P1 · 2026-10-28 · T-61 · the board (after: T-62, #giulia-1)"), { colleague: "matteo", text: "the board", priority: "P1", date: "2026-10-28", id: "T-61", after: ["T-62", "#giulia-1"] });
+        const todos = [{ colleague: "matteo-conti", lines: ["P1 · 2026-10-28 · T-61 · the board", "P2 · 2026-10-28 · #matteo-3 · fix it"] }];
+        assert.deepEqual([...openIdsOf(todos)], [["T-61", "matteo-conti"], ["#matteo-3", "matteo-conti"]]);
+        // The backlog says what is open: T-61 is done there, T-62 is Claude's.
+        const open = openIdsOf(todos, [{ id: "T-62", to: "Claude" }]);
+        assert.deepEqual([...open], [["#matteo-3", "matteo-conti"], ["T-62", "Claude"]]);
+        assert.deepEqual(blockersOf(taskOf("elena", "run it (after: T-61, T-62)"), open), [{ id: "T-62", colleague: "Claude" }]);
+    });
+
     it("takes a bold name with its colon whole, leaving no stars", () => {
         assert.deepEqual(segmentsOf("**[Matteo]:** regge.", [matteo]).map(segment => segment.text), ["regge."]);
     });

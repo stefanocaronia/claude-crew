@@ -11,7 +11,7 @@ import { avatarSvg, barEndSvg, blankSvg, checkboxSvg, pickedTint, captionSvg, cl
 import { claudeId, segmentsOf, speakersOf } from "./meeting.ts";
 import { imagePathsIn, imageTypeOf, isInside, isOwnMemory, resolvedPath } from "./paths.ts";
 import { contextShare, progressOf, withCount } from "./progress.ts";
-import { ageOf, agentSpecFrom, backlogOf, blockersOf, cardFrom, colleagueFrom, colleagueOf, memorySizeOf, openIdsOf, openTasks, retestsOf, taskOf as todoTask, withEffort, withNextPriority, withPermissions } from "./team.ts";
+import { ageOf, agentSpecFrom, backlogOf, type BacklogTask, blockersOf, cardFrom, colleagueFrom, colleagueOf, isBacklogId, memorySizeOf, openIdsOf, openTasks, retestsOf, taskOf as todoTask, withEffort, withNextPriority, withPermissions } from "./team.ts";
 import { contextWindowOf, dateOf, formatTime, formatTokens, isoWeek, languageNames, languageOf, listNames, modelName, slugOf, words } from "./text.ts";
 import type { Language, Words } from "./text.ts";
 
@@ -43,6 +43,8 @@ let portraits = new Map<string, string>();
 // The 32 px portraits of the backlog's rows, light enough for one on every row.
 let smallPortraits = new Map<string, string>();
 let portraitsRead = "";
+// The project backlog's open tasks as last asked, and what the project's docs were then.
+let backlogRead: { signature: string; tasks: BacklogTask[] | undefined } | undefined;
 let language: Language = "en";
 // The language the options, Claude Code and the system ask for: what "automatic" means in the panel's settings.
 let detectedLanguage: Language = "en";
@@ -771,7 +773,7 @@ export const register: Register = (on, options) => {
                 }
             };
             // Every open task with an id, by who holds it: what a task waits for is found there, without asking anyone.
-            const openIds = openIdsOf(latest.tasks);
+            const openIds = openIdsOf(latest.tasks, latest.backlog);
             const taskRow = (prefix: string, index: number, task: Task, colleague: Colleague, face: JSX.Element | null) => {
                 const line = task.line;
                 const text = plainText(task.text);
@@ -1477,13 +1479,14 @@ async function refresh($: EngineInterface): Promise<void>
 
     const hasCommands = (await $.command.list()).some(info => info.plugin === "crew" || info.name.startsWith("crew:"));
     const sortedTasks = tasks.sort((first, second) => second.lines.length - first.lines.length || first.colleague.localeCompare(second.colleague));
+    const backlog = await projectBacklog($, root, sortedTasks);
     const previous = await read($, board);
 
     // Every write redraws the panel, and a click that lands on a drawing already replaced is lost: write only what changed.
     if (previous.hasCommands !== hasCommands || previous.error || JSON.stringify(previous.tasks) !== JSON.stringify(sortedTasks) || JSON.stringify(previous.heavy ?? []) !== JSON.stringify(heavy)
-        || JSON.stringify(previous.longMemories ?? []) !== JSON.stringify(longMemories)) {
+        || JSON.stringify(previous.longMemories ?? []) !== JSON.stringify(longMemories) || JSON.stringify(previous.backlog) !== JSON.stringify(backlog)) {
         const checkedAt = await $.clock.now();
-        await update($, board, current => ({ ...current, hasCommands, tasks: sortedTasks, heavy, longMemories, error: undefined, checkedAt }));
+        await update($, board, current => ({ ...current, hasCommands, tasks: sortedTasks, heavy, longMemories, backlog, error: undefined, checkedAt }));
     }
 
     const signature = [...kept, ...small].map(([id, uri]) => `${id}:${uri.length}`).join("|");
@@ -1529,6 +1532,66 @@ async function filesIn($: EngineInterface, folder: string): Promise<Map<string, 
     }
 
     return files;
+}
+
+// The open tasks of the project's backlog, asked of the project plugin's own command when a todo line names one (T-61) and the plugin
+// is installed; asked again only when a file of the project's docs changes. Undefined without them: the todo lines say what is open.
+async function projectBacklog($: EngineInterface, root: string, tasks: { colleague: string; lines: string[] }[]): Promise<BacklogTask[] | undefined>
+{
+    const isNamed = tasks.some(group => group.lines.some(line => {
+        const task = todoTask("", line);
+        return [task.id ?? "", ...(task.after ?? [])].some(isBacklogId);
+    }));
+    const configPath = `${root}/.claude/project.yaml`;
+
+    if (!isNamed || !(await $.fs.exists(configPath))) {
+        return undefined;
+    }
+
+    const script = await backlogScript($);
+
+    if (!script) {
+        return undefined;
+    }
+
+    const config = await $.fs.read(configPath).catch(() => "");
+    const docs = /^docs:\s*["']?([^\s"'#]+)/m.exec(config)?.[1] ?? "project";
+    const prefix = /\btask:\s*["']?([A-Z]+)/.exec(/^prefixes:.*(?:\n[ \t].*)*/m.exec(config)?.[0] ?? "")?.[1] ?? "T";
+    const stamps = await filesIn($, `${root}/${docs}`).catch(() => new Map<string, FileStamp>());
+    const signature = [script, prefix, ...[...stamps].map(([name, file]) => `${name}:${file.mtimeMs}:${file.size}`)].join("|");
+
+    if (backlogRead?.signature !== signature) {
+        const listed = await $.process.run(["node", script, "list", "--json"], { cwd: root, env: { CLAUDE_PROJECT_DIR: root }, timeoutMs: 30_000 }).catch(() => undefined);
+        let open: BacklogTask[] | undefined;
+
+        try {
+            open = listed?.exitCode === 0 ? (JSON.parse(listed.stdout) as { id: number | string; to?: string }[]).map(task => ({ id: `${prefix}-${task.id}`, to: task.to ?? "" })) : undefined;
+        } catch {
+            open = undefined;
+        }
+
+        backlogRead = { signature, tasks: open };
+    }
+
+    return backlogRead.tasks;
+}
+
+// The project plugin's backlog command, where Claude Code installed it.
+async function backlogScript($: EngineInterface): Promise<string | undefined>
+{
+    const home = (await $.env.get("CLAUDE_CONFIG_DIR")) ?? `${(await $.env.get("USERPROFILE")) ?? (await $.env.get("HOME")) ?? ""}/.claude`;
+    const registry = JSON.parse(await $.fs.read(`${home}/plugins/installed_plugins.json`).catch(() => "{}")) as { plugins?: Record<string, { installPath?: string }[]> };
+    const installs = Object.entries(registry.plugins ?? {}).filter(([name]) => name.startsWith("project@")).flatMap(([, list]) => list);
+
+    for (const install of installs) {
+        const script = `${(install.installPath ?? "").replace(/\\/g, "/")}/scripts/backlog.mjs`;
+
+        if (install.installPath && (await $.fs.exists(script))) {
+            return script;
+        }
+    }
+
+    return undefined;
 }
 
 // A file's text, or what `load` makes of it, read again only when its time or size changed.

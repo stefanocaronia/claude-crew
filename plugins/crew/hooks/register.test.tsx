@@ -60,7 +60,7 @@ function world(on: On, members: string[], hasCommands = true): string[] & { file
     const reads: string[] = [];
     const writes: string[] = [];
     const files: Record<string, string> = { ...project, ...(members.length ? { "/tmp/claude-crew/s1.json": JSON.stringify({ active: members }) } : {}) };
-    mock.env(on, { OS: "Linux", TMPDIR: "/tmp", LANG: "en_US.UTF-8" });
+    mock.env(on, { OS: "Linux", TMPDIR: "/tmp", LANG: "en_US.UTF-8", USERPROFILE: "/home" });
     const clock = mock.clock(on, { now: Date.UTC(2026, 9, 10, 9, 0) });
     on("session.start", () => ({ cwd: "/p" }) as never);
     on("settings.read", () => ({ value: {} }) as never);
@@ -560,6 +560,39 @@ test("a task that waits for another's open task shows who it waits for, and is f
     const after = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
     expect(await after.find({ type: "Text", text: /waits for/ })).toBeUndefined();
     expect(await after.find({ type: "Text", text: "blocked tasks" })).toBeUndefined();
+    await after.unmount();
+});
+
+test("a task that waits for a task of the project's backlog (T-62) shows who holds it while the backlog says it is open", async ($, on) => {
+    const sent = world(on, []);
+    const { files } = sent;
+    let open = [{ id: 62, to: "Claude", state: "todo" }];
+    const asked: string[][] = [];
+    on("process.run", (_, e) => {
+        asked.push([...e.argv]);
+        return { value: { exitCode: 0, stdout: JSON.stringify(open), stderr: "" } } as never;
+    });
+    files["/home/.claude/plugins/installed_plugins.json"] = JSON.stringify({ plugins: { "project@claude-project": [{ installPath: "C:\\plugins\\project" }] } });
+    files["/plugins/project/scripts/backlog.mjs"] = "";
+    files["/p/.claude/project.yaml"] = "docs: project\n";
+    files["/p/project/TASKS.md"] = "- T-62";
+    files["/p/.claude/agent-memory/sara-lombardi/todo.md"] = "- [ ] P1 · 2026-10-28 · T-61 · run loot2 again (after: T-62)\n";
+    on("turn.complete", () => ({ text: "" }) as never);
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+    const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
+    await ui.press({ key: "backlog-toggle" });
+    expect(await ui.find({ type: "Text", text: "⛓︎ waits for Claude" })).toBeDefined();
+    expect(asked.at(-1)).toEqual(["node", "C:/plugins/project/scripts/backlog.mjs", "list", "--json"]);
+    await ui.unmount();
+    // The backlog is asked again only once its files change; T-62 done, Sara's task is free.
+    const count = asked.length;
+    await $.turn.complete({ reason: "answer", answer: "", durationMs: 1000, isAborted: false, turnId: "t1" } as never);
+    expect(asked.length).toBe(count);
+    open = [];
+    files["/p/project/TASKS.md"] = "- T-62 done";
+    await $.turn.complete({ reason: "answer", answer: "", durationMs: 1000, isAborted: false, turnId: "t2" } as never);
+    const after = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
+    expect(await after.find({ type: "Text", text: /waits for/ })).toBeUndefined();
     await after.unmount();
 });
 

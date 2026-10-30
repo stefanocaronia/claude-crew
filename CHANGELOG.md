@@ -2,8 +2,9 @@
 
 What changes for whoever uses Crew, version by version. Plugins update in a new chat: `/plugin`, Marketplaces, claude-crew, Update marketplace, or turn its auto-update on there.
 
-## 0.12.0 – 0.12.5
+## 0.12.0 – 0.12.6
 
+- A task can wait for a task of the project's backlog, `(after: T-62)`, and a todo line that is a colleague's part of one carries its number where the id goes, `- [ ] P1 · 2026-10-28 · T-61 · text`. With the project plugin installed, the panel asks its backlog which tasks are open and who holds them (again only when its files change); without it, the todo lines say so. `/crew:next` follows a chain through backlog tasks, and a link that is Claude's or a person's is asked in the chat.
 - Every card carries the same faint gray background, colleagues and tasks alike; a picked colleague's stays in their color.
 - Tasks can wait for other tasks, written in their own lines when they are written: the task waited for has an id after its date (`- [ ] P1 · 2026-10-28 · #matteo-3 · correct lootNote`), the waiting one ends with `(after: #matteo-3)`. A colleague who finds that their task needs another's work gives that task an id, or writes it in the other's todo `(for <name>)`. The panel reads the dependencies from the lines: a blocked task shows a chain mark and who it waits for, and the dashboard counts the blocked tasks. `/crew:next` and ▶ on a blocked task show the whole chain and ask once, then start each link when the one before is done. Tidying never archives a task others wait for.
 - A task done is no longer deleted when the todo is tidied: it moves, with the day it was done, to `notes/todo-done.md`, the colleague's history of what is done.

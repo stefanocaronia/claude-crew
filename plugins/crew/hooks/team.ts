@@ -235,11 +235,12 @@ export function backlogOf(tasks: { colleague: string; lines: string[] }[], limit
     return ranked.slice(0, limit).map(entry => ({ ...entry.task, line: tasks[entry.groupIndex]?.lines[entry.index] }));
 }
 
-/** A todo line's parts: `P2 · 2026-10-29 · #matteo-3 · the task (after: #elena-1) (effort: high)`, each but the words optional: the
- * id is there when other tasks wait for this one, `after` names the tasks this one waits for, in any order with the effort. */
+/** A todo line's parts: `P2 · 2026-10-29 · #matteo-3 · the task (after: #elena-1, T-62) (effort: high)`, each but the words optional:
+ * the id is there when other tasks wait for this one, or is the number of the project's backlog task the line is the colleague's part
+ * of (`T-61`); `after` names the tasks this one waits for, todo lines or backlog tasks, in any order with the effort. */
 export function taskOf(colleague: string, line: string): Task
 {
-    const head = /^(?:(P[1-3]) · )?(?:(\d{4}-\d{2}-\d{2}) · )?(?:(#[\w-]+) · )?/.exec(line);
+    const head = /^(?:(P[1-3]) · )?(?:(\d{4}-\d{2}-\d{2}) · )?(?:(#[\w-]+|[A-Z]+-\d+) · )?/.exec(line);
     let rest = line.slice(head?.[0].length ?? 0);
     let effort: string | undefined;
     let after: string[] | undefined;
@@ -254,7 +255,7 @@ export function taskOf(colleague: string, line: string): Task
         if (effortMatch) {
             effort = effortMatch[1]?.toLowerCase();
         } else if (afterMatch) {
-            after = (afterMatch[1] ?? "").split(/[,\s]+/).filter(id => /^#[\w-]+$/.test(id));
+            after = (afterMatch[1] ?? "").split(/[,\s]+/).filter(id => /^#[\w-]+$/.test(id) || isBacklogId(id));
         }
 
         if (match) {
@@ -279,13 +280,29 @@ export function blockersOf(task: Task, open: Map<string, string>): { id: string;
     return (task.after ?? []).flatMap(id => (open.has(id) ? [{ id, colleague: open.get(id) ?? "" }] : []));
 }
 
-/** The ids of the open tasks of every todo, with who holds each. */
-export function openIdsOf(tasks: { colleague: string; lines: string[] }[]): Map<string, string>
+/** The ids of the open tasks of every todo, with who holds each. A backlog task's number (`T-61`) is open as the project's backlog
+ * says, held by whom it names, once the backlog was read; else while a todo line carries it open. */
+export function openIdsOf(tasks: { colleague: string; lines: string[] }[], backlog?: BacklogTask[]): Map<string, string>
 {
-    return new Map(tasks.flatMap(group => group.lines.flatMap(line => {
+    const open = new Map(tasks.flatMap(group => group.lines.flatMap(line => {
         const id = taskOf(group.colleague, line).id;
-        return id ? [[id, group.colleague] as const] : [];
+        return id && !(backlog && isBacklogId(id)) ? [[id, group.colleague] as const] : [];
     })));
+
+    for (const task of backlog ?? []) {
+        open.set(task.id, task.to);
+    }
+
+    return open;
+}
+
+/** An open task of the project's backlog, the project plugin's: its number (`T-61`) and who holds it, a colleague's first name or a person. */
+export type BacklogTask = { id: string; to: string };
+
+/** Whether an id names a task of the project's backlog, `T-61`, rather than a todo line, `#matteo-3`. */
+export function isBacklogId(id: string): boolean
+{
+    return /^[A-Z]+-\d+$/.test(id);
 }
 
 /** A todo line with its next priority, P1 to P2 to P3 and back to P1, a line without one becoming P1; its date kept, or today's

@@ -5,7 +5,7 @@ import { describe, it } from "node:test";
 import { segmentsOf, speakersOf } from "./meeting.ts";
 import { imagePathsIn, isInside, isOwnMemory, resolvedPath } from "./paths.ts";
 import { withCount } from "./progress.ts";
-import { ageOf, agentSpecFrom, backlogOf, blockersOf, cardFrom, colleagueFrom, colleagueOf, memorySizeOf, openIdsOf, openTasks, permissionsOf, retestsOf, taskOf, withEffort, withNextPriority, withPermissions } from "./team.ts";
+import { ageOf, agentSpecFrom, backlogLinesOf, backlogOf, blockersOf, cardFrom, colleagueFrom, colleagueOf, memorySizeOf, openIdsOf, openTasks, permissionsOf, retestsOf, taskOf, withEffort, withNextPriority, withPermissions } from "./team.ts";
 import { dateOf, formatTokens, formatUntil, isoWeek, languageOf, listNames, modelName, slugOf, words } from "./text.ts";
 
 const profile = "---\r\nname: matteo-conti\r\ndescription: \"Matteo Conti, architetto TypeScript. Usalo per le revisioni.\"\r\ntools: Read\r\nmemory: project\r\neffort: high\r\ncolor: red\r\n---\r\n\r\n# Matteo Conti, architetto TypeScript\r\n\r\nChi sei.";
@@ -77,6 +77,22 @@ describe("colleagues from their files", () => {
         const open = openIdsOf(todos, [{ id: "T-62", to: "Claude" }]);
         assert.deepEqual([...open], [["#matteo-3", "matteo-conti"], ["T-62", "Claude"]]);
         assert.deepEqual(blockersOf(taskOf("elena", "run it (after: T-61, T-62)"), open), [{ id: "T-62", colleague: "Claude" }]);
+    });
+
+    it("writes the backlog's tasks a colleague holds as their todo lines, leaving out those a line already carries and those of others", () => {
+        const team = [{ id: "matteo-conti", name: "Matteo" }, { id: "sara-lombardi", name: "Sara" }];
+        const todos = [{ colleague: "matteo-conti", lines: ["P1 · 2026-10-28 · T-61 · his part"] }];
+        const backlog = [
+            { id: "T-61", to: "Matteo", priority: "P1", date: "2026-10-27", text: "the board" },
+            { id: "T-70", to: "matteo", priority: "P2", date: "2026-10-28", text: "the guide", after: ["T-62", "#giulia-1"] },
+            { id: "T-71", to: "Claude", priority: "P1", date: "2026-10-28", text: "Claude's own" },
+            { id: "T-72", to: "Sara", text: "no priority yet" },
+        ];
+        assert.deepEqual([...backlogLinesOf(backlog, team, todos)], [
+            ["matteo-conti", ["P2 · 2026-10-28 · T-70 · the guide (after: T-62, #giulia-1)"]],
+            ["sara-lombardi", ["T-72 · no priority yet"]],
+        ]);
+        assert.deepEqual(taskOf("matteo-conti", "P2 · 2026-10-28 · T-70 · the guide (after: T-62, #giulia-1)"), { colleague: "matteo-conti", text: "the guide", priority: "P2", date: "2026-10-28", id: "T-70", after: ["T-62", "#giulia-1"] });
     });
 
     it("takes a bold name with its colon whole, leaving no stars", () => {

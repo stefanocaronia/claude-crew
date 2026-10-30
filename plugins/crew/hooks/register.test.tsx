@@ -484,7 +484,7 @@ test("the backlog puts a P1 task first, with its priority and its age", async ($
     expect(await ui.find({ type: "Text", text: "▸ now" })).toBeDefined();
     // A row opens in place: the task whole, who holds it, its priority, its date and age.
     await ui.press({ key: "backlog-open-0" });
-    expect(await ui.find({ type: "Text", text: "Sara Lombardi · P1 · 2026-10-07 (3d)" })).toBeDefined();
+    expect(await ui.find({ type: "Text", text: "Sara Lombardi · P1 high priority · 2026-10-07 (3d)" })).toBeDefined();
     await ui.press({ key: "backlog-open-0" });
     expect(await ui.find({ type: "Text", text: /Sara Lombardi · P1/ })).toBeUndefined();
     await ui.unmount();
@@ -594,6 +594,41 @@ test("a task that waits for a task of the project's backlog (T-62) shows who hol
     const after = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
     expect(await after.find({ type: "Text", text: /waits for/ })).toBeUndefined();
     await after.unmount();
+});
+
+test("a colleague's tasks of the project's backlog are theirs: counted once, shown with their number, started, turned and archived by the backlog's command", async ($, on) => {
+    const sent = world(on, []);
+    const { files } = sent;
+    const asked: string[][] = [];
+    on("process.run", (_, e) => {
+        asked.push([...e.argv]);
+        const open = [{ id: 61, to: "Sara", priority: "P1", created: "2026-10-08", text: "the board", after: [] }, { id: 70, to: "Sara", priority: "P2", created: "2026-10-09", text: "the guide", after: [] }];
+        return { value: { exitCode: 0, stdout: e.argv.includes("list") ? JSON.stringify(open) : "", stderr: "" } } as never;
+    });
+    on("turn.complete", () => ({ text: "" }) as never);
+    files["/home/.claude/plugins/installed_plugins.json"] = JSON.stringify({ plugins: { "project@claude-project": [{ installPath: "/plugins/project" }] } });
+    files["/plugins/project/scripts/backlog.mjs"] = "";
+    files["/p/.claude/project.yaml"] = "docs: project\n";
+    files["/p/project/TASKS.md"] = "- T-61\n- T-70";
+    // Sara's todo carries T-61: one task, her line.
+    files["/p/.claude/agent-memory/sara-lombardi/todo.md"] = "- [ ] P1 · 2026-10-07 · T-61 · her part of the board\n";
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+    const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
+    expect(await ui.find({ type: "Text", text: "2 to do" })).toBeDefined();
+    await ui.press({ key: "backlog-toggle" });
+    expect(await ui.find({ type: "Text", text: "▸ T-61 · her part of the board" })).toBeDefined();
+    expect(await ui.find({ type: "Text", text: "▸ T-70 · the guide" })).toBeDefined();
+    expect(await ui.find({ type: "Text", text: "▸ T-61 · the board" })).toBeUndefined();
+    await ui.press({ key: "backlog-start-1" });
+    expect(sent.at(-1)).toBe("/crew:next Sara -- T-70 · the guide");
+    // Its priority and its removal go to the backlog's command; her own line stays in her todo.
+    await ui.press({ key: "backlog-cycle-1" });
+    expect(asked).toContainEqual(["node", "/plugins/project/scripts/backlog.mjs", "set", "T-70", "--p", "P3"]);
+    await ui.press({ key: "backlog-open-1" });
+    await ui.press({ key: "backlog-remove-1" });
+    expect(asked).toContainEqual(["node", "/plugins/project/scripts/backlog.mjs", "archive", "T-70"]);
+    expect(files["/p/.claude/agent-memory/sara-lombardi/todo.md"]).toBe("- [ ] P1 · 2026-10-07 · T-61 · her part of the board\n");
+    await ui.unmount();
 });
 
 test("▶ on a backlog row starts that task; Next task starts the next one of the colleagues picked, or of those free; each says it is starting", async ($, on) => {

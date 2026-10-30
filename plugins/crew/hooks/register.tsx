@@ -11,7 +11,7 @@ import { avatarSvg, barEndSvg, blankSvg, checkboxSvg, pickedTint, captionSvg, cl
 import { claudeId, segmentsOf, speakersOf } from "./meeting.ts";
 import { imagePathsIn, imageTypeOf, isInside, isOwnMemory, resolvedPath } from "./paths.ts";
 import { contextShare, progressOf, withCount } from "./progress.ts";
-import { ageOf, agentSpecFrom, backlogOf, type BacklogTask, blockersOf, cardFrom, colleagueFrom, colleagueOf, isBacklogId, memorySizeOf, openIdsOf, openTasks, retestsOf, taskOf as todoTask, withEffort, withNextPriority, withPermissions } from "./team.ts";
+import { ageOf, agentSpecFrom, backlogLinesOf, backlogOf, type BacklogTask, blockersOf, cardFrom, colleagueFrom, colleagueOf, isBacklogId, memorySizeOf, openIdsOf, openTasks, retestsOf, taskOf as todoTask, withEffort, withNextPriority, withPermissions } from "./team.ts";
 import { contextWindowOf, dateOf, formatTime, formatTokens, isoWeek, languageNames, languageOf, listNames, modelName, slugOf, words } from "./text.ts";
 import type { Language, Words } from "./text.ts";
 
@@ -65,6 +65,8 @@ const sectionIcons = { meeting: "☰", working: "⚒\uFE0E", finished: "✓", re
 const errorColor = "#D0453F";
 // A task's priority on the terminal, as the desktop draws it: two arrows up in red, an equals in orange, an arrow down in blue.
 const priorityGlyphs: Record<string, { glyph: string; color: string }> = { P1: { glyph: "⇈", color: "#E5493A" }, P2: { glyph: "=", color: "#E2852B" }, P3: { glyph: "↓", color: "#4C8FE0" } };
+// The priority after each, as a press on the mark turns it.
+const nextPriorities: Record<string, string> = { P1: "P2", P2: "P3", P3: "P1" };
 // The dashboard's tiles of who is at work and of the week.
 const workingColor = "#4E9A6B";
 const weekColor = "#8A63C9";
@@ -751,7 +753,7 @@ export const register: Register = (on, options) => {
                 const drawn = isDesktop ? prioritySvg(priority) : undefined;
                 const glyph = priorityGlyphs[priority];
                 return drawn && "Svg" in ui
-                    ? <ui.Svg key={key} source={drawn} alt={priority} width={14} height={14} />
+                    ? <ui.Svg key={key} source={drawn} alt={say.priorityNames[priority as "P1"] ?? priority} width={14} height={14} />
                     : <Text key={key} bold color={glyph?.color}>{glyph?.glyph ?? priority}</Text>;
             };
             const today = await $.clock.now();
@@ -772,6 +774,21 @@ export const register: Register = (on, options) => {
                     await readCard($, colleague.id);
                 }
             };
+            // A task of the project's backlog is changed by the backlog's own command: its priority turned, or archived.
+            const changeBacklogTask = async (colleague: Colleague, args: string[]) => {
+                try {
+                    await changeBacklog($, args);
+                } catch (error) {
+                    await update($, board, current => ({ ...current, error: error instanceof Error ? error.message : String(error) }));
+                    return;
+                }
+
+                await update($, view, current => ({ ...current, openTask: args[0] === "archive" ? undefined : current.openTask }));
+                await safeRefresh($);
+                if ((await read($, view)).selected === colleague.id) {
+                    await readCard($, colleague.id);
+                }
+            };
             // Every open task with an id, by who holds it: what a task waits for is found there, without asking anyone.
             const openIds = openIdsOf(latest.tasks, latest.backlog);
             const taskRow = (prefix: string, index: number, task: Task, colleague: Colleague, face: JSX.Element | null) => {
@@ -787,7 +804,13 @@ export const register: Register = (on, options) => {
                 // The tasks it still waits for, from their ids: who holds them, in place of its age.
                 const blockers = blockersOf(task, openIds);
                 const waits = blockers.length ? say.waitsFor(listNames([...new Set(blockers.map(blocker => byId.get(blocker.colleague)?.name ?? blocker.colleague))], say.and, say.comma)) : "";
-                const facts = [face ? colleague.fullName : "", task.priority ?? "", task.id ?? "", task.date ? `${task.date} (${days})` : "", effort ? say.effort(effort) : ""].filter(Boolean).join(" · ");
+                const priorityName = task.priority ? `${task.priority} ${say.priorityNames[task.priority as "P1"] ?? ""}`.trim() : "";
+                const facts = [face ? colleague.fullName : "", priorityName, task.id ?? "", task.date ? `${task.date} (${days})` : "", effort ? say.effort(effort) : ""].filter(Boolean).join(" · ");
+                // A task of the project's backlog, not a line of the todo: the backlog's command changes it, and ▶ names its number.
+                const backlogId = line && latest.fromBacklog?.includes(`${colleague.id}:${line}`) ? task.id : undefined;
+                const startText = task.id && isBacklogId(task.id) ? `${task.id} · ${task.text}` : task.text;
+                const cycle = (current: string) => (backlogId ? changeBacklogTask(colleague, ["set", backlogId, "--p", nextPriorities[task.priority ?? ""] ?? "P1"]) : cyclePriority(colleague, current));
+                const remove = (current: string) => (backlogId ? changeBacklogTask(colleague, ["archive", backlogId]) : removeTask(colleague, current));
                 return (
                     <Box key={`${prefix}-${index}`} flexDirection="column" borderStyle="round" {...border} paddingX={1} {...(isDesktop ? tinted() : {})}>
                         <Box flexDirection="row" flexWrap="nowrap" gap={1} alignItems="center">
@@ -798,14 +821,14 @@ export const register: Register = (on, options) => {
                                     <Box key={`${prefix}-priority-${index}`} flexShrink={0}>
                                         {task.priority ? priorityMark(`priority-${index}`, task.priority) : <Text dimColor>○</Text>}
                                         <Box position="absolute" top={0} left={0}>
-                                            <Button key={`${prefix}-cycle-${index}`} label={" "} plain onPress={() => cyclePriority(colleague, line)} />
+                                            <Button key={`${prefix}-cycle-${index}`} label={" "} plain onPress={() => cycle(line)} />
                                         </Box>
                                     </Box>
                                 )
                                 : null}
                             <Box flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
                                 <Button key={`${prefix}-open-${index}`} plain onPress={toggleTask}>
-                                    <Text wrap="truncate-end">{`${isOpen ? "▾" : "▸"} ${text}`}</Text>
+                                    <Text wrap="truncate-end">{`${isOpen ? "▾" : "▸"} ${task.id && isBacklogId(task.id) ? `${task.id} · ` : ""}${text}`}</Text>
                                 </Button>
                             </Box>
                             {waits
@@ -816,9 +839,9 @@ export const register: Register = (on, options) => {
                             {effortCell(`${prefix}-effort-${index}`, effort)}
                             {!isFree(colleague)
                                 ? null
-                                : isStarting(`${colleague.id}:${task.text}`, [colleague.id])
+                                : isStarting(`${colleague.id}:${startText}`, [colleague.id])
                                 ? <Box key={`${prefix}-starting-${index}`} flexShrink={0}><Text dimColor wrap="truncate">{`⏳ ${say.starting}`}</Text></Box>
-                                : <Button key={`${prefix}-start-${index}`} label="▶" plain dimColor onPress={() => startTask(colleague, task.text)} />}
+                                : <Button key={`${prefix}-start-${index}`} label="▶" plain dimColor onPress={() => startTask(colleague, startText)} />}
                         </Box>
                         {isOpen
                             ? (
@@ -830,7 +853,7 @@ export const register: Register = (on, options) => {
                                         : null}
                                     {line
                                         ? (
-                                            <Button key={`${prefix}-remove-${index}`} plain onPress={() => removeTask(colleague, line)}>
+                                            <Button key={`${prefix}-remove-${index}`} plain onPress={() => remove(line)}>
                                                 <Text color={errorColor}>{`✕ ${say.removeTask}`}</Text>
                                             </Button>
                                         )
@@ -1477,16 +1500,38 @@ async function refresh($: EngineInterface): Promise<void>
         }
     }
 
+    // The tasks of the project's backlog a colleague holds join their open tasks, written as todo lines, and count as theirs.
+    const backlog = await projectBacklog($, root);
+    const fromBacklog: string[] = [];
+
+    for (const [id, lines] of backlogLinesOf(backlog ?? [], loaded, tasks)) {
+        const group = tasks.find(one => one.colleague === id);
+
+        if (group) {
+            group.lines.push(...lines);
+        } else {
+            tasks.push({ colleague: id, lines });
+        }
+
+        fromBacklog.push(...lines.map(line => `${id}:${line}`));
+        const holder = loaded.findIndex(one => one.id === id);
+        const colleague = loaded[holder];
+
+        if (colleague) {
+            loaded[holder] = { ...colleague, openTasks: colleague.openTasks + lines.length };
+        }
+    }
+
     const hasCommands = (await $.command.list()).some(info => info.plugin === "crew" || info.name.startsWith("crew:"));
     const sortedTasks = tasks.sort((first, second) => second.lines.length - first.lines.length || first.colleague.localeCompare(second.colleague));
-    const backlog = await projectBacklog($, root, sortedTasks);
     const previous = await read($, board);
 
     // Every write redraws the panel, and a click that lands on a drawing already replaced is lost: write only what changed.
     if (previous.hasCommands !== hasCommands || previous.error || JSON.stringify(previous.tasks) !== JSON.stringify(sortedTasks) || JSON.stringify(previous.heavy ?? []) !== JSON.stringify(heavy)
-        || JSON.stringify(previous.longMemories ?? []) !== JSON.stringify(longMemories) || JSON.stringify(previous.backlog) !== JSON.stringify(backlog)) {
+        || JSON.stringify(previous.longMemories ?? []) !== JSON.stringify(longMemories) || JSON.stringify(previous.backlog) !== JSON.stringify(backlog)
+        || JSON.stringify(previous.fromBacklog ?? []) !== JSON.stringify(fromBacklog)) {
         const checkedAt = await $.clock.now();
-        await update($, board, current => ({ ...current, hasCommands, tasks: sortedTasks, heavy, longMemories, backlog, error: undefined, checkedAt }));
+        await update($, board, current => ({ ...current, hasCommands, tasks: sortedTasks, heavy, longMemories, backlog, fromBacklog, error: undefined, checkedAt }));
     }
 
     const signature = [...kept, ...small].map(([id, uri]) => `${id}:${uri.length}`).join("|");
@@ -1534,21 +1579,12 @@ async function filesIn($: EngineInterface, folder: string): Promise<Map<string, 
     return files;
 }
 
-// The open tasks of the project's backlog, asked of the project plugin's own command when a todo line names one (T-61) and the plugin
-// is installed; asked again only when a file of the project's docs changes. Undefined without them: the todo lines say what is open.
-async function projectBacklog($: EngineInterface, root: string, tasks: { colleague: string; lines: string[] }[]): Promise<BacklogTask[] | undefined>
+// The open tasks of the project's backlog, asked of the project plugin's own command when the project has one and the plugin is
+// installed; asked again only when a file of the project's docs changes. Undefined without them: the todo lines say what is open.
+async function projectBacklog($: EngineInterface, root: string): Promise<BacklogTask[] | undefined>
 {
-    const isNamed = tasks.some(group => group.lines.some(line => {
-        const task = todoTask("", line);
-        return [task.id ?? "", ...(task.after ?? [])].some(isBacklogId);
-    }));
     const configPath = `${root}/.claude/project.yaml`;
-
-    if (!isNamed || !(await $.fs.exists(configPath))) {
-        return undefined;
-    }
-
-    const script = await backlogScript($);
+    const script = (await $.fs.exists(configPath)) ? await backlogScript($) : undefined;
 
     if (!script) {
         return undefined;
@@ -1565,7 +1601,8 @@ async function projectBacklog($: EngineInterface, root: string, tasks: { colleag
         let open: BacklogTask[] | undefined;
 
         try {
-            open = listed?.exitCode === 0 ? (JSON.parse(listed.stdout) as { id: number | string; to?: string }[]).map(task => ({ id: `${prefix}-${task.id}`, to: task.to ?? "" })) : undefined;
+            const listedTasks = listed?.exitCode === 0 ? (JSON.parse(listed.stdout) as { id: number | string; to?: string; priority?: string; created?: string; text?: string; after?: string[] }[]) : undefined;
+            open = listedTasks?.map(task => ({ id: `${prefix}-${task.id}`, to: task.to ?? "", priority: task.priority, date: task.created, text: task.text, after: task.after }));
         } catch {
             open = undefined;
         }
@@ -1574,6 +1611,24 @@ async function projectBacklog($: EngineInterface, root: string, tasks: { colleag
     }
 
     return backlogRead.tasks;
+}
+
+// A change to a task of the project's backlog, by the project plugin's own command (`set T-61 --p P2`, `archive T-61`); read again after.
+async function changeBacklog($: EngineInterface, args: string[]): Promise<void>
+{
+    const script = await backlogScript($);
+
+    if (!script) {
+        return;
+    }
+
+    const root = await projectRoot($);
+    const changed = await $.process.run(["node", script, ...args], { cwd: root, env: { CLAUDE_PROJECT_DIR: root }, timeoutMs: 30_000 });
+    backlogRead = undefined;
+
+    if (changed.exitCode !== 0) {
+        throw new Error(`The project plugin's backlog refused ${args.join(" ")}: ${changed.stderr.trim() || changed.stdout.trim()}`);
+    }
 }
 
 // The project plugin's backlog command, where Claude Code installed it.
@@ -2066,7 +2121,10 @@ async function readCard($: EngineInterface, id: string): Promise<void>
 {
     const root = await projectRoot($);
     const text = async (path: string) => ((await $.fs.exists(path)) ? await $.fs.read(path) : "");
-    const loaded = cardFrom(id, await text(`${root}/.claude/agents/${id}.md`), await text(`${root}/.claude/agent-memory/${id}/todo.md`), await text(`${root}/.claude/agent-memory/${id}/MEMORY.md`));
+    const todoCard = cardFrom(id, await text(`${root}/.claude/agents/${id}.md`), await text(`${root}/.claude/agent-memory/${id}/todo.md`), await text(`${root}/.claude/agent-memory/${id}/MEMORY.md`));
+    // With the backlog's tasks they hold, as the board has them.
+    const held = ((await read($, board)).fromBacklog ?? []).filter(key => key.startsWith(`${id}:`)).map(key => key.slice(id.length + 1));
+    const loaded = { ...todoCard, openTasks: [...todoCard.openTasks, ...held] };
     // The round reports are named by their date first: the newest is the latest date's last written, a copy (-2) after its first.
     const notes = `${root}/.claude/agent-memory/${id}/notes`;
     const reports = (await $.fs.exists(notes)) ? (await $.fs.list(notes)).filter(entry => entry.kind === "file" && /^\d{4}-\d{2}-\d{2}-.*\.md$/.test(entry.name)) : [];

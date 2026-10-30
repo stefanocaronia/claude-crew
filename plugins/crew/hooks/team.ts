@@ -296,8 +296,31 @@ export function openIdsOf(tasks: { colleague: string; lines: string[] }[], backl
     return open;
 }
 
-/** An open task of the project's backlog, the project plugin's: its number (`T-61`) and who holds it, a colleague's first name or a person. */
-export type BacklogTask = { id: string; to: string };
+/** An open task of the project's backlog, the project plugin's: its number (`T-61`), who holds it (a colleague's first name or a
+ * person), and what a todo line says of a task. */
+export type BacklogTask = { id: string; to: string; priority?: string; date?: string; text?: string; after?: string[] };
+
+/** The backlog's tasks each colleague holds, by their first name, written as todo lines (`P1 · 2026-10-28 · T-61 · the board
+ * (after: T-62)`), by colleague id; a task some todo line already carries (its id `T-61`) is that line, and is left out. */
+export function backlogLinesOf(backlog: BacklogTask[], team: { id: string; name: string }[], tasks: { colleague: string; lines: string[] }[]): Map<string, string[]>
+{
+    const carried = new Set(tasks.flatMap(group => group.lines.map(line => taskOf("", line).id ?? "")));
+    const lines = new Map<string, string[]>();
+
+    for (const task of backlog) {
+        const holder = team.find(colleague => colleague.name.toLowerCase() === task.to.toLowerCase());
+
+        if (!holder || carried.has(task.id)) {
+            continue;
+        }
+
+        const head = [task.priority && /^P[1-3]$/.test(task.priority) ? task.priority : "", task.date ?? "", task.id].filter(Boolean).join(" · ");
+        const after = task.after?.length ? ` (after: ${task.after.join(", ")})` : "";
+        lines.set(holder.id, [...(lines.get(holder.id) ?? []), `${head} · ${task.text ?? ""}${after}`]);
+    }
+
+    return lines;
+}
 
 /** Whether an id names a task of the project's backlog, `T-61`, rather than a todo line, `#matteo-3`. */
 export function isBacklogId(id: string): boolean

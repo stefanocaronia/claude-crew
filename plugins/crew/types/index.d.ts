@@ -83,9 +83,12 @@ export type Board = {
     heavy?: string[];
     /** The colleagues whose MEMORY.md is past what it may hold, by id: Tidy compacts it. */
     longMemories?: string[];
-    /** The open tasks of the project's backlog (the project plugin's), by number with who holds each, when a todo line names one:
-     * a task that waits for `T-62` is blocked while it is open there. */
-    backlog?: { id: string; to: string }[];
+    /** The open tasks of the project's backlog (the project plugin's), by number with who holds each: a task that waits for `T-62` is
+     * blocked while it is open there. */
+    backlog?: { id: string; to: string; priority?: string; date?: string; text?: string; after?: string[] }[];
+    /** The lines of `tasks` that are backlog tasks a colleague holds, not lines of their todo, as "<colleague id>:<line>": the backlog's
+     * own commands change them. */
+    fromBacklog?: string[];
     /** Why the last reading of the team failed, shown in the panel. */
     error?: string;
     checkedAt: number;

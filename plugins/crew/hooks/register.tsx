@@ -72,7 +72,7 @@ const outline = "#8080803d";
 const stateLayer = "#80808014";
 // A card's faint background in its color, stronger under the pointer; picked, as strong as it gets. Without a color, the state layer alone.
 const tinted = (color?: string, isPicked = false) =>
-    color ? { backgroundColor: tintOf(color, isPicked ? "1f" : "0a"), hover: { backgroundColor: tintOf(color, isPicked ? "1f" : "14") } } : { hover: { backgroundColor: stateLayer } };
+    color ? { backgroundColor: tintOf(color, isPicked ? "1f" : "05"), hover: { backgroundColor: tintOf(color, isPicked ? "1f" : "0a") } } : { hover: { backgroundColor: stateLayer } };
 // The name 2 px larger than the panel's text (13 px), and larger still in a colleague's own card.
 const nameSize = 15;
 const cardNameSize = 18;

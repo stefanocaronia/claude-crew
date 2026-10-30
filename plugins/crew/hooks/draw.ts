@@ -90,7 +90,7 @@ export function prioritySvg(priority: string): string | undefined
     return mark ? `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14">${mark}</svg>` : undefined;
 }
 
-/** A color as a faint background, readable in either theme: a card's own at `alpha` 0a, under the pointer 14, picked 1f. */
+/** A color as a faint background, readable in either theme: a card's own at `alpha` 05, under the pointer 0a, picked 1f. */
 export function tintOf(color: string, alpha = "1f"): string
 {
     const tint = tints[color.toLowerCase()]?.[1] ?? (/^#[0-9a-f]{6}$/i.test(color) ? color : "#808080");

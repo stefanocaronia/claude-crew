@@ -2,7 +2,7 @@
 
 What changes for whoever uses Crew, version by version. Plugins update in a new chat: `/plugin`, Marketplaces, claude-crew, Update marketplace, or turn its auto-update on there.
 
-## 0.12.0 – 0.12.3
+## 0.12.0 – 0.12.4
 
 - Cards carry a faint background: a colleague's in their color, a task's in its priority's, a little stronger under the pointer; a picked colleague's stronger still.
 - Tasks can wait for other tasks, written in their own lines when they are written: the task waited for has an id after its date (`- [ ] P1 · 2026-10-28 · #matteo-3 · correct lootNote`), the waiting one ends with `(after: #matteo-3)`. A colleague who finds that their task needs another's work gives that task an id, or writes it in the other's todo `(for <name>)`. The panel reads the dependencies from the lines: a blocked task shows a chain mark and who it waits for, and the dashboard counts the blocked tasks. `/crew:next` and ▶ on a blocked task show the whole chain and ask once, then start each link when the one before is done. Tidying never archives a task others wait for.

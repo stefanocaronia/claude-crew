@@ -1579,8 +1579,9 @@ async function filesIn($: EngineInterface, folder: string): Promise<Map<string, 
     return files;
 }
 
-// The open tasks of the project's backlog, asked of the project plugin's own command when the project has one and the plugin is
-// installed; asked again only when a file of the project's docs changes. Undefined without them: the todo lines say what is open.
+// The open tasks of the project's backlog done in one go, its parts and never the task they make up, asked of the project plugin's
+// own command when the project has one and the plugin is installed; asked again only when a file of the project's docs changes.
+// Undefined without them: the todo lines say what is open.
 async function projectBacklog($: EngineInterface, root: string): Promise<BacklogTask[] | undefined>
 {
     const configPath = `${root}/.claude/project.yaml`;
@@ -1597,7 +1598,7 @@ async function projectBacklog($: EngineInterface, root: string): Promise<Backlog
     const signature = [script, prefix, ...[...stamps].map(([name, file]) => `${name}:${file.mtimeMs}:${file.size}`)].join("|");
 
     if (backlogRead?.signature !== signature) {
-        const listed = await $.process.run(["node", script, "list", "--json"], { cwd: root, env: { CLAUDE_PROJECT_DIR: root }, timeoutMs: 30_000 }).catch(() => undefined);
+        const listed = await $.process.run(["node", script, "list", "--atomic", "--json"], { cwd: root, env: { CLAUDE_PROJECT_DIR: root }, timeoutMs: 30_000 }).catch(() => undefined);
         let open: BacklogTask[] | undefined;
 
         try {

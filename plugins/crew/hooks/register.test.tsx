@@ -582,7 +582,7 @@ test("a task that waits for a task of the project's backlog (T-62) shows who hol
     const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
     await ui.press({ key: "backlog-toggle" });
     expect(await ui.find({ type: "Text", text: "⛓︎ waits for Claude" })).toBeDefined();
-    expect(asked.at(-1)).toEqual(["node", "C:/plugins/project/scripts/backlog.mjs", "list", "--json"]);
+    expect(asked.at(-1)).toEqual(["node", "C:/plugins/project/scripts/backlog.mjs", "list", "--atomic", "--json"]);
     await ui.unmount();
     // The backlog is asked again only once its files change; T-62 done, Sara's task is free.
     const count = asked.length;

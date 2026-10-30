@@ -7,7 +7,7 @@ import type { EngineInterface, Register } from "claude-code";
 import type { Activity, Colleague, Meeting, Permissions, Preferences, Run, Speaker, WeeklyCounts } from "../types";
 import type { Task } from "./team.ts";
 
-import { avatarSvg, barEndSvg, blankSvg, checkboxSvg, captionSvg, claudeSvg, effortSvg, iconSvg, nameSvg, prioritySvg, thumbnailSvg, tintOf, wideBarSvg } from "./draw.ts";
+import { avatarSvg, barEndSvg, blankSvg, checkboxSvg, pickedTint, captionSvg, claudeSvg, effortSvg, iconSvg, nameSvg, prioritySvg, thumbnailSvg, wideBarSvg } from "./draw.ts";
 import { claudeId, segmentsOf, speakersOf } from "./meeting.ts";
 import { imagePathsIn, imageTypeOf, isInside, isOwnMemory, resolvedPath } from "./paths.ts";
 import { contextShare, progressOf, withCount } from "./progress.ts";
@@ -70,9 +70,9 @@ const weekColor = "#8A63C9";
 const blockedColor = "#C9A227";
 const outline = "#8080803d";
 const stateLayer = "#80808014";
-// A card's faint background in its color, stronger under the pointer; picked, as strong as it gets. Without a color, the state layer alone.
-const tinted = (color?: string, isPicked = false) =>
-    color ? { backgroundColor: tintOf(color, isPicked ? "1f" : "05"), hover: { backgroundColor: tintOf(color, isPicked ? "1f" : "0a") } } : { hover: { backgroundColor: stateLayer } };
+// Every card's faint gray, the same for all, and the state layer under the pointer; a picked colleague's in their color.
+const cardTint = "#80808003";
+const tinted = (picked?: string) => (picked ? { backgroundColor: pickedTint(picked), hover: { backgroundColor: pickedTint(picked) } } : { backgroundColor: cardTint, hover: { backgroundColor: stateLayer } });
 // The name 2 px larger than the panel's text (13 px), and larger still in a colleague's own card.
 const nameSize = 15;
 const cardNameSize = 18;
@@ -607,9 +607,9 @@ export const register: Register = (on, options) => {
             const about = (colleague: Colleague) => say.toDo(colleague.openTasks);
             // Each colleague in an outlined card, the portrait at its top left; the cards make a grid that takes a second column when the
             // pane is wide.
-            // A card is faintly tinted in the colleague's color, more under the pointer, more still once picked.
+            // A card is faintly gray, tinted in the colleague's color once picked.
             const colleagueCard = (key: string, children: (JSX.Element | null)[], color: string, isPicked = false) => (
-                <Box key={key} flexDirection="row" flexWrap="nowrap" gap={1} alignItems="flex-start" flexGrow={1} flexShrink={1} width={cardWidth} overflow="hidden" borderStyle="round" {...border} paddingX={1} {...(isDesktop ? tinted(color, isPicked) : {})}>
+                <Box key={key} flexDirection="row" flexWrap="nowrap" gap={1} alignItems="flex-start" flexGrow={1} flexShrink={1} width={cardWidth} overflow="hidden" borderStyle="round" {...border} paddingX={1} {...(isDesktop ? tinted(isPicked ? color : undefined) : {})}>
                     {children}
                 </Box>
             );
@@ -787,7 +787,7 @@ export const register: Register = (on, options) => {
                 const waits = blockers.length ? say.waitsFor(listNames([...new Set(blockers.map(blocker => byId.get(blocker.colleague)?.name ?? blocker.colleague))], say.and, say.comma)) : "";
                 const facts = [face ? colleague.fullName : "", task.priority ?? "", task.id ?? "", task.date ? `${task.date} (${days})` : "", effort ? say.effort(effort) : ""].filter(Boolean).join(" · ");
                 return (
-                    <Box key={`${prefix}-${index}`} flexDirection="column" borderStyle="round" {...border} paddingX={1} {...(isDesktop ? tinted(priorityGlyphs[task.priority ?? ""]?.color) : {})}>
+                    <Box key={`${prefix}-${index}`} flexDirection="column" borderStyle="round" {...border} paddingX={1} {...(isDesktop ? tinted() : {})}>
                         <Box flexDirection="row" flexWrap="nowrap" gap={1} alignItems="center">
                             {face}
                             {line
@@ -1018,7 +1018,7 @@ export const register: Register = (on, options) => {
                     </Box>,
                 ], colleague.color);
             };
-            // A free colleague's card, tinted more in their color once picked.
+            // A free colleague's card, tinted in their color once picked.
             const teamRow = (colleague: Colleague, canPick = true) => colleagueCard(`idle-${colleague.id}`, [
                 face(colleague, 40, true),
                 <Box key={`lines-${colleague.id}`} flexDirection="column" flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">

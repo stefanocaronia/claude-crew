@@ -215,7 +215,7 @@ test("under the team: the backlog, each task with who holds it and its effort; t
         await ui.press({ key: "pick-sara-lombardi" });
         await ui.press({ key: "pick-matteo-conti" });
         expect((await ui.find({ key: "act-meeting" }))?.props.label).toBe("☰ Meeting with Sara and Matteo");
-        // A press on a free colleague's lines picks them, and tints their card more; the terminal checks their box.
+        // A press on a free colleague's lines picks them, and tints their card in their color; the terminal checks their box.
         const isPicked = async (id: string) => (surface === "desktop" ? String((await ui.find({ key: `idle-${id}` }))?.props.backgroundColor).endsWith("1f") : (await ui.find({ key: `pick-${id}` }))?.props.label !== "☐");
         expect(await isPicked("sara-lombardi")).toBe(true);
         expect(await ui.find({ key: "act-hire" })).toBeUndefined();
@@ -224,7 +224,7 @@ test("under the team: the backlog, each task with who holds it and its effort; t
         for (const [key, command] of [["act-round", "/crew:review Sara Matteo"], ["act-fire", "/crew:fire Sara Matteo"], ["act-portraits", "/crew:portraits Sara Matteo"], ["act-meeting", "/crew:meeting Sara Matteo"]] as const) {
             await ui.press({ key });
             expect(sent.at(-1)).toBe(command);
-            // Unpicked, the card keeps only its faint tint.
+            // Unpicked, the card is faintly gray again.
             expect(await isPicked("sara-lombardi")).toBe(false);
             await ui.press({ key: "pick-sara-lombardi" });
             await ui.press({ key: "pick-matteo-conti" });

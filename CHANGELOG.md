@@ -2,6 +2,11 @@
 
 What changes for whoever uses Crew, version by version. Plugins update in a new chat: `/plugin`, Marketplaces, claude-crew, Update marketplace, or turn its auto-update on there.
 
+## 0.13.1
+
+- A backlog task of type `test`, a test or a playtest, is drawn as the project plugin draws it: a white flask on orange.
+- A backlog task's details name the project's specifications it does («does S-12»), from its `see`, where the project keeps specifications (the project plugin's SPECS.md). Real work given to a colleague cites the spec it does (`add … --see S-12`, its number found with `specs.mjs find`), and a review round checks the work against the specs the reviewed tasks cite.
+
 ## 0.13.0
 
 - Remove asks first: the first press says «Remove? Press again» («Archive T-61? Press again» for a backlog task), and only a second press within four seconds removes it, as in the project plugin's panel.

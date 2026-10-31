@@ -869,6 +869,7 @@ export const register: Register = (on, options) => {
                     listed?.by && task.date ? say.createdBy(listed.by, born) : born,
                     listed?.due ? (isDueNear && dueDays !== undefined ? `${say.dueOn(listed.due)} (${say.due(dueDays)})` : say.dueOn(listed.due)) : "",
                     isInProgress && listed?.started ? say.inProgress(listed.started, isStalled) : "",
+                    listed?.specs?.length ? say.does(listed.specs.join(say.comma)) : "",
                     effort ? say.effort(effort) : "",
                 ].filter(Boolean).join(" · ");
                 // A task of the project's backlog, not a line of the todo: the backlog's command changes it, and ▶ names its number.
@@ -1708,18 +1709,22 @@ async function projectBacklog($: EngineInterface, root: string): Promise<Backlog
 
     const config = await $.fs.read(configPath).catch(() => "");
     const docs = /^docs:\s*["']?([^\s"'#]+)/m.exec(config)?.[1] ?? "project";
-    const prefix = /\btask:\s*["']?([A-Z]+)/.exec(/^prefixes:.*(?:\n[ \t].*)*/m.exec(config)?.[0] ?? "")?.[1] ?? "T";
+    const prefixes = /^prefixes:.*(?:\n[ \t].*)*/m.exec(config)?.[0] ?? "";
+    const prefix = /\btask:\s*["']?([A-Z]+)/.exec(prefixes)?.[1] ?? "T";
+    // The specifications a task does are the ids of its `see` with their prefix, where the project keeps them.
+    const specPrefix = /\bspec:\s*["']?([A-Z]+)/.exec(prefixes)?.[1] ?? "S";
     const stamps = await filesIn($, `${root}/${docs}`).catch(() => new Map<string, FileStamp>());
-    const signature = [script, prefix, ...[...stamps].map(([name, file]) => `${name}:${file.mtimeMs}:${file.size}`)].join("|");
+    const signature = [script, prefix, specPrefix, ...[...stamps].map(([name, file]) => `${name}:${file.mtimeMs}:${file.size}`)].join("|");
 
     if (backlogRead?.signature !== signature) {
         const listed = await $.process.run(["node", script, "list", "--atomic", "--json"], { cwd: root, env: { CLAUDE_PROJECT_DIR: root }, timeoutMs: 30_000 }).catch(() => undefined);
         let open: BacklogTask[] | undefined;
 
         try {
-            type Listed = { id: number | string; to?: string; priority?: string; created?: string; text?: string; after?: string[]; type?: string | null; due?: string | null; by?: string | null; started?: string | null; state?: string };
+            type Listed = { id: number | string; to?: string; priority?: string; created?: string; text?: string; after?: string[]; type?: string | null; due?: string | null; by?: string | null; started?: string | null; state?: string; see?: string[] };
             const listedTasks = listed?.exitCode === 0 ? (JSON.parse(listed.stdout) as Listed[]) : undefined;
             open = listedTasks?.map(task => ({
+                ...specsOf(task.see ?? [], specPrefix),
                 id: `${prefix}-${task.id}`,
                 to: task.to ?? "",
                 priority: task.priority,
@@ -1740,6 +1745,13 @@ async function projectBacklog($: EngineInterface, root: string): Promise<Backlog
     }
 
     return backlogRead.tasks;
+}
+
+// The specifications among a task's `see`, by their prefix: `{ specs: ["S-12"] }`, or nothing when it cites none.
+function specsOf(see: string[], prefix: string): { specs?: string[] }
+{
+    const specs = see.filter(id => id.startsWith(`${prefix}-`));
+    return specs.length ? { specs } : {};
 }
 
 // A change to a task of the project's backlog, by the project plugin's own command (`set T-61 --p P2`, `archive T-61`); read again after.

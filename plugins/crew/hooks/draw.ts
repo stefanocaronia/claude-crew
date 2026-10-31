@@ -91,7 +91,7 @@ export function prioritySvg(priority: string): string | undefined
 }
 
 /** A task's type as Jira draws an issue type, as the project plugin's panel does: a rounded square in its color with a white sign,
- * a bug a dot, a feature a bookmark, a chore a tick, a research a lens; a type of the project's own its first letter. */
+ * a bug a dot, a feature a bookmark, a chore a tick, a research a lens, a test a flask; a type of the project's own its first letter. */
 export function typeSvg(type: string): string
 {
     const signs: Record<string, string> = {
@@ -99,15 +99,16 @@ export function typeSvg(type: string): string
         feature: `<path d="M4.5 3.5h5v7L7 8.6 4.5 10.5z" fill="#ffffff"/>`,
         chore: `<path d="M4 7.2l2 2 4-4.4" fill="none" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>`,
         research: `<circle cx="6.3" cy="6.3" r="2.4" fill="none" stroke="#ffffff" stroke-width="1.5"/><path d="M8.1 8.1l2.2 2.2" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round"/>`,
+        test: `<path d="M5.4 3.2h3.2M6 3.2v2.9L3.7 10.2a.7.7 0 0 0 .6 1h5.4a.7.7 0 0 0 .6-1L8 6.1V3.2" fill="none" stroke="#ffffff" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>`,
     };
     const sign = signs[type] ?? `<text x="7" y="10" text-anchor="middle" font-family="${font}" font-size="8" font-weight="700" fill="#ffffff">${xml(type.slice(0, 1).toUpperCase())}</text>`;
     return `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14"><rect x="0.5" y="0.5" width="13" height="13" rx="3" fill="${typeColor(type)}"/>${sign}</svg>`;
 }
 
-/** A task type's color, as Jira's issue types: a bug red, a feature green, a chore blue, a research purple; others gray. */
+/** A task type's color, as Jira's issue types: a bug red, a feature green, a chore blue, a research purple, a test orange; others gray. */
 export function typeColor(type: string): string
 {
-    return ({ bug: "#E5493A", feature: "#36B37E", chore: "#4C9AFF", research: "#8777D9" } as Record<string, string>)[type] ?? "#8993A4";
+    return ({ bug: "#E5493A", feature: "#36B37E", chore: "#4C9AFF", research: "#8777D9", test: "#E2852B" } as Record<string, string>)[type] ?? "#8993A4";
 }
 
 /** A colleague's color as a faint background, for a card that is picked: its light tint at a tenth, readable in either theme. */

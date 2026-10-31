@@ -313,6 +313,8 @@ export type BacklogTask = {
     by?: string;
     started?: string;
     state?: string;
+    /** The project's specifications it does, by number (`S-12`), from its `see`. */
+    specs?: string[];
 };
 
 /** The backlog's tasks each colleague holds, by their first name, written as todo lines (`P1 · 2026-10-28 · T-61 · the board

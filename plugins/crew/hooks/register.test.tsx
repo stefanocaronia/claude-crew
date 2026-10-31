@@ -630,7 +630,7 @@ test("a colleague's tasks of the project's backlog are theirs: counted once, sho
         asked.push([...e.argv]);
         const open = [
             { id: 61, to: "Sara", priority: "P1", created: "2026-10-08", text: "the board", after: [] },
-            { id: 70, to: "Sara", priority: "P2", created: "2026-10-09", text: "the guide", after: [], type: "bug", due: "2026-10-12", by: "Stefano", started: null, state: "todo" },
+            { id: 70, to: "Sara", priority: "P2", created: "2026-10-09", text: "the guide", after: [], type: "bug", due: "2026-10-12", by: "Stefano", started: null, state: "todo", see: ["S-12", "D-3"] },
         ];
         return { value: { exitCode: 0, stdout: e.argv.includes("list") ? JSON.stringify(open) : "", stderr: "" } } as never;
     });
@@ -658,7 +658,7 @@ test("a colleague's tasks of the project's backlog are theirs: counted once, sho
     await ui.press({ key: "backlog-cycle-1" });
     expect(asked).toContainEqual(["node", "/plugins/project/scripts/backlog.mjs", "set", "T-70", "--p", "P3"]);
     await ui.press({ key: "backlog-open-1" });
-    expect(await ui.find({ type: "Text", text: /created by Stefano on 2026-10-09/ })).toBeDefined();
+    expect(await ui.find({ type: "Text", text: /created by Stefano on 2026-10-09.* · does S-12($| · )/ })).toBeDefined();
     await ui.press({ key: "backlog-edit-text-1" });
     await ui.input({ key: "backlog-edit-1", text: "the whole guide" });
     expect(asked).toContainEqual(["node", "/plugins/project/scripts/backlog.mjs", "set", "T-70", "--text", "the whole guide"]);

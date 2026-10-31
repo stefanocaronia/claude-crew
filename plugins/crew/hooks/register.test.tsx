@@ -622,7 +622,7 @@ test("a task that waits for a task of the project's backlog (T-62) shows who hol
     await after.unmount();
 });
 
-test("a colleague's tasks of the project's backlog are theirs: counted once, shown with their number, started, turned and archived by the backlog's command", async ($, on) => {
+test("a colleague's tasks of the project's backlog are theirs: counted beside the todo lines that cite them, shown with their number, started, turned and archived by the backlog's command", async ($, on) => {
     const sent = world(on, []);
     const { files } = sent;
     const asked: string[][] = [];
@@ -639,36 +639,36 @@ test("a colleague's tasks of the project's backlog are theirs: counted once, sho
     files["/plugins/project/scripts/backlog.mjs"] = "";
     files["/p/.claude/project.yaml"] = "docs: project\npeople: [Claude, Stefano]\n";
     files["/p/project/TASKS.md"] = "- T-61\n- T-70";
-    // Sara's todo carries T-61: one task, her line.
-    files["/p/.claude/agent-memory/sara-lombardi/todo.md"] = "- [ ] P1 · 2026-10-07 · T-61 · her part of the board\n";
+    // Sara's todo cites T-61: her own reminder, beside the task.
+    files["/p/.claude/agent-memory/sara-lombardi/todo.md"] = "- [ ] P1 · 2026-10-07 · T-61 · retest once it is done\n";
     await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
     const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
-    expect(await ui.find({ type: "Text", text: "2 to do" })).toBeDefined();
+    expect(await ui.find({ type: "Text", text: "3 to do" })).toBeDefined();
     await ui.press({ key: "backlog-toggle" });
     // The number in its own color, beside the words; the type, and a due day near in place of the age.
     expect((await ui.find({ type: "Text", text: "T-61" }))?.props.color).toBe("#2E9AA6");
-    expect(await ui.find({ type: "Text", text: "▸ her part of the board" })).toBeDefined();
+    expect(await ui.find({ type: "Text", text: "▸ retest once it is done" })).toBeDefined();
     expect(await ui.find({ type: "Text", text: "▸ the guide" })).toBeDefined();
-    expect(await ui.find({ type: "Text", text: "▸ the board" })).toBeUndefined();
+    expect(await ui.find({ type: "Text", text: "▸ the board" })).toBeDefined();
     expect(await ui.find({ type: "Text", text: "bug" })).toBeDefined();
     expect(await ui.find({ type: "Text", text: "⏰ due in 2 d" })).toBeDefined();
-    await ui.press({ key: "backlog-start-1" });
+    await ui.press({ key: "backlog-start-2" });
     expect(sent.at(-1)).toBe("/crew:next Sara -- T-70 · the guide");
     // Its priority, its words and its removal go to the backlog's command; her own line stays in her todo.
-    await ui.press({ key: "backlog-cycle-1" });
+    await ui.press({ key: "backlog-cycle-2" });
     expect(asked).toContainEqual(["node", "/plugins/project/scripts/backlog.mjs", "set", "T-70", "--p", "P3"]);
-    await ui.press({ key: "backlog-open-1" });
+    await ui.press({ key: "backlog-open-2" });
     expect(await ui.find({ type: "Text", text: /created by Stefano on 2026-10-09.* · does S-12($| · )/ })).toBeDefined();
-    await ui.press({ key: "backlog-edit-text-1" });
-    await ui.input({ key: "backlog-edit-1", text: "the whole guide" });
+    await ui.press({ key: "backlog-edit-text-2" });
+    await ui.input({ key: "backlog-edit-2", text: "the whole guide" });
     expect(asked).toContainEqual(["node", "/plugins/project/scripts/backlog.mjs", "set", "T-70", "--text", "the whole guide"]);
-    await ui.press({ key: "backlog-open-1" });
-    await ui.press({ key: "backlog-remove-1" });
+    await ui.press({ key: "backlog-open-2" });
+    await ui.press({ key: "backlog-remove-2" });
     expect(await ui.find({ type: "Text", text: "✕ Archive T-70? Press again" })).toBeDefined();
     expect(asked).not.toContainEqual(["node", "/plugins/project/scripts/backlog.mjs", "archive", "T-70"]);
-    await ui.press({ key: "backlog-remove-1" });
+    await ui.press({ key: "backlog-remove-2" });
     expect(asked).toContainEqual(["node", "/plugins/project/scripts/backlog.mjs", "archive", "T-70"]);
-    expect(files["/p/.claude/agent-memory/sara-lombardi/todo.md"]).toBe("- [ ] P1 · 2026-10-07 · T-61 · her part of the board\n");
+    expect(files["/p/.claude/agent-memory/sara-lombardi/todo.md"]).toBe("- [ ] P1 · 2026-10-07 · T-61 · retest once it is done\n");
     // A new task in her card is the backlog's, held by her, created by the project's owner.
     await ui.press({ key: "open-sara-lombardi" });
     await ui.press({ key: "card-new-task" });

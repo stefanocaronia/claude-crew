@@ -82,17 +82,16 @@ describe("colleagues from their files", () => {
         assert.deepEqual(blockersOf(taskOf("elena", "run it (after: T-61, T-62)"), open), [{ id: "T-62", colleague: "Claude" }]);
     });
 
-    it("writes the backlog's tasks a colleague holds as their todo lines, leaving out those a line already carries and those of others", () => {
+    it("writes the backlog's tasks a colleague holds as their todo lines, leaving out those of others", () => {
         const team = [{ id: "matteo-conti", name: "Matteo" }, { id: "sara-lombardi", name: "Sara" }];
-        const todos = [{ colleague: "matteo-conti", lines: ["P1 · 2026-10-28 · T-61 · his part"] }];
         const backlog = [
             { id: "T-61", to: "Matteo", priority: "P1", date: "2026-10-27", text: "the board" },
             { id: "T-70", to: "matteo", priority: "P2", date: "2026-10-28", text: "the guide", after: ["T-62", "#giulia-1"] },
             { id: "T-71", to: "Claude", priority: "P1", date: "2026-10-28", text: "Claude's own" },
             { id: "T-72", to: "Sara", text: "no priority yet" },
         ];
-        assert.deepEqual([...backlogLinesOf(backlog, team, todos)], [
-            ["matteo-conti", ["P2 · 2026-10-28 · T-70 · the guide (after: T-62, #giulia-1)"]],
+        assert.deepEqual([...backlogLinesOf(backlog, team)], [
+            ["matteo-conti", ["P1 · 2026-10-27 · T-61 · the board", "P2 · 2026-10-28 · T-70 · the guide (after: T-62, #giulia-1)"]],
             ["sara-lombardi", ["T-72 · no priority yet"]],
         ]);
         assert.deepEqual(taskOf("matteo-conti", "P2 · 2026-10-28 · T-70 · the guide (after: T-62, #giulia-1)"), { colleague: "matteo-conti", text: "the guide", priority: "P2", date: "2026-10-28", id: "T-70", after: ["T-62", "#giulia-1"] });

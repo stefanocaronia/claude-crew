@@ -2,6 +2,10 @@
 
 What changes for whoever uses Crew, version by version. Plugins update in a new chat: `/plugin`, Marketplaces, claude-crew, Update marketplace, or turn its auto-update on there.
 
+## 0.13.2
+
+- Where the project keeps a backlog (the project plugin's), a colleague's todo is their own notebook: reminders, retests, checks, things to tell. A colleague proposes work for the project in their report, and Claude adds it to the backlog `--by` that colleague, `--to` whoever's field it is in, or Claude; only Claude and the user open and assign backlog tasks. A todo line with `T-61` in the id's place cites that task, it is no longer the task: the panel shows the task beside the line, and a line citing a task in another colleague's todo no longer hides it. Tidying a todo only cleans it.
+
 ## 0.13.1
 
 - A backlog task of type `test`, a test or a playtest, is drawn as the project plugin draws it: a white flask on orange.

@@ -1620,7 +1620,7 @@ async function refresh($: EngineInterface): Promise<void>
     const backlog = await projectBacklog($, root);
     const fromBacklog: string[] = [];
 
-    for (const [id, lines] of backlogLinesOf(backlog ?? [], loaded, tasks)) {
+    for (const [id, lines] of backlogLinesOf(backlog ?? [], loaded)) {
         const group = tasks.find(one => one.colleague === id);
 
         if (group) {

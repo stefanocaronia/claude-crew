@@ -318,16 +318,16 @@ export type BacklogTask = {
 };
 
 /** The backlog's tasks each colleague holds, by their first name, written as todo lines (`P1 · 2026-10-28 · T-61 · the board
- * (after: T-62)`), by colleague id; a task some todo line already carries (its id `T-61`) is that line, and is left out. */
-export function backlogLinesOf(backlog: BacklogTask[], team: { id: string; name: string }[], tasks: { colleague: string; lines: string[] }[]): Map<string, string[]>
+ * (after: T-62)`), by colleague id. A todo line that cites a task (`T-61 · retest once it is done`) is its colleague's own reminder,
+ * never the task: the task shows all the same. */
+export function backlogLinesOf(backlog: BacklogTask[], team: { id: string; name: string }[]): Map<string, string[]>
 {
-    const carried = new Set(tasks.flatMap(group => group.lines.map(line => taskOf("", line).id ?? "")));
     const lines = new Map<string, string[]>();
 
     for (const task of backlog) {
         const holder = team.find(colleague => colleague.name.toLowerCase() === task.to.toLowerCase());
 
-        if (!holder || carried.has(task.id)) {
+        if (!holder) {
             continue;
         }
 

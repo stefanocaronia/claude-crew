@@ -116,6 +116,8 @@ claude plugin validate .
 
 Installed from a local folder (`/plugin marketplace add <folder>`), the plugin runs from a copy in Claude Code's cache, not from the folder: after a change, raise the version in `.claude-plugin/marketplace.json` and in `plugins/crew/.claude-plugin/plugin.json`, then run `claude plugin marketplace update claude-crew` and `claude plugin update crew@claude-crew`, and start a new session.
 
+A version is tagged on the commit that raises it, `git tag -a v0.14.1 -m v0.14.1`, and the tag goes up with it, `git push --follow-tags`: the tags are the repo's list of versions.
+
 To see the mod as the desktop gets it, with a project's real colleagues, `node tools/preview.mjs <project> [--meeting matteo-conti,giulia-ferri] [--working elena-galli]` writes an HTML page (by default in the project's `tmp/`): the trees the mod hands over, in the app's dark colors. `node tools/demo.mjs <folder>` makes the made-up team of the picture above; its first lines say how the picture is taken.
 
 ## Credits

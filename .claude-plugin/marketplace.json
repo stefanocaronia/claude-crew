@@ -5,15 +5,15 @@
     "url": "https://github.com/stefanocaronia"
   },
   "metadata": {
-    "description": "Crew: a standing team of expert colleagues for your projects: hire them, run review rounds, talk with them one-to-one or in meetings."
+    "description": "Crew: a standing team of expert colleagues for your projects, each a subagent with a profile, a memory and a todo: hire them, run review rounds, hand them tasks, talk with them one-to-one or in meetings."
   },
   "plugins": [
     {
       "name": "crew",
       "source": "./plugins/crew",
-      "description": "Crew: set up a team of expert colleagues, hire, fire and portray them, run review rounds, talk with them one-to-one or in meetings; the Crew panel shows the team, their work, their reports and the meetings.",
+      "description": "Crew: set up a team of expert colleagues, hire, fire and portray them, run review rounds, hand them tasks by priority, talk with them one-to-one or in meetings; the Crew panel shows the team, their work and reports, their tasks and the meetings, and works with the project plugin's backlog.",
       "version": "0.13.2",
-      "category": "skill"
+      "category": "productivity"
     }
   ]
 }

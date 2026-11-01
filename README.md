@@ -11,8 +11,15 @@ A standing team of expert colleagues for your projects, in Claude Code. Each col
 
 One plugin, `crew`:
 
-- **The skill** (setting the team up, hiring and firing, portraits, review rounds, tasks, conversations and meetings), its commands (`/crew:init`, `/crew:review`, `/crew:meeting`, `/crew:ask`, `/crew:talk`, `/crew:invite`, `/crew:leave`, `/crew:end`, `/crew:hire`, `/crew:fire`, `/crew:portraits`, `/crew:tidy`, `/crew:next`, `/crew:panel`) and the hook that hands the chat over to the colleagues and back.
-- **The panel** and a group chat. The panel shows each colleague in one of four sections: in the meeting, at work (with the steps they report, their context, tokens and time), finished, on a coffee break. Their card holds how many tasks they have of each priority, their open tasks as the backlog draws them (the first ten, all on request), their latest memory under its heading (in red when it is past 80 lines or 10 KB, the most Claude Code hands a colleague), their profile and settings: effort and permissions. Under the team and in a colleague's card, the buttons for a review, a meeting, hiring, firing and new portraits: each runs a command that asks in the chat what it needs (what to review and the meeting's topic, with three proposals from the work and the todos and a box for your own; the new colleague's field; the portraits' style; a yes before a firing). A Tidy button has the colleagues picked, or with none those whose todo is past 15 open lines, tidy their todos. A Next task button starts the next task of the colleagues picked, or of everyone free. Then the backlog of open tasks, by priority and then the oldest first, each with its priority drawn as an issue tracker does (P1 two red arrows up, P2 an orange equals, P3 a blue arrow down), its age and a ▶ that starts it; a task waiting for another's shows who it waits for (`(after: #matteo-3)` in its line, the id on the task waited for; or `(after: T-62)`, a task of the project's backlog, read from the [project](https://github.com/stefanocaronia/claude-project) plugin when it is installed); with that plugin, the backlog tasks a colleague holds count among their tasks and show here with their number, their type, due day and creator shown, their priority, words and removal changed by the backlog's own command, and its ▶ starts the whole chain after one yes; a row opens in place to read the task whole, edit its words or remove it (to the colleague's archive, after a second press), a colleague's card adds a new one, and a press on its priority turns it, the rows keeping their places for a few seconds, P1, P2, P3: every todo line carries a priority (P1 now, P2 in the plan, P3 later) and the day it was written, `- [ ] P2 · 2026-10-29 · task`; in a project without colleagues, a button that sets the team up. A finished colleague's report opens in the panel, from their row or their card. The panel speaks eleven languages (English, Italian, Spanish, French, German, Portuguese, Japanese, Chinese, Korean, Arabic, Russian), following Claude Code's language or the system's; its own settings page (⚙) picks another and says whether it opens at the start of a session. In a meeting, each colleague's turn is drawn under their portrait, name and role, and a card above the prompt holds the participants, an invite menu and the button that closes it.
+- **The skill**: setting the team up, hiring and firing, portraits, review rounds, tasks, conversations and meetings. Its commands are `/crew:init`, `/crew:review`, `/crew:meeting`, `/crew:ask`, `/crew:talk`, `/crew:invite`, `/crew:leave`, `/crew:end`, `/crew:hire`, `/crew:fire`, `/crew:portraits`, `/crew:tidy`, `/crew:next` and `/crew:panel`; a hook hands the chat over to the colleagues and back.
+- **The panel**, beside the chat:
+  - a small dashboard of colored tiles: tasks in progress, open tasks of high, normal and low priority, blocked tasks, tasks given this week;
+  - the team in four sections: in the meeting, at work (the steps they report, their context, tokens and time), finished (their report one press away), on a coffee break;
+  - buttons for a review, a meeting, hiring, firing, new portraits, Tidy and Next task; each runs a command that asks in the chat what it needs;
+  - the backlog of open tasks, by priority and then the oldest first (see [Tasks](#tasks));
+  - a colleague's card: their tasks by priority, a new task, their latest memory (in red past 80 lines or 10 KB, the most Claude Code hands a colleague), their profile and settings, effort and permissions;
+  - eleven languages (English, Italian, Spanish, French, German, Portuguese, Japanese, Chinese, Korean, Arabic, Russian), following Claude Code's language or the system's; its settings page (⚙) picks another and says whether it opens at the start of a session.
+- **The group chat**: in a meeting, each colleague's turn is drawn under their portrait, name and role, and a card above the prompt holds the participants, an invite menu and the button that closes it.
 
 ## Requirements
 
@@ -61,9 +68,22 @@ The panel opens by itself at the start of a session in a project with colleagues
 
 Each colleague has four permissions, set in their card or by Claude at hiring from their field: **Read** the project, **Write** its files, **Testing** (run commands, which brings Write, since a command can change files), **Web**. A reviewer starts with Read only: they give opinions and touch nothing but their own notes. Without Read or Write, the panel refuses their reading or writing outside their own memory. Claude hands a colleague a check, a test or a change in their field whenever it helps, within those permissions; a colleague at work or in a meeting takes no other task.
 
-**Cost.** Each colleague at work is a subagent and spends your plan's usage like Claude does: a review round with five colleagues costs about five tasks. Fewer colleagues, narrower rounds, lower effort in their card: all spend less. The top of the panel is a small dashboard of colored tiles: the tasks in progress, the open tasks of high, normal and low priority, and the tasks given this week.
+**Cost.** Each colleague at work is a subagent and spends your plan's usage like Claude does: a review round with five colleagues costs about five tasks. Fewer colleagues, narrower rounds, lower effort in their card: all spend less.
 
 A meeting can open on a topic: `/crew:meeting Matteo Giulia -- the parser`, or in words. Each version's changes are in [CHANGELOG.md](CHANGELOG.md).
+
+## Tasks
+
+A colleague's `todo.md` holds one task a line, with a priority (P1 now, P2 in the plan, P3 later) and the day it was written: `- [ ] P2 · 2026-10-29 · task`; done, `- [x] 2026-10-30 · task`, moved at the next tidying to `notes/todo-done.md`. At most 15 lines stay open; the rest go to `notes/todo-archive.md`, never deleted.
+
+- **Waiting for another task**: the task waited for carries an id after its date, `#matteo-3`, and the waiting one ends with `(after: #matteo-3)`. The panel shows who it waits for; `/crew:next` and ▶ show the whole chain and start each link after one yes.
+- **In the panel**: a row opens in place to read the task whole, edit its words or remove it (to the colleague's archive, after a second press); a press on its priority turns it, P1, P2, P3, the rows keeping their places for a few seconds; ▶ starts it, gray while the colleague is busy.
+- **`/crew:next`**, or Next task: the next open task of the colleagues picked, or of everyone free, the highest priority and the oldest first, skipping those waiting for you, for an event or for a permission the colleague lacks. **`/crew:tidy`** ticks what is already done, merges duplicates and archives the rest.
+
+**With the [project](https://github.com/stefanocaronia/claude-project) plugin**, the project's work lives in its backlog of numbered tasks, and a colleague's todo is their own notebook: reminders, retests, checks, things to tell. Only Claude and you open and assign backlog tasks: a colleague proposes work in their report, and Claude adds it to the backlog, by them, held by whoever's field it is in. Then:
+
+- the backlog tasks a colleague holds count among their tasks and show in the panel with their number, type, due day, creator and the specifications they do; their priority, words and removal go through the backlog's own command, and a colleague's card adds a new one there;
+- a todo line may cite a backlog task by its number in the id's place, `- [ ] P2 · 2026-10-28 · T-61 · retest once it is done`, and a task may wait for one, `(after: T-62)`, open as the backlog says.
 
 ## Files
 
@@ -72,10 +92,13 @@ Everything stays in your project, under `.claude/`:
 ```
 .claude/agents/matteo-conti.md          the profile: who they are and how they work
 .claude/agent-memory/matteo-conti/
-    MEMORY.md                           their memory, handed to them at every round
-    todo.md                             their tasks
+    MEMORY.md                           their memory, an index of at most 80 lines, handed to them at every round
+    todo.md                             their tasks, or with the project plugin their notebook
     avatar.jpg, avatar-small.jpg        their portrait at 128 and 32 px (or avatar.svg)
-    notes/                              longer notes, linked from MEMORY.md
+    notes/                              longer notes and reports, linked from MEMORY.md
+    notes/todo-done.md                  the tasks done, each with its day
+    notes/todo-archive.md               the open tasks set aside
+    notes/diary-<year>-<month>.md       the memory's older sections
 .claude/agent-memory/_former/           colleagues who left
 ```
 

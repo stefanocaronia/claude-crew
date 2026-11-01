@@ -1,7 +1,7 @@
 {
   "name": "crew",
   "version": "0.13.2",
-  "description": "A standing team of expert colleagues for a project: subagents with a profile, a memory and a todo, who review the work at milestones and talk with you one-to-one or in meetings; with the Crew panel: the team with portraits, who is at work and the steps they report, the reports, and meetings drawn as a group chat.",
+  "description": "A standing team of expert colleagues for a project: subagents with a profile, a memory and a todo, who review the work at milestones, take tasks by priority and talk with you one-to-one or in meetings; with the Crew panel: the team with portraits, who is at work and the steps they report, the reports, the tasks and their backlog (with the project plugin's too), and meetings drawn as a group chat; in eleven languages.",
   "author": {
     "name": "Stefano Caronia",
     "url": "https://github.com/stefanocaronia"
@@ -16,7 +16,12 @@
     "personas",
     "memory",
     "meetings",
-    "panel"
+    "panel",
+    "multi-agent",
+    "code-review",
+    "tasks",
+    "backlog",
+    "productivity"
   ],
   "types": "./types/index.d.ts",
   "userConfig": {

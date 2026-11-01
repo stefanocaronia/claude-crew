@@ -7,7 +7,7 @@ import type { EngineInterface, Register } from "claude-code";
 import type { Activity, Colleague, Meeting, Permissions, Preferences, Run, Speaker, WeeklyCounts } from "../types";
 import type { Task } from "./team.ts";
 
-import { avatarSvg, barEndSvg, blankSvg, checkboxSvg, pickedTint, captionSvg, claudeSvg, effortSvg, iconSvg, idleButtonSvg, nameSvg, prioritySvg, thumbnailSvg, typeColor, typeSvg, wideBarSvg } from "./draw.ts";
+import { avatarSvg, barEndSvg, blankSvg, checkboxSvg, chipEnd, chipEndSvg, pickedTint, captionSvg, claudeSvg, effortSvg, iconSvg, idleButtonSvg, nameSvg, prioritySvg, thumbnailSvg, typeColor, typeSvg, wideBarSvg } from "./draw.ts";
 import { claudeId, segmentsOf, speakersOf } from "./meeting.ts";
 import { imagePathsIn, imageTypeOf, isInside, isOwnMemory, resolvedPath } from "./paths.ts";
 import { cached, dataUri, filesIn, type FileStamp, forgetAll, forgetFiles, projectRoot, tempFolder } from "./files.ts";
@@ -542,6 +542,23 @@ export const register: Register = (on, options) => {
                     ? <Box key={key} flexShrink={0}><ui.Svg source={pill.source} alt={label} width={pill.width} height={pill.height} /></Box>
                     : <Box key={key} flexShrink={0}><Text dimColor>{`[ ${label} ]`}</Text></Box>;
             };
+            // A chip, as the project plugin draws a task's facts: one line high on a tint, gray or of its color, with rounded ends, each a
+            // drawing, as a Box has no corner radius; in brackets on the terminal.
+            const chip = (key: string, text: string, color?: string) => {
+                if (!isDesktop || !("Svg" in ui)) {
+                    return <Box key={key} flexShrink={0}><Text color={color} dimColor={!color}>{`[${text}]`}</Text></Box>;
+                }
+
+                const tint = color ? `${color}26` : stateLayer;
+                const end = (side: "start" | "end") => <ui.Svg key={`${key}-${side}`} source={chipEndSvg(side, tint)} alt="" width={chipEnd.width} height={chipEnd.height} />;
+                return (
+                    <Box key={key} flexShrink={0} flexDirection="row">
+                        {end("start")}
+                        <Box flexDirection="row" alignItems="center" backgroundColor={tint}><Text color={color} dimColor={!color}>{text}</Text></Box>
+                        {end("end")}
+                    </Box>
+                );
+            };
             // On the desktop a button is its mark alone, its words under the pointer; the terminal, which shows no hint, keeps them.
             const iconButton = (key: string, mark: string, words: string, onPress: () => unknown, color?: string) => {
                 const label = isDesktop ? mark : `${mark} ${words}`;
@@ -899,18 +916,15 @@ export const register: Register = (on, options) => {
                 const stuckDays = isInProgress && listed?.started && isFree(colleague) ? daysBetween(listed.started, todayDate) : 0;
                 const isStalled = stuckDays > staleDays;
                 const priorityName = task.priority ? `${task.priority} ${say.priorityNames[task.priority as "P1"] ?? ""}`.trim() : "";
-                const born = task.date ? `${task.date} (${days})` : "";
+                // The open task's facts, as the project plugin draws a task's: chips of what its row does not show already. Who holds it,
+                // its type and its priority are its marks, each named under the pointer; its effort and its age are on the row.
                 const facts = [
-                    face ? colleague.fullName : "",
-                    listed?.type ?? "",
-                    priorityName,
-                    task.id ?? "",
-                    listed?.by && task.date ? say.createdBy(listed.by, born) : born,
-                    listed?.due ? (isDueNear && dueDays !== undefined ? `${say.dueOn(listed.due)} (${say.due(dueDays)})` : say.dueOn(listed.due)) : "",
-                    isInProgress && listed?.started ? say.inProgress(listed.started, isStalled) : "",
-                    listed?.specs?.length ? say.does(listed.specs.join(say.comma)) : "",
-                    effort ? say.effort(effort) : "",
-                ].filter(Boolean).join(" · ");
+                    task.id && !number ? chip(`${prefix}-id-${index}`, task.id) : null,
+                    listed?.due ? chip(`${prefix}-due-chip-${index}`, isDueNear && dueDays !== undefined ? `⏰ ${say.dueOn(listed.due)} (${say.due(dueDays)})` : say.dueOn(listed.due), isDueNear && dueDays !== undefined ? (dueDays < 0 ? errorColor : warningColor) : undefined) : null,
+                    isInProgress && listed?.started ? chip(`${prefix}-started-${index}`, say.inProgress(listed.started, isStalled), isStalled ? warningColor : workingColor) : null,
+                    listed?.specs?.length ? chip(`${prefix}-specs-${index}`, say.does(listed.specs.join(say.comma))) : null,
+                    task.date ? chip(`${prefix}-born-${index}`, listed?.by ? say.createdBy(listed.by, task.date) : say.createdOn(task.date)) : null,
+                ].filter((one): one is JSX.Element => one !== null);
                 // A task of the project's backlog, not a line of the todo: the backlog's command changes it, and ▶ names its number.
                 const backlogId = line && latest.fromBacklog?.includes(`${colleague.id}:${line}`) ? task.id : undefined;
                 const startText = number ? `${number} · ${task.text}` : task.text;
@@ -955,22 +969,24 @@ export const register: Register = (on, options) => {
                         ? <ui.Svg key={`${prefix}-type-${index}`} source={typeSvg(listed.type)} alt={listed.type} width={14} height={14} />
                         : <Text key={`${prefix}-type-${index}`} color={typeColor(listed.type)}>■</Text>, { isAbove: true, isFromLeft: true })
                     : null;
+                // A press on the mark turns the priority, P1, P2, P3 and P1 again; a task without one shows a dim circle to start from. Its
+                // name under the pointer.
+                const priorityCell = line
+                    ? (
+                        <Box key={`${prefix}-priority-${index}`} flexShrink={0}>
+                            {task.priority ? priorityMark(`priority-${index}`, task.priority) : <Text dimColor>○</Text>}
+                            <Box position="absolute" top={0} left={0}>
+                                <Button key={`${prefix}-cycle-${index}`} label={" "} plain onPress={() => cycle(line)} />
+                            </Box>
+                        </Box>
+                    )
+                    : null;
                 return (
                     <Box key={`${prefix}-${index}`} flexDirection="column" borderStyle="round" {...border} paddingX={1} {...(isDesktop ? tinted() : {})}>
                         <Box flexDirection="row" flexWrap="nowrap" gap={1} alignItems="center">
-                            {face}
+                            {face ? tip(`${prefix}-face-${index}`, colleague.fullName, face, { isAbove: true, isFromLeft: true }) : null}
                             {typeMark}
-                            {line
-                                ? (
-                                    // A press on the mark turns the priority, P1, P2, P3 and P1 again; a task without one shows a dim circle to start from.
-                                    <Box key={`${prefix}-priority-${index}`} flexShrink={0}>
-                                        {task.priority ? priorityMark(`priority-${index}`, task.priority) : <Text dimColor>○</Text>}
-                                        <Box position="absolute" top={0} left={0}>
-                                            <Button key={`${prefix}-cycle-${index}`} label={" "} plain onPress={() => cycle(line)} />
-                                        </Box>
-                                    </Box>
-                                )
-                                : null}
+                            {priorityName && priorityCell ? tip(`${prefix}-priority-${index}`, priorityName, priorityCell, { isAbove: true, isFromLeft: true }) : priorityCell}
                             {number ? <Box key={`${prefix}-number-${index}`} flexShrink={0}><Text color={taskColor} bold>{number}</Text></Box> : null}
                             <Box flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
                                 <Button key={`${prefix}-open-${index}`} plain onPress={toggleTask}>
@@ -992,7 +1008,7 @@ export const register: Register = (on, options) => {
                                     {isEditing && line && "Input" in ui
                                         ? <ui.Input key={`${prefix}-edit-${index}`} value={task.text} rows={2} autoFocus submitLabel={saveMark} onSubmit={(value: string) => saveText(line, value)} />
                                         : <Text>{parts.map((part, at) => (typeof part === "string" ? part : <Link key={`${prefix}-link-${index}-${at}`} href={part.href} label={part.label} />))}</Text>}
-                                    <Text dimColor>{facts}</Text>
+                                    {facts.length ? <Box key={`${prefix}-facts-${index}`} flexDirection="row" flexWrap="wrap" gap={1}>{facts}</Box> : null}
                                     {blockers.length
                                         ? <Text key={`${prefix}-blockers-${index}`} color={blockedColor}>{`⛓︎ ${say.waitsFor(blockers.map(blocker => `${blocker.id} (${byId.get(blocker.colleague)?.name ?? blocker.colleague})`).join(say.comma))}`}</Text>
                                         : null}

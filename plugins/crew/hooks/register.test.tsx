@@ -488,11 +488,14 @@ test("the backlog puts a P1 task first, with its priority and its age", async ($
     expect((await terminal.find({ type: "Text", text: "↓" }))?.props.color).toBe("#4C8FE0");
     await terminal.unmount();
     expect(await ui.find({ type: "Text", text: "▸ now" })).toBeDefined();
-    // A row opens in place: the task whole, who holds it, its priority, its date and age.
+    // Who holds a task and its priority are its marks, named under the pointer.
+    expect(await ui.find({ type: "Text", text: "Sara Lombardi" })).toBeDefined();
+    expect(await ui.find({ type: "Text", text: "P1 high priority" })).toBeDefined();
+    // A row opens in place: the task whole, and in chips only what the row does not show, here the day it was written.
     await ui.press({ key: "backlog-open-0" });
-    expect(await ui.find({ type: "Text", text: "Sara Lombardi · P1 high priority · 2026-10-07 (3d)" })).toBeDefined();
+    expect((await ui.find({ key: "backlog-born-0" }))?.text).toBe("created on 2026-10-07");
     await ui.press({ key: "backlog-open-0" });
-    expect(await ui.find({ type: "Text", text: /Sara Lombardi · P1/ })).toBeUndefined();
+    expect(await ui.find({ key: "backlog-born-0" })).toBeUndefined();
     await ui.unmount();
 });
 
@@ -685,7 +688,10 @@ test("a colleague's tasks of the project's backlog are theirs: counted beside th
     await ui.press({ key: "backlog-cycle-2" });
     expect(asked).toContainEqual(["node", "/plugins/project/scripts/backlog.mjs", "set", "T-70", "--p", "P3"]);
     await ui.press({ key: "backlog-open-2" });
-    expect(await ui.find({ type: "Text", text: /created by Stefano on 2026-10-09.* · does S-12($| · )/ })).toBeDefined();
+    expect((await ui.find({ key: "backlog-born-2" }))?.text).toBe("created by Stefano on 2026-10-09");
+    expect((await ui.find({ key: "backlog-specs-2" }))?.text).toBe("does S-12");
+    // Its number is on its row: no chip says it again.
+    expect(await ui.find({ key: "backlog-id-2" })).toBeUndefined();
     await ui.press({ key: "backlog-edit-text-2" });
     await ui.input({ key: "backlog-edit-2", text: "the whole guide" });
     expect(asked).toContainEqual(["node", "/plugins/project/scripts/backlog.mjs", "set", "T-70", "--text", "the whole guide"]);

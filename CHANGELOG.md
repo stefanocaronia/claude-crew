@@ -2,6 +2,10 @@
 
 What changes for whoever uses Crew, version by version. Plugins update in a new chat: `/plugin`, Marketplaces, claude-crew, Update marketplace, or turn its auto-update on there.
 
+## 0.14.4
+
+- An open task says only what its row does not (T-12): who holds it, its type and its priority are its marks, each named under the pointer, and its effort and age stay on its row. The rest are chips, as the project plugin draws a task's facts, gray with rounded ends, `[…]` on the terminal: a todo line's id, the due day (orange when near, red when past), since when it is in progress, the specifications it does, and who created it and when.
+
 ## 0.14.3
 
 - A button that cannot be pressed, Next task's "Starting…", is drawn on the desktop as its buttons are, 28 px high with rounded corners, gray, no longer a box with a border three lines high (claude-project's T-98).

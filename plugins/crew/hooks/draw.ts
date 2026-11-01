@@ -173,6 +173,19 @@ export function idleButtonSvg(label: string, ground: string, ink: string): { sou
     return { source: svg(width, height, body, false), width, height };
 }
 
+/** A chip's line, 22 px; its ends 8 px wide, the room its text keeps from them. */
+export const chipEnd = { width: 8, height: 22 };
+
+/** A rounded end of a chip in its tint, corners of 4: the chip's middle is a Box, which has no corner radius. */
+export function chipEndSvg(side: "start" | "end", tint: string): string
+{
+    const { width, height } = chipEnd;
+    const path = side === "start"
+        ? `M${width} 0H4A4 4 0 0 0 0 4V${height - 4}A4 4 0 0 0 4 ${height}H${width}Z`
+        : `M0 0H${width - 4}A4 4 0 0 1 ${width} 4V${height - 4}A4 4 0 0 1 ${width - 4} ${height}H0Z`;
+    return svg(width, height, `<path d="${path}" fill="${tint}"/>`, false);
+}
+
 /** A wide bar's square middle, filled or the track, stretched to the room it is given: its rounded ends are `barEndSvg`. */
 export function wideBarSvg(color: string | undefined, isFilled: boolean): string
 {

@@ -7,7 +7,7 @@ import type { EngineInterface, Register } from "claude-code";
 import type { Activity, Colleague, Meeting, Permissions, Preferences, Run, Speaker, WeeklyCounts } from "../types";
 import type { Task } from "./team.ts";
 
-import { avatarSvg, barEndSvg, blankSvg, checkboxSvg, pickedTint, captionSvg, claudeSvg, effortSvg, iconSvg, nameSvg, prioritySvg, thumbnailSvg, typeColor, typeSvg, wideBarSvg } from "./draw.ts";
+import { avatarSvg, barEndSvg, blankSvg, checkboxSvg, pickedTint, captionSvg, claudeSvg, effortSvg, iconSvg, idleButtonSvg, nameSvg, prioritySvg, thumbnailSvg, typeColor, typeSvg, wideBarSvg } from "./draw.ts";
 import { claudeId, segmentsOf, speakersOf } from "./meeting.ts";
 import { imagePathsIn, imageTypeOf, isInside, isOwnMemory, resolvedPath } from "./paths.ts";
 import { cached, dataUri, filesIn, type FileStamp, forgetAll, forgetFiles, projectRoot, tempFolder } from "./files.ts";
@@ -84,6 +84,9 @@ const taskColor = "#2E9AA6";
 const warningColor = "#E2852B";
 // A ▶ that cannot be pressed now: gray, fainter than a dim one.
 const idleColor = "#80808040";
+// A field's button is a mark, as the project plugin's: save, add.
+const saveMark = "✓";
+const addMark = "+";
 // Days in progress with nobody at work on it after which a backlog task is stuck, as the project plugin's default.
 const staleDays = 3;
 // The dashboard's tiles of who is at work and of the week.
@@ -530,11 +533,23 @@ export const register: Register = (on, options) => {
                     </Box>
                 )
                 : control);
-            // A button that cannot be pressed now, as one whose command is starting: drawn in a button's shape, gray, and no Button, which
-            // would still take the pointer, the hover and the focus (a Button has no disabled). The terminal draws a Button "[ label ]".
-            const idleButton = (key: string, label: string) => (isDesktop
-                ? <Box key={key} flexShrink={0} borderStyle="round" borderColor={outline} paddingX={1}><Text color={idleColor}>{label}</Text></Box>
-                : <Box key={key} flexShrink={0}><Text dimColor>{`[ ${label} ]`}</Text></Box>);
+            // A button that cannot be pressed now, as one whose command is starting: no Button, which would still take the pointer, the
+            // hover and the focus (a Button has no disabled). On the desktop a drawing of its buttons, as high and as round, on the gray
+            // ground; the terminal draws a Button "[ label ]".
+            const idleButton = (key: string, label: string) => {
+                const pill = isDesktop ? idleButtonSvg(label, stateLayer, idleColor) : undefined;
+                return pill && "Svg" in ui
+                    ? <Box key={key} flexShrink={0}><ui.Svg source={pill.source} alt={label} width={pill.width} height={pill.height} /></Box>
+                    : <Box key={key} flexShrink={0}><Text dimColor>{`[ ${label} ]`}</Text></Box>;
+            };
+            // On the desktop a button is its mark alone, its words under the pointer; the terminal, which shows no hint, keeps them.
+            const iconButton = (key: string, mark: string, words: string, onPress: () => unknown, color?: string) => {
+                const label = isDesktop ? mark : `${mark} ${words}`;
+                const button = color
+                    ? <Button key={key} plain onPress={() => void onPress()}><Text color={color}>{label}</Text></Button>
+                    : <Button key={key} plain dimColor label={label} onPress={() => void onPress()} />;
+                return isDesktop ? tip(key, words, button) : button;
+            };
             const border = isDesktop ? { borderColor: outline } : { borderDimColor: true };
             // Material's outlined card, with the state layer under the pointer.
             const outlined = (key: string, children: (JSX.Element | null)[]) => (
@@ -975,7 +990,7 @@ export const register: Register = (on, options) => {
                             ? (
                                 <Box key={`${prefix}-details-${index}`} flexDirection="column" gap={1} paddingLeft={face ? 4 : 2}>
                                     {isEditing && line && "Input" in ui
-                                        ? <ui.Input key={`${prefix}-edit-${index}`} value={task.text} rows={2} autoFocus submitLabel={say.save} onSubmit={(value: string) => saveText(line, value)} />
+                                        ? <ui.Input key={`${prefix}-edit-${index}`} value={task.text} rows={2} autoFocus submitLabel={saveMark} onSubmit={(value: string) => saveText(line, value)} />
                                         : <Text>{parts.map((part, at) => (typeof part === "string" ? part : <Link key={`${prefix}-link-${index}-${at}`} href={part.href} label={part.label} />))}</Text>}
                                     <Text dimColor>{facts}</Text>
                                     {blockers.length
@@ -985,11 +1000,12 @@ export const register: Register = (on, options) => {
                                         ? (
                                             <Box key={`${prefix}-actions-${index}`} flexDirection="row" flexWrap="wrap" columnGap={2}>
                                                 {"Input" in ui
-                                                    ? <Button key={`${prefix}-edit-text-${index}`} label={isEditing ? say.cancel : `✎ ${say.editText}`} plain dimColor onPress={() => update($, view, now => ({ ...now, editing: now.editing === taskKey ? undefined : taskKey }))} />
+                                                    ? iconButton(`${prefix}-edit-text-${index}`, isEditing ? "✕" : "✎", isEditing ? say.cancel : say.editText, () => update($, view, now => ({ ...now, editing: now.editing === taskKey ? undefined : taskKey })))
                                                     : null}
-                                                <Button key={`${prefix}-remove-${index}`} plain onPress={() => (isRemoving ? remove(line) : askRemove())}>
-                                                    <Text color={errorColor}>{`✕ ${isRemoving ? say.removeSure(backlogId ?? "") : say.removeTask}`}</Text>
-                                                </Button>
+                                                {/* Removing archives it, the todo line or the backlog task: the second press asks in words. */}
+                                                {isRemoving
+                                                    ? <Button key={`${prefix}-remove-${index}`} plain onPress={() => remove(line)}><Text color={errorColor}>{`🗄 ${say.removeSure(backlogId ?? "")}`}</Text></Button>
+                                                    : iconButton(`${prefix}-remove-${index}`, "🗄", say.removeTask, askRemove, errorColor)}
                                             </Box>
                                         )
                                         : null}
@@ -1086,7 +1102,7 @@ export const register: Register = (on, options) => {
                                     </Box>
                                     {"Input" in ui
                                         ? panel.editing === `new:${selected.id}`
-                                            ? <ui.Input key="card-new-task" placeholder={say.newTaskHint} autoFocus submitLabel={say.add} onSubmit={(value: string) => addTask(selected, value)} />
+                                            ? <ui.Input key="card-new-task" placeholder={say.newTaskHint} autoFocus submitLabel={addMark} onSubmit={(value: string) => addTask(selected, value)} />
                                             : <Button key="card-new-task" label={`＋ ${say.newTask}`} plain dimColor onPress={() => update($, view, now => ({ ...now, editing: `new:${selected.id}` }))} />
                                         : null}
                                     {cardTasks.length ? cardTasks.map((task, index) => taskRow("card-task", index, task, selected, null)) : <Text key="card-no-tasks" dimColor>{say.toDo(0)}</Text>}

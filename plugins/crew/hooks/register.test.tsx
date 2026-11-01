@@ -548,7 +548,14 @@ test("a task's words are written again in place, and a new task written in a col
     const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
     await ui.press({ key: "backlog-toggle" });
     await ui.press({ key: "backlog-open-0" });
+    // On the desktop an open task's buttons are their marks, the words under the pointer; the terminal keeps the words.
+    expect((await ui.find({ key: "backlog-edit-text-0" }))?.props.label).toBe("✎");
+    expect(await ui.find({ type: "Text", text: "Edit the text" })).toBeDefined();
+    const terminal = await $.ui.mount({ plugin, surface: "terminal", component: "Pane", requestId: "crew", props: pane });
+    expect((await terminal.find({ key: "backlog-edit-text-0" }))?.props.label).toBe("✎ Edit the text");
+    await terminal.unmount();
     await ui.press({ key: "backlog-edit-text-0" });
+    expect((await ui.find({ key: "backlog-edit-text-0" }))?.props.label).toBe("✕");
     await ui.input({ key: "backlog-edit-0", text: "now  and · then" });
     expect(files[todo]).toBe("# Sara: todo\n\n- [ ] P1 · 2026-10-07 · #sara-1 · now and - then (effort: high)\n\n## Notes\n");
     await ui.press({ key: "open-sara-lombardi" });
@@ -581,7 +588,7 @@ test("a press on a task's priority turns it in its todo, and Remove moves the ta
     await last.press({ key: "backlog-open-0" });
     // Remove asks first; the second press removes.
     await last.press({ key: "backlog-remove-0" });
-    expect(await last.find({ type: "Text", text: "✕ Remove? Press again" })).toBeDefined();
+    expect(await last.find({ type: "Text", text: "🗄 Remove? Press again" })).toBeDefined();
     expect(files[todo]).toContain("later");
     await last.press({ key: "backlog-remove-0" });
     expect(files[todo]).not.toContain("later");
@@ -684,7 +691,7 @@ test("a colleague's tasks of the project's backlog are theirs: counted beside th
     expect(asked).toContainEqual(["node", "/plugins/project/scripts/backlog.mjs", "set", "T-70", "--text", "the whole guide"]);
     await ui.press({ key: "backlog-open-2" });
     await ui.press({ key: "backlog-remove-2" });
-    expect(await ui.find({ type: "Text", text: "✕ Archive T-70? Press again" })).toBeDefined();
+    expect(await ui.find({ type: "Text", text: "🗄 Archive T-70? Press again" })).toBeDefined();
     expect(asked).not.toContainEqual(["node", "/plugins/project/scripts/backlog.mjs", "archive", "T-70"]);
     await ui.press({ key: "backlog-remove-2" });
     expect(asked).toContainEqual(["node", "/plugins/project/scripts/backlog.mjs", "archive", "T-70"]);
@@ -716,7 +723,7 @@ test("▶ on a backlog row starts that task; Next task starts the next one of th
     expect(sent.at(-1)).toBe("/crew:next Matteo Sara");
     // Starting, it is no button at all: nothing to point at, hover or press.
     expect(await ui.find({ type: "Button", key: "act-next" })).toBeUndefined();
-    expect(await ui.find({ key: "act-next" })).toBeDefined();
+    expect((await ui.findAll({ type: "Svg" })).some(drawing => (drawing.props as { alt?: string }).alt === "⏳ Starting…")).toBe(true);
     expect(await ui.find({ type: "Text", text: "⏳ Starting…" })).toBeDefined();
     // Once Sara is at work, her task is no longer starting.
     await $.agent.spawn({ prompt: "Now.", description: "now", subagentType: "sara-lombardi" } as never);

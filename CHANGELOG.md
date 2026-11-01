@@ -2,6 +2,11 @@
 
 What changes for whoever uses Crew, version by version. Plugins update in a new chat: `/plugin`, Marketplaces, claude-crew, Update marketplace, or turn its auto-update on there.
 
+## 0.14.3
+
+- A button that cannot be pressed, Next task's "Starting…", is drawn on the desktop as its buttons are, 28 px high with rounded corners, gray, no longer a box with a border three lines high (claude-project's T-98).
+- An open task's buttons are their marks on the desktop, the words under the pointer: ✎ edit, ✕ cancel, 🗄 remove, which archives the todo line or the backlog task; the second press still asks in words. The terminal keeps the words. A field's button is a mark: save ✓, add + (claude-project's T-99).
+
 ## 0.14.2
 
 - With the project plugin (0.13.0 or later), colleagues comment on the backlog's tasks: a remark on a task already there that their work or review touches is one or two sentences in their report, `T-12: …`, which Claude leaves at once as theirs, `backlog.mjs comment T-12 --by <their name>`, never a new task and never a report. A colleague's brief for a backlog task carries its comments.

@@ -162,6 +162,17 @@ export function effortSvg(level: string): string | undefined
     return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="12" viewBox="0 0 16 12">${bars}</svg>`;
 }
 
+/** A button that cannot be pressed now, drawn as the desktop draws its buttons: 28 px high, corners of 4, on `ground`, its label in
+ * `ink` in the middle at the panel's 15 px, as wide as the label comes to. A Box has no corner radius, and one with a border is three
+ * lines high. */
+export function idleButtonSvg(label: string, ground: string, ink: string): { source: string; width: number; height: number }
+{
+    const height = 28;
+    const width = Math.ceil(labelWidth(label) * 15) + 24;
+    const body = `<rect width="${width}" height="${height}" rx="4" fill="${ground}"/><text x="${width / 2}" y="${height / 2}" dominant-baseline="central" text-anchor="middle" font-family="${font}" font-size="15" fill="${ink}">${xml(label)}</text>`;
+    return { source: svg(width, height, body, false), width, height };
+}
+
 /** A wide bar's square middle, filled or the track, stretched to the room it is given: its rounded ends are `barEndSvg`. */
 export function wideBarSvg(color: string | undefined, isFilled: boolean): string
 {
@@ -182,6 +193,15 @@ export function barEndSvg(side: "start" | "end", color: string | undefined, isFi
 function svg(width: number, height: number, body: string, isThemed = true): string
 {
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${isThemed ? theme : ""}${body}</svg>`;
+}
+
+// Roughly how wide a label is in the system's sans-serif, in em: a mark that only picks a glyph's look takes none, narrow letters, wide
+// ones, capitals, figures and the rest of the letters; a symbol or an emoji about a square.
+const widths: [RegExp, number][] = [[/[​-‏︀-️]/, 0], [/[ ilIj'.,:;!|]/, 0.27], [/[frt]/, 0.36], [/[mwMW]/, 0.86], [/[A-Z]/, 0.64], [/[0-9]/, 0.55]];
+
+function labelWidth(label: string): number
+{
+    return [...label].reduce((sum, character) => sum + (widths.find(([pattern]) => pattern.test(character))?.[1] ?? ((character.codePointAt(0) ?? 0) > 0x2000 ? 1 : 0.55)), 0);
 }
 
 function xml(text: string): string

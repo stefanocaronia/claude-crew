@@ -2,6 +2,10 @@
 
 What changes for whoever uses Crew, version by version. Plugins update in a new chat: `/plugin`, Marketplaces, claude-crew, Update marketplace, or turn its auto-update on there.
 
+## 0.14.2
+
+- With the project plugin (0.13.0 or later), colleagues comment on the backlog's tasks: a remark on a task already there that their work or review touches is one or two sentences in their report, `T-12: …`, which Claude leaves at once as theirs, `backlog.mjs comment T-12 --by <their name>`, never a new task and never a report. A colleague's brief for a backlog task carries its comments.
+
 ## 0.14.1
 
 - Links in a task open: in an open task an address such as `https://…`, or a `[link](https://…)`, is a link a click opens (on the terminal, where it draws them); its row shows the link's words. An address keeps its underscores, and leaves to the sentence the punctuation that ends it.

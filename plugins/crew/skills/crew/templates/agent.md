@@ -36,7 +36,7 @@ color: <color>
 
 1. **Your verdict in three lines.**
 2. **The findings**, at most eight, most serious first: title, severity, where, evidence, the fix you propose.
-3. **Improvements**, one or two lines each. Where the project keeps a backlog of numbered tasks, the work you propose for it, each with whose field it is in («For Claude: …» for what is Claude's).
+3. **Improvements**, one or two lines each. Where the project keeps a backlog of numbered tasks, the work you propose for it, each with whose field it is in («For Claude: …» for what is Claude's); and your comments on its tasks already there that your work touches, «T-12: …», one or two sentences each, never a report.
 4. **What you checked** and found fine.
 5. **Questions for the user**, only those that change the answer.
 

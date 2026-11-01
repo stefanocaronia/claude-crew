@@ -16,18 +16,6 @@ export function contextShare(run: Run): number
     return run.contextMax ? Math.min(1, run.contextTokens / run.contextMax) : 0;
 }
 
-/** From the first run's start to the last one's end, or to now while one still works. */
-export function totalTime(runs: Run[], now: number): number
-{
-    if (!runs.length) {
-        return 0;
-    }
-
-    const start = Math.min(...runs.map(run => run.startedAt));
-    const end = Math.max(...runs.map(run => run.endedAt ?? Math.max(now, run.startedAt)));
-    return end - start;
-}
-
 /** The week's counts with one more task or refusal for a colleague, or their tokens added; only the last `kept` weeks stay. */
 export function withCount(counts: WeeklyCounts, week: string, id: string, kind: "tasks" | "refusals" | "tokens", kept: number, amount = 1): WeeklyCounts
 {

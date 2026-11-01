@@ -341,20 +341,21 @@ function dismiss(people)
         + "to notes/diary-<year>-<month>.md, and the index keeps one line for each with its link.";
 }
 
-// The persona without the frontmatter and without the sections that only serve the rounds.
 // A file's lines that look like this script's own headers or notes are quoted, so the file's text cannot pass for them.
 function fence(text)
 {
     return text.replace(/^(=+|\[Crew\])/gm, "> $1");
 }
 
+// The persona without the frontmatter and without the sections that only serve the rounds.
 function persona(id)
 {
     return withoutFrontmatter(read(agentPath(id))).replace(roundOnlySections, "").trim();
 }
 
-// What a colleague may do, from the profile's tools: Grep or Glob read the project, Edit or Write change it, Bash runs commands,
-// WebSearch or WebFetch search the web. A profile without a tools line inherits every tool.
+// What a colleague may do, from the profile's tools, as the panel reads them (permissionsOf in hooks/team.ts, which this script
+// cannot import): Grep or Glob read the project, Edit or Write change it, Bash runs commands and so changes it too, WebSearch or
+// WebFetch search the web. The tools as a comma line, a [list] or YAML items; a profile without a tools line inherits every tool.
 function permissionsOf(profile)
 {
     const frontmatter = /^\uFEFF?---\r?\n([\s\S]*?)\r?\n---/.exec(profile)?.[1] ?? "";
@@ -365,9 +366,9 @@ function permissionsOf(profile)
     }
 
     const items = [...frontmatter.slice(line.index + line[0].length).matchAll(/^\s+-\s*(\S+)/gm)].map(match => match[1]);
-    const tools = new Set([...line[1].split(","), ...items].map(tool => tool.trim()).filter(Boolean));
+    const tools = new Set([...line[1].split(","), ...items].map(tool => tool.replace(/["'[\]]/g, "").trim()).filter(Boolean));
     const has = (...names) => names.some(name => tools.has(name));
-    return { read: has("Grep", "Glob"), write: has("Edit", "Write"), test: has("Bash"), web: has("WebSearch", "WebFetch") };
+    return { read: has("Grep", "Glob"), write: has("Edit", "Write", "Bash"), test: has("Bash"), web: has("WebSearch", "WebFetch") };
 }
 
 function permissionPhrase(permissions)
@@ -423,12 +424,13 @@ function writeActive(sessionId, active)
     forgetOldConversations();
 }
 
-// A conversation left open in a session nobody resumed for a month is forgotten, so the temp folder does not fill up.
+// A conversation left open in a session nobody resumed for a month is forgotten, so the temp folder does not fill up; with it what
+// the panel leaves there by session (who works in a chat, when it last loaded).
 function forgetOldConversations()
 {
     const oldest = Date.now() - 30 * 24 * 60 * 60 * 1000;
 
-    for (const name of readdirSync(stateFolder).filter(file => file.endsWith(".json"))) {
+    for (const name of readdirSync(stateFolder).filter(file => file.endsWith(".json") || file.endsWith(".txt"))) {
         try {
             if (statSync(join(stateFolder, name)).mtimeMs < oldest) {
                 rmSync(join(stateFolder, name), { force: true });
@@ -457,7 +459,7 @@ function memoryPath(id)
 function read(path)
 {
     const file = join(root, path);
-    return existsSync(file) ? readFileSync(file, "utf8").replace(/^﻿/, "").replace(/\r\n/g, "\n").trim() : "";
+    return existsSync(file) ? readFileSync(file, "utf8").replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").trim() : "";
 }
 
 function listNames(names)

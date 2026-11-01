@@ -1,12 +1,13 @@
 // A preview of the Crew panel as the desktop gets it: the mod draws the panel, the meeting band and a group-chat reply from a
-// project's real colleagues, inside `claude plugin test`; the trees it hands over become an HTML page in the app's dark colors.
-// Not the app's own paint, but its layout, portraits and wrapping. Usage:
+// project's real colleagues (tools/demo.mjs makes a made-up team), inside `claude plugin test`; the trees it hands over become
+// an HTML page in the app's dark colors, the chat and the band beside the panel. Not the app's own paint, but its layout,
+// portraits and wrapping. Usage:
 //   node tools/preview.mjs <project> [--out page.html] [--meeting id,id] [--working id] [--card id] [--pick id] [--backlog] [--language it|en]
 // CLAUDE_BIN names the claude to run, when the one on the PATH is not the build the mod is made for.
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repo = resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -20,6 +21,20 @@ const card = option("card", "");
 const pick = option("pick", "");
 const isBacklogOpen = args.includes("--backlog");
 const language = option("language", "it");
+// The made-up words of the preview, in its language (English for the others): the work of the colleague at work, their step, the group chat's reply.
+const samples = {
+    it: {
+        work: "revisione del passo 13", step: "leggo todo, istruzioni e decisioni", read: "/p/docs/decisioni.md",
+        chat: (first, second) => `[${first}] Il passo 13 regge, ma l'import salta l'ultimo punto delle tracce lunghe.\n\n*Claude apre src/import.ts.*\n\n[${second}] Io partirei dalla prova di ieri: due persone su cinque non hanno trovato da dove cominciare.`,
+        titles: { pane: "Pannello", band: "Sopra il prompt", chat: "Chat" },
+    },
+    en: {
+        work: "review of step 13", step: "reading the todo, instructions and decisions", read: "/p/docs/decisions.md",
+        chat: (first, second) => `[${first}] Step 13 holds, but the import drops the last point of long tracks.\n\n*Claude opens src/import.ts.*\n\n[${second}] I would start from yesterday's test: two people out of five could not find where to begin.`,
+        titles: { pane: "Panel", band: "Above the prompt", chat: "Chat" },
+    },
+};
+const sample = samples[language] ?? samples.en;
 // The portraits the page defines once, and a count that keeps each drawing's ids apart.
 const symbols = new Map();
 let drawings = 0;
@@ -39,6 +54,7 @@ try {
         throw new Error(`The mod drew no panel:\n${output.slice(-3000)}`);
     }
 
+    mkdirSync(dirname(out), { recursive: true });
     writeFileSync(out, page(trees));
     console.log(`written ${out}`);
 } finally {
@@ -94,10 +110,10 @@ import { bytes, files, times } from "./fixture.ts";
 const posix = (path: string) => path.replace(/\\\\/g, "/").replace(/^[A-Za-z]:/, "");
 const exists = (path: string) => Object.keys({ ...files, ...bytes }).some(name => name === posix(path) || name.startsWith(\`\${posix(path)}/\`));
 
-function world(on: On): void
+function world(on: On)
 {
     mock.env(on, { OS: "Linux", TMPDIR: "/tmp" });
-    mock.clock(on, { now: ${Date.now()} });
+    const clock = mock.clock(on, { now: ${Date.now()} });
     on("session.start", () => ({ cwd: "/p" }) as never);
     on("settings.read", () => ({ value: {} }) as never);
     on("tool.register", () => ({ value: {} }) as never);
@@ -109,28 +125,30 @@ function world(on: On): void
     on("session.id", () => ({ value: "preview" }));
     on("session.usage", () => ({ value: { startedAt: 0, context: {}, rateLimits: [{ kind: "five_hour", percentUsed: 7, resetsAt: new Date(${Date.now()} + 35 * 60000).toISOString() }, { kind: "seven_day", percentUsed: 8, resetsAt: new Date(${Date.now()} + 6 * 86400000).toISOString() }] } }) as never);
     on("fs.exists", (_, e) => ({ value: exists(e.path) }));
-    on("fs.list", (_, e) => ({ value: Object.keys(files).filter(name => name.startsWith(\`\${posix(e.path)}/\`) && !name.slice(posix(e.path).length + 1).includes("/")).map(name => ({ name: name.slice(posix(e.path).length + 1), kind: "file", size: 1, mtimeMs: 0, isLink: false })) }) as never);
+    on("fs.list", (_, e) => ({ value: Object.keys({ ...files, ...bytes }).filter(name => name.startsWith(\`\${posix(e.path)}/\`) && !name.slice(posix(e.path).length + 1).includes("/")).map(name => ({ name: name.slice(posix(e.path).length + 1), kind: "file", size: 1, mtimeMs: 0, isLink: false })) }) as never);
     on("fs.read", (_, e) => ({ value: e.as === "bytes" ? { base64: bytes[posix(e.path)] ?? "" } : files[posix(e.path)] ?? "" }) as never);
     on("fs.stat", (_, e) => ({ value: { kind: "file", size: 1, mtimeMs: times[posix(e.path)] ?? 1, isLink: false } }) as never);
     on("agent.spawn", () => ({ model: "claude-opus-5-5", agentId: "preview-run" }) as never);
     on("tool.call", { tool: "Read" }, () => ({ result: "" }) as never);
     // A model request of the colleague at work, with what it spent.
     on("turn.step", async function* () {
-        return { usage: { model: "claude-opus-5-5", input_tokens: 58000, output_tokens: 1200 } };
+        return { answer: "", toolUses: [], usage: { model: "claude-opus-5-5", input_tokens: 58000, output_tokens: 1200 } };
     } as never);
     on("ui.render", ($, e) => {
         const { Text } = $.ui.resolve(e);
         return <Text key="engine">engine</Text>;
     });
+    return clock;
 }
 
 test("preview", { options: { language: "${language}" }, timeoutMs: 20000 }, async ($, on) => {
-    world(on);
+    const clock = world(on);
     await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
-    ${working ? `await $.agent.spawn({ prompt: "Review.", description: "revisione del passo 13", subagentType: "${working}", effort: "medium" } as never);
-    await $.turn.step({ agentId: "preview-run", model: "claude-opus-5-5", effort: "medium" } as never);
-    await $.tool.call({ tool: "Read", file_path: "/p/private/project/DECISIONI.md", agentId: "preview-run", tool_use_id: "r1" } as never);
-    await $.tool.call({ tool: "mcp__crew__step", done: 1, total: 5, note: "leggo todo, istruzioni e decisioni", agentId: "preview-run", tool_use_id: "s1" } as never);` : ""}
+    ${working ? `await $.agent.spawn({ prompt: "Review.", description: ${JSON.stringify(sample.work)}, subagentType: "${working}", effort: "medium" } as never);
+    await clock.advance(4 * 60000);
+    for await (const _ of $.turn.step({ agentId: "preview-run", model: "claude-opus-5-5", effort: "medium" } as never)) {}
+    await $.tool.call({ tool: "Read", file_path: ${JSON.stringify(sample.read)}, agentId: "preview-run", tool_use_id: "r1" } as never);
+    await $.tool.call({ tool: "mcp__crew__step", done: 1, total: 5, note: ${JSON.stringify(sample.step)}, agentId: "preview-run", tool_use_id: "s1" } as never);` : ""}
     const pane = await $.ui.mount({ plugin: "crew", surface: "desktop", component: "Pane", requestId: "crew", props: { title: "Crew", isFocused: false, bodyColumns: 50, placement: "dock" } as never });
     ${card ? `await pane.press({ key: "open-${card}" });` : ""}
     ${pick ? `await pane.press({ key: "pick-${pick}" });` : ""}
@@ -144,27 +162,31 @@ test("preview", { options: { language: "${language}" }, timeoutMs: 20000 }, asyn
 `;
 }
 
-// A reply of the first two colleagues, with a narrator line, to see the group chat.
+// A reply of two colleagues, with a narrator line, to see the group chat: those in the meeting, else the first two; the first
+// speaks twice in a team of one.
 function chatSample()
 {
-    const names = readdirSync(join(project, ".claude", "agents")).filter(name => name.endsWith(".md")).slice(0, 2)
-        .map(name => /^# ([^\s,]+)/m.exec(readFileSync(join(project, ".claude", "agents", name), "utf8"))?.[1] ?? "");
-    return `[${names[0]}] Il passo 13 regge, ma il viaggio a tratti salta l'evento al confine.\n\n*Claude apre src/travel.ts.*\n\n[${names[1]}] Io partirei dalla prova di ieri sera: il master si è fermato tre volte.`;
+    const ids = meeting.length ? meeting.map(id => `${id}.md`) : readdirSync(join(project, ".claude", "agents")).filter(name => name.endsWith(".md"));
+    const names = ids.slice(0, 2).map(name => /^# ([^\s,]+)/m.exec(readFileSync(join(project, ".claude", "agents", name), "utf8"))?.[1] ?? "");
+    names[1] ??= names[0];
+    return sample.chat(names[0], names[1]);
 }
 
 // The trees as HTML: Box a flex box, Text a span, Button a button, Svg an image, Markdown a little markdown.
 function page(trees)
 {
-    const sections = [["pane", "Pannello"], ["band", "Sopra il prompt"], ["chat", "Chat"]].filter(([key]) => trees[key])
-        .map(([key, title]) => `<section class="${key}"><h2>${title}</h2><div class="surface">${element(trees[key], false)}</div></section>`);
+    const sections = ["pane", "band", "chat"].filter(key => trees[key])
+        .map(key => `<section class="${key}"><h2>${sample.titles[key]}</h2><div class="surface">${element(trees[key], false)}</div></section>`);
     return `<!doctype html><meta charset="utf-8"><title>Crew panel preview</title>
 <style>
 :root{color-scheme:dark}
-body{margin:0;padding:16px;background:#141413;color:#ececec;font:13px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start}
+body{margin:0;padding:24px;background:#141413;color:#ececec;font:13px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;display:grid;grid-template-columns:auto auto;grid-template-rows:auto 1fr;grid-template-areas:"chat pane" "band pane";gap:20px 28px;align-items:start;justify-content:center}
+.pane{grid-area:pane}.band{grid-area:band}.chat{grid-area:chat}
 h2{font-size:11px;font-weight:600;color:#7d7d79;text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px}
 .surface{background:#1f1f1e;border:1px solid #333331;border-radius:10px;padding:12px}
-.pane .surface{width:var(--pane,380px);resize:horizontal;overflow:auto}
-.band .surface,.chat .surface{width:520px;resize:horizontal;overflow:auto}
+.pane .surface{width:var(--pane,380px);overflow:auto}
+.band .surface,.chat .surface{width:520px;overflow:auto}
+.surface:hover{resize:horizontal}
 .box{display:flex;min-width:0;position:relative}
 .text{min-width:0}.text.block{display:block}.dim{color:#9a9a96}.bold{font-weight:600}.italic{font-style:italic}
 .truncate{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -207,18 +229,20 @@ function element(node, isInline)
         case "Markdown":
             return `<div class="md${props.dimColor ? " dim" : ""}">${markdown(String(props.text ?? ""))}</div>`;
         case "Select":
-            return `<select><option>${escape(String(props.label ?? ""))}</option>${(props.options ?? []).map(choice => `<option>${escape(choice.label ?? choice.value)}</option>`).join("")}</select>`;
+            return `<select>${props.label ? `<option>${escape(String(props.label))}</option>` : ""}${(props.options ?? []).map(choice => `<option${choice.value === props.value ? " selected" : ""}>${escape(choice.label ?? choice.value)}</option>`).join("")}</select>`;
         default:
             return children.join("");
     }
 }
 
-// An Svg drawn inline: its ids made unique in the page, each portrait defined once as a symbol and used where it is drawn.
+// An Svg drawn inline: its ids and classes made unique in the page, its dark rules taken as the page is dark, each portrait defined once as a symbol and used where it is drawn.
 function inlineSvg(source)
 {
     const number = ++drawings;
     return source
         .replace(/id="([\w-]+)"/g, `id="$1-${number}"`).replace(/url\(#([\w-]+)\)/g, `url(#$1-${number})`)
+        .replace(/class="([^"]+)"/g, (_, names) => `class="${names.split(/\s+/).map(name => `${name}-${number}`).join(" ")}"`)
+        .replace(/<style>([\s\S]*?)<\/style>/g, (_, css) => `<style>${css.replace(/@media \(prefers-color-scheme: dark\)\{((?:[^{}]*\{[^{}]*\})*)\}/g, "$1").replace(/\.([A-Za-z][\w-]*)/g, `.$1-${number}`)}</style>`)
         .replace(/<image href="(data:[^"]+)" x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"([^>]*)\/>/g, (_, uri, x, y, width, height, rest) => {
             if (!symbols.has(uri)) {
                 symbols.set(uri, `portrait-${symbols.size + 1}`);

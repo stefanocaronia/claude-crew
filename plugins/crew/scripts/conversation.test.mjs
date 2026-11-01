@@ -2,7 +2,7 @@
 // (a JSON input on stdin): node --test plugins/crew/scripts/conversation.test.mjs
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
@@ -113,6 +113,31 @@ describe("the commands", () => {
         assert.match(run("four", "talk", "Helper"), /Nothing changed/);
         assert.equal(hook({ hook_event_name: "UserPromptSubmit", session_id: "four", prompt: "ciao" }), "");
     });
+
+    it("reads the permissions as the panel does: a tools list in brackets, and commands that change files", () => {
+        writeColleague("luca-neri", "Luca Neri, tester", "Luca remembers the flaky test.", "", { tools: "[Read, Bash]" });
+        assert.match(run("nine", "talk", "Luca"), /Their permissions, binding: Luca changes its files and runs commands\./);
+        run("nine", "end");
+        rmSync(join(project, ".claude", "agents", "luca-neri.md"));
+        rmSync(join(project, ".claude", "agent-memory", "luca-neri"), { recursive: true });
+    });
+
+    it("forgets what sessions left in the temp folder a month ago, the panel's files too", () => {
+        const folder = join(sandbox, "temp", "claude-crew");
+        mkdirSync(folder, { recursive: true });
+        const old = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000);
+
+        for (const name of ["gone.json", "loaded-gone.txt"]) {
+            writeFileSync(join(folder, name), "{}");
+            utimesSync(join(folder, name), old, old);
+        }
+
+        run("ten", "talk", "Giulia");
+        assert.equal(existsSync(join(folder, "gone.json")), false);
+        assert.equal(existsSync(join(folder, "loaded-gone.txt")), false);
+        assert.equal(existsSync(join(folder, "ten.json")), true);
+        run("ten", "end");
+    });
 });
 
 describe("the hook", () => {
@@ -181,7 +206,7 @@ function writeAgent(id, heading, body = "", quirks = {})
     const folder = join(project, ".claude", "agents");
     mkdirSync(folder, { recursive: true });
     const file = [
-        "---", `name: ${id}`, ...(quirks.comment ? ["# a yaml comment"] : []), ...(quirks.watches ? [`watches: ${quirks.watches}`] : []), `description: "${heading}."`, "tools: Read, Grep, Glob", "memory: project", "---", "",
+        "---", `name: ${id}`, ...(quirks.comment ? ["# a yaml comment"] : []), ...(quirks.watches ? [`watches: ${quirks.watches}`] : []), `description: "${heading}."`, `tools: ${quirks.tools ?? "Read, Grep, Glob"}`, "memory: project", "---", "",
         `# ${heading}`, "", "**Who you are.** Someone.", body, "", "## How you work", "", "- Carefully.", "",
         "## What you return", "", "REPORT FORMAT", "", "## Your memory", "", "MEMORY RULES", "",
     ];

@@ -4,15 +4,9 @@
 // Unknown traits fall back to the defaults; the portrait is square, with no text, for panels that crop it to a circle.
 import { writeFileSync } from "node:fs";
 
-const defaults = { background: "#888780", skin: "#E3B08D", hair: "#3B2A20", hairStyle: "short", clothes: "#2F3640", neckline: "crew", glasses: "none", beard: "none", accessory: "none" };
-const [output, json] = process.argv.slice(2);
+import { shade, traitsFrom } from "./portrait-traits.mjs";
 
-if (!output) {
-    process.stderr.write("Usage: node pixel-portrait.mjs <out.svg> '{\"background\":\"#D9773A\",\"hairStyle\":\"bob\",...}'\n");
-    process.exit(1);
-}
-
-const traits = { ...defaults, ...JSON.parse(json ?? "{}") };
+const { output, traits } = traitsFrom("pixel-portrait.mjs");
 const grid = Array.from({ length: 32 }, () => Array(32).fill(traits.background));
 const paint = (x, y, color) => {
     if (x >= 0 && x < 32 && y >= 0 && y < 32) {
@@ -24,26 +18,6 @@ const span = (y, from, to, color) => {
         paint(x, y, color);
     }
 };
-// A color as six hex digits: #abc and the plain names a profile uses become #aabbcc; anything else is refused, with what works.
-const names = { red: "C0453A", blue: "2F6FDB", green: "2E9E5B", yellow: "D9A21B", purple: "8B5CF6", orange: "D9773A", pink: "D9599A", cyan: "1FA3B8", black: "222222", white: "F4F4F1", gray: "888780", grey: "888780", brown: "7A5230" };
-const hex = color => {
-    const plain = String(color).trim().replace(/^#/, "").toLowerCase();
-    const full = /^[0-9a-f]{6}$/.test(plain) ? plain : /^[0-9a-f]{3}$/.test(plain) ? plain.replace(/./g, digit => digit + digit) : names[plain]?.toLowerCase();
-
-    if (!full) {
-        process.stderr.write(`Unknown color "${color}": give #rrggbb, #rgb or one of ${Object.keys(names).join(", ")}.
-`);
-        process.exit(1);
-    }
-
-    return full;
-};
-// Every color trait checked once, so a color the script does not know never reaches the drawing raw.
-for (const key of ["background", "skin", "hair", "clothes"]) {
-    traits[key] = `#${hex(traits[key])}`;
-}
-
-const shade = (color, amount) => `#${hex(color).match(/../g).map(part => Math.max(0, Math.min(255, Math.round(parseInt(part, 16) * amount))).toString(16).padStart(2, "0")).join("")}`;
 const skinShade = shade(traits.skin, 0.84);
 const hairLight = shade(traits.hair, 1.35);
 

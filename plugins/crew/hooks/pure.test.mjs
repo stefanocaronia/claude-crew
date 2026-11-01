@@ -6,7 +6,8 @@ import { segmentsOf, speakersOf } from "./meeting.ts";
 import { imagePathsIn, isInside, isOwnMemory, resolvedPath } from "./paths.ts";
 import { withCount } from "./progress.ts";
 import { ageOf, agentSpecFrom, backlogLinesOf, backlogOf, blockersOf, daysBetween, cardFrom, colleagueFrom, colleagueOf, memorySizeOf, openIdsOf, openTasks, permissionsOf, retestsOf, taskOf, withEffort, withNextPriority, withPermissions, withText } from "./team.ts";
-import { dateOf, formatTokens, formatUntil, isoWeek, languageOf, listNames, modelName, slugOf, words } from "./text.ts";
+import { taskWords } from "./todo.ts";
+import { dateOf, formatTokens, isoWeek, languageOf, listNames, modelName, slugOf, words } from "./text.ts";
 
 const profile = "---\r\nname: matteo-conti\r\ndescription: \"Matteo Conti, architetto TypeScript. Usalo per le revisioni.\"\r\ntools: Read\r\nmemory: project\r\neffort: high\r\ncolor: red\r\n---\r\n\r\n# Matteo Conti, architetto TypeScript\r\n\r\nChi sei.";
 const matteo = colleagueFrom("matteo-conti", profile, "# todo\n- [ ] uno\n- [x] fatto\n- [ ] due\n", 7);
@@ -49,6 +50,9 @@ describe("colleagues from their files", () => {
     it("reads a task's priority and date, and puts P1 first, then P2, P3 and the lines without a priority", () => {
         assert.deepEqual(taskOf("matteo", "P2 · 2026-10-29 · the parser (effort: high)"), { colleague: "matteo", text: "the parser", priority: "P2", date: "2026-10-29", effort: "high" });
         assert.deepEqual(taskOf("matteo", "2026-10-14 · done long ago"), { colleague: "matteo", text: "done long ago", date: "2026-10-14" });
+        // A line is read once: its parts are kept, frozen, for every drawing.
+        assert.equal(taskOf("matteo", "2026-10-14 · done long ago"), taskOf("matteo", "2026-10-14 · done long ago"));
+        assert.ok(Object.isFrozen(taskOf("matteo", "2026-10-14 · done long ago")));
         assert.deepEqual(taskOf("matteo", "P2 is a word here"), { colleague: "matteo", text: "P2 is a word here" });
         const tasks = [{ colleague: "matteo", lines: ["P3 · 2026-10-01 · m-later", "old line", "P1 · 2026-10-28 · m-now"] }, { colleague: "giulia", lines: ["P2 · 2026-10-20 · g-plan", "P1 · 2026-10-27 · g-now"] }];
         assert.deepEqual(backlogOf(tasks, 10).map(task => task.text), ["g-now", "m-now", "g-plan", "m-later", "old line"]);
@@ -153,6 +157,13 @@ describe("colleagues from their files", () => {
         assert.deepEqual(card.openTasks, ["uno"]);
         assert.equal(card.memory, "## 9 ottobre\n- nuovo");
         assert.deepEqual({ ...card.memorySize, bytes: undefined }, { lines: 7, bytes: undefined, isLong: false });
+        // A profile saved with a byte order mark reads the same.
+        assert.equal(cardFrom("matteo-conti", `﻿${profile}`, "", "").description, card.description);
+    });
+
+    it("takes a color only as a name or a hex code", () => {
+        assert.equal(colleagueFrom("x", "---\ncolor: \"#12ab34\"\n---\n# X\n", "", 0).color, "#12ab34");
+        assert.equal(colleagueFrom("x", "---\ncolor: #12ab34 onload=x\n---\n# X\n", "", 0).color, "#888780");
     });
 
     it("measures a memory: past 80 lines or 10 KB it is long, counting its bytes as UTF-8", () => {
@@ -239,8 +250,9 @@ describe("words", () => {
         assert.deepEqual([1, 2, 5, 21, 112].map(count => words.ru.toDo(count)), ["1 задача", "2 задачи", "5 задач", "21 задача", "112 задач"]);
         assert.deepEqual([0, 1, 2, 3, 11].map(count => words.ar.toDo(count)), ["لا مهام", "مهمة واحدة", "مهمتان", "3 مهام", "11 مهمة"]);
         assert.equal(formatTokens(1_250_000, words.de.units), "1,3 Mio.");
-        assert.equal(formatUntil(new Date(Date.UTC(2026, 9, 12, 5, 0)).toISOString(), Date.UTC(2026, 9, 10, 0, 0), words.ja.units), "2日 5時間");
-        assert.equal(formatUntil(new Date(Date.UTC(2026, 9, 10, 3, 10)).toISOString(), Date.UTC(2026, 9, 10, 0, 0), words.ru.units), "3 ч 10 мин");
+        // Thousands that would round to a thousand are a million already.
+        assert.equal(formatTokens(999_600), "1.0M");
+        assert.equal(formatTokens(999_400), "999k");
         assert.equal(listNames(["Matteo", "Giulia", "Sara"], words.ja.and, words.ja.comma), "Matteo、GiuliaとSara");
     });
 
@@ -249,9 +261,8 @@ describe("words", () => {
         assert.equal(listNames(["Matteo"], " and "), "Matteo");
     });
 
-    it("writes models and the time to a reset", () => {
+    it("writes models", () => {
         assert.equal(modelName("claude-opus-5-5"), "Opus 5.5");
-        assert.equal(formatUntil(new Date(Date.UTC(2026, 9, 12, 5, 0)).toISOString(), Date.UTC(2026, 9, 10, 0, 0)), "2d 5h");
     });
 });
 
@@ -312,5 +323,13 @@ describe("a task's words and days", () => {
         assert.equal(daysBetween("2026-10-10", "2026-10-12"), 2);
         assert.equal(daysBetween("2026-10-12", "2026-10-10"), -2);
         assert.equal(daysBetween("2026-10-31", "2026-11-01"), 1);
+    });
+});
+
+describe("words typed in the panel", () => {
+    it("are one line that no todo or backlog command reads as more than words", () => {
+        assert.equal(taskWords("  the  legend\n· soon "), "the legend - soon");
+        assert.equal(taskWords("--to Sara the board (after: T-61) (effort: high)"), "to Sara the board [after: T-61] [effort: high]");
+        assert.equal(taskWords("a (small) note"), "a (small) note");
     });
 });

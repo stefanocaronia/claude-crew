@@ -1,6 +1,5 @@
-// The only drawings the panel makes: a colleague's portrait in a circle and a progress bar, each at a fixed size, so the window's
-// width never shrinks them; the text around them is the surface's own. The light and dark colors follow savvy-progress by
-// johnnyvizz (MIT).
+// The panel's drawings: portraits, names, icons, marks and bars, each at a fixed size, so the window's width never shrinks them;
+// the text around them is the surface's own. The bars' light and dark colors follow savvy-progress by johnnyvizz (MIT).
 import type { Speaker } from "../types";
 
 const font = "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif";
@@ -26,7 +25,6 @@ export function avatarSvg(colleague: Speaker, uri: string | undefined, size: num
     return svg(size, size, face + ring + dot, isWorking);
 }
 
-/** A thin bar: the steps a colleague reported, in their color, or how full their context is, in gray. */
 /** Claude in a meeting's chat: an orange pixel critter of our own, on a round cream background as the colleagues' portraits are round. */
 export function claudeSvg(size: number): string
 {
@@ -53,7 +51,6 @@ export function iconSvg(name: "clock" | "calendar" | "bolt" | "pencil" | "memory
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size + top}" viewBox="0 ${-room} 24 ${24 + room}">${shapes[name]}</svg>`;
 }
 
-// The style block only where a drawing uses it: every character is carried in the panel's drawing, once per picture.
 // Each colleague color in a dark tint for the light theme and a light one for the dark theme, both readable in bold.
 const tints: Record<string, [string, string]> = {
     red: ["#b42318", "#f87171"],
@@ -181,6 +178,7 @@ export function barEndSvg(side: "start" | "end", color: string | undefined, isFi
     return svg(3, 6, track + (isFilled ? `<path d="${half}" fill="${color ?? "#8a8a86"}"/>` : `<path class="k" d="${half}"/>`));
 }
 
+// The style block only where a drawing uses it: every character is carried in the panel's drawing, once per picture.
 function svg(width: number, height: number, body: string, isThemed = true): string
 {
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${isThemed ? theme : ""}${body}</svg>`;

@@ -44,7 +44,7 @@ const en = {
     portrait: "Redo the portrait",
     levels: englishLevels,
     // `gap` stands between a number and its day or hour; `minute` carries its own space.
-    units: { day: "d", hour: "h", minute: " min", gap: "", thousand: "k", million: "M", decimal: "." },
+    units: { day: "d", gap: "", thousand: "k", million: "M", decimal: "." },
     meeting: "Meeting",
     invite: "Invite",
     closeMeeting: "Close the meeting",
@@ -59,7 +59,6 @@ const en = {
     tidyWith: (names: string) => `Tidy the todos of ${names}`,
     next: "Next task",
     nextWith: (names: string) => `Next task for ${names}`,
-    nextTip: "Start this task",
     starting: "Starting…",
     removeTask: "Remove",
     removeSure: (id: string) => (id ? `Archive ${id}? Press again` : "Remove? Press again"),
@@ -162,7 +161,7 @@ export const words: Record<Language, Words> = {
         canWrite: "può modificare i file del progetto",
         portrait: "Rifai il ritratto",
         levels: italianLevels,
-        units: { day: "g", hour: "h", minute: " min", gap: " ", thousand: " mila", million: " milioni", decimal: "," },
+        units: { day: "g", gap: " ", thousand: " mila", million: " milioni", decimal: "," },
         meeting: "Riunione",
         invite: "Invita",
         closeMeeting: "Chiudi la riunione",
@@ -177,7 +176,6 @@ export const words: Record<Language, Words> = {
         tidyWith: (names: string) => `Riordina i todo di ${names}`,
         next: "Prossimo compito",
         nextWith: (names: string) => `Prossimo compito per ${names}`,
-        nextTip: "Avvia questo compito",
         starting: "Avvio…",
         removeTask: "Elimina",
         removeSure: (id: string) => (id ? `Archiviare ${id}? Premi ancora` : "Eliminare? Premi ancora"),
@@ -276,7 +274,7 @@ export const words: Record<Language, Words> = {
         canWrite: "puede cambiar los archivos del proyecto",
         portrait: "Rehacer el retrato",
         levels: levelsOf.es,
-        units: { day: "d", hour: "h", minute: " min", gap: "", thousand: " mil", million: " M", decimal: "," },
+        units: { day: "d", gap: "", thousand: " mil", million: " M", decimal: "," },
         meeting: "Reunión",
         invite: "Invitar",
         closeMeeting: "Cerrar la reunión",
@@ -291,7 +289,6 @@ export const words: Record<Language, Words> = {
         tidyWith: (names: string) => `Ordenar los pendientes de ${names}`,
         next: "Siguiente tarea",
         nextWith: (names: string) => `Siguiente tarea para ${names}`,
-        nextTip: "Iniciar esta tarea",
         starting: "Iniciando…",
         removeTask: "Eliminar",
         removeSure: (id: string) => (id ? `¿Archivar ${id}? Pulsa otra vez` : "¿Eliminar? Pulsa otra vez"),
@@ -390,7 +387,7 @@ export const words: Record<Language, Words> = {
         canWrite: "peut modifier les fichiers du projet",
         portrait: "Refaire le portrait",
         levels: levelsOf.fr,
-        units: { day: "j", hour: "h", minute: " min", gap: "", thousand: " k", million: " M", decimal: "," },
+        units: { day: "j", gap: "", thousand: " k", million: " M", decimal: "," },
         meeting: "Réunion",
         invite: "Inviter",
         closeMeeting: "Clore la réunion",
@@ -405,7 +402,6 @@ export const words: Record<Language, Words> = {
         tidyWith: (names: string) => `Ranger les tâches de ${names}`,
         next: "Tâche suivante",
         nextWith: (names: string) => `Tâche suivante pour ${names}`,
-        nextTip: "Lancer cette tâche",
         starting: "Lancement…",
         removeTask: "Supprimer",
         removeSure: (id: string) => (id ? `Archiver ${id} ? Appuyez encore` : "Supprimer ? Appuyez encore"),
@@ -504,7 +500,7 @@ export const words: Record<Language, Words> = {
         canWrite: "darf die Dateien des Projekts ändern",
         portrait: "Porträt neu machen",
         levels: levelsOf.de,
-        units: { day: "T", hour: "Std.", minute: " Min.", gap: " ", thousand: " Tsd.", million: " Mio.", decimal: "," },
+        units: { day: "T", gap: " ", thousand: " Tsd.", million: " Mio.", decimal: "," },
         meeting: "Meeting",
         invite: "Einladen",
         closeMeeting: "Meeting beenden",
@@ -519,7 +515,6 @@ export const words: Record<Language, Words> = {
         tidyWith: (names: string) => `Aufgaben von ${names} aufräumen`,
         next: "Nächste Aufgabe",
         nextWith: (names: string) => `Nächste Aufgabe für ${names}`,
-        nextTip: "Diese Aufgabe starten",
         starting: "Startet…",
         removeTask: "Entfernen",
         removeSure: (id: string) => (id ? `${id} archivieren? Noch einmal drücken` : "Entfernen? Noch einmal drücken"),
@@ -618,7 +613,7 @@ export const words: Record<Language, Words> = {
         canWrite: "pode alterar os arquivos do projeto",
         portrait: "Refazer o retrato",
         levels: levelsOf.pt,
-        units: { day: "d", hour: "h", minute: " min", gap: "", thousand: " mil", million: " mi", decimal: "," },
+        units: { day: "d", gap: "", thousand: " mil", million: " mi", decimal: "," },
         meeting: "Reunião",
         invite: "Convidar",
         closeMeeting: "Encerrar a reunião",
@@ -633,7 +628,6 @@ export const words: Record<Language, Words> = {
         tidyWith: (names: string) => `Organizar as tarefas de ${names}`,
         next: "Próxima tarefa",
         nextWith: (names: string) => `Próxima tarefa para ${names}`,
-        nextTip: "Iniciar esta tarefa",
         starting: "Iniciando…",
         removeTask: "Remover",
         removeSure: (id: string) => (id ? `Arquivar ${id}? Pressione de novo` : "Remover? Pressione de novo"),
@@ -732,7 +726,7 @@ export const words: Record<Language, Words> = {
         canWrite: "プロジェクトのファイルを変更できます",
         portrait: "肖像を描き直す",
         levels: levelsOf.ja,
-        units: { day: "日", hour: "時間", minute: "分", gap: "", thousand: "k", million: "M", decimal: "." },
+        units: { day: "日", gap: "", thousand: "k", million: "M", decimal: "." },
         meeting: "会議",
         invite: "招待",
         closeMeeting: "会議を終了",
@@ -747,7 +741,6 @@ export const words: Record<Language, Words> = {
         tidyWith: (names: string) => `${names}のタスクを整理`,
         next: "次のタスク",
         nextWith: (names: string) => `${names}の次のタスク`,
-        nextTip: "このタスクを開始",
         starting: "開始中…",
         removeTask: "削除",
         removeSure: (id: string) => (id ? `${id} をアーカイブしますか？もう一度押してください` : "削除しますか？もう一度押してください"),
@@ -846,7 +839,7 @@ export const words: Record<Language, Words> = {
         canWrite: "可以修改项目文件",
         portrait: "重画头像",
         levels: levelsOf.zh,
-        units: { day: "天", hour: "小时", minute: "分钟", gap: "", thousand: "k", million: "M", decimal: "." },
+        units: { day: "天", gap: "", thousand: "k", million: "M", decimal: "." },
         meeting: "会议",
         invite: "邀请",
         closeMeeting: "结束会议",
@@ -861,7 +854,6 @@ export const words: Record<Language, Words> = {
         tidyWith: (names: string) => `整理${names}的待办`,
         next: "下一个任务",
         nextWith: (names: string) => `${names}的下一个任务`,
-        nextTip: "开始这个任务",
         starting: "启动中…",
         removeTask: "删除",
         removeSure: (id: string) => (id ? `归档 ${id}？再按一次` : "删除？再按一次"),
@@ -960,7 +952,7 @@ export const words: Record<Language, Words> = {
         canWrite: "프로젝트 파일을 수정할 수 있습니다",
         portrait: "초상화 다시 그리기",
         levels: levelsOf.ko,
-        units: { day: "일", hour: "시간", minute: "분", gap: "", thousand: "k", million: "M", decimal: "." },
+        units: { day: "일", gap: "", thousand: "k", million: "M", decimal: "." },
         meeting: "회의",
         invite: "초대",
         closeMeeting: "회의 종료",
@@ -975,7 +967,6 @@ export const words: Record<Language, Words> = {
         tidyWith: (names: string) => `${names}의 할 일 정리`,
         next: "다음 작업",
         nextWith: (names: string) => `${names}의 다음 작업`,
-        nextTip: "이 작업 시작",
         starting: "시작 중…",
         removeTask: "삭제",
         removeSure: (id: string) => (id ? `${id}을(를) 보관할까요? 한 번 더 누르세요` : "삭제할까요? 한 번 더 누르세요"),
@@ -1074,7 +1065,7 @@ export const words: Record<Language, Words> = {
         canWrite: "يمكنه تعديل ملفات المشروع",
         portrait: "إعادة رسم الصورة",
         levels: levelsOf.ar,
-        units: { day: "يوم", hour: "ساعة", minute: " دقيقة", gap: " ", thousand: " ألف", million: " مليون", decimal: "." },
+        units: { day: "يوم", gap: " ", thousand: " ألف", million: " مليون", decimal: "." },
         meeting: "اجتماع",
         invite: "دعوة",
         closeMeeting: "إنهاء الاجتماع",
@@ -1089,7 +1080,6 @@ export const words: Record<Language, Words> = {
         tidyWith: (names: string) => `ترتيب مهام ${names}`,
         next: "المهمة التالية",
         nextWith: (names: string) => `المهمة التالية لـ ${names}`,
-        nextTip: "ابدأ هذه المهمة",
         starting: "جارٍ البدء…",
         removeTask: "حذف",
         removeSure: (id: string) => (id ? `أرشفة ${id}؟ اضغط مرة أخرى` : "حذف؟ اضغط مرة أخرى"),
@@ -1188,7 +1178,7 @@ export const words: Record<Language, Words> = {
         canWrite: "может менять файлы проекта",
         portrait: "Перерисовать портрет",
         levels: levelsOf.ru,
-        units: { day: "д", hour: "ч", minute: " мин", gap: " ", thousand: " тыс.", million: " млн", decimal: "," },
+        units: { day: "д", gap: " ", thousand: " тыс.", million: " млн", decimal: "," },
         meeting: "Совещание",
         invite: "Пригласить",
         closeMeeting: "Завершить совещание",
@@ -1203,7 +1193,6 @@ export const words: Record<Language, Words> = {
         tidyWith: (names: string) => `Навести порядок в задачах: ${names}`,
         next: "Следующая задача",
         nextWith: (names: string) => `Следующая задача: ${names}`,
-        nextTip: "Начать эту задачу",
         starting: "Запуск…",
         removeTask: "Удалить",
         removeSure: (id: string) => (id ? `Архивировать ${id}? Нажмите ещё раз` : "Удалить? Нажмите ещё раз"),
@@ -1315,7 +1304,8 @@ export function languageOf(...hints: unknown[]): Language
 /** "920k", "1.2M"; in Italian "920 mila", "1,2 milioni". */
 export function formatTokens(count: number, units: Words["units"] = words.en.units): string
 {
-    return count >= 1e6 ? `${(count / 1e6).toFixed(1).replace(".", units.decimal)}${units.million}` : count >= 1e3 ? `${Math.round(count / 1e3)}${units.thousand}` : `${Math.round(count)}`;
+    // Past 999.5 thousand the thousands would round to 1000: a million already.
+    return count >= 999_500 ? `${(count / 1e6).toFixed(1).replace(".", units.decimal)}${units.million}` : count >= 1e3 ? `${Math.round(count / 1e3)}${units.thousand}` : `${Math.round(count)}`;
 }
 
 /** "2 min 54 s", "1 h 05 min", "40 s". */
@@ -1341,7 +1331,7 @@ export function isoWeek(at: number): string
 /** A task as a file name's part: lowercase ASCII and hyphens, at most `length` characters. */
 export function slugOf(text: string, length = 50): string
 {
-    const slug = text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    const slug = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
     return slug.slice(0, length).replace(/-+$/, "") || "report";
 }
 
@@ -1356,22 +1346,6 @@ export function dateOf(at: number): string
 export function listNames(names: string[], and: string, comma = ", "): string
 {
     return names.length < 2 ? names.join("") : `${names.slice(0, -1).join(comma)}${and}${names.at(-1)}`;
-}
-
-/** How long until a window resets: "2d 5h", "3h 10 min", "12 min"; in Italian "2 g 5 h". */
-export function formatUntil(resetsAt: string | undefined, now: number, units: Words["units"] = words.en.units): string
-{
-    const at = resetsAt ? Date.parse(resetsAt) : NaN;
-
-    if (Number.isNaN(at)) {
-        return "";
-    }
-
-    const minutes = Math.max(0, Math.round((at - now) / 60000));
-    const days = Math.floor(minutes / 1440);
-    const hours = Math.floor((minutes % 1440) / 60);
-    const gap = units.gap;
-    return days ? `${days}${gap}${units.day} ${hours}${gap}${units.hour}` : hours ? `${hours}${gap}${units.hour} ${minutes % 60}${units.minute}` : `${minutes}${units.minute}`;
 }
 
 /** "claude-opus-5-5" → "Opus 5.5". */

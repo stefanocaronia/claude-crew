@@ -17,7 +17,7 @@ const gray = "#888780";
 /** A colleague from their profile and their todo: the heading's name and role, the frontmatter's color, model and effort. */
 export function colleagueFrom(id: string, profile: string, todo: string, avatarStamp: number): Colleague
 {
-    const text = profile.replace(/^﻿/, "").replace(/\r\n/g, "\n");
+    const text = normalized(profile);
     const heading = /^# (.+)$/m.exec(text.replace(/^---\n[\s\S]*?\n---\n/, ""))?.[1]?.trim() ?? id;
     const [fullName = id, ...role] = heading.split(",");
     const color = field(text, "color");
@@ -26,7 +26,7 @@ export function colleagueFrom(id: string, profile: string, todo: string, avatarS
         name: fullName.trim().split(/\s+/)[0] ?? id,
         fullName: fullName.trim(),
         role: role.join(",").trim(),
-        color: (color && colors[color.toLowerCase()]) ?? (color?.startsWith("#") ? color : gray),
+        color: (color && colors[color.toLowerCase()]) ?? (color && /^#[0-9a-f]{3,8}$/i.test(color) ? color : gray),
         model: field(text, "model"),
         effort: field(text, "effort"),
         permissions: permissionsOf(listField(text, "tools")),
@@ -42,7 +42,7 @@ export function cardFrom(id: string, profile: string, todo: string, memory: stri
     const sections = text.split(/^(?=## )/m).filter(section => section.startsWith("## "));
     return {
         id,
-        description: field(profile.replace(/\r\n/g, "\n"), "description") ?? "",
+        description: field(normalized(profile), "description") ?? "",
         openTasks: openTasks(todo),
         memory: (sections.at(-1) ?? text.split("\n").slice(-12).join("\n")).trim(),
         memorySize: memorySizeOf(memory),
@@ -56,9 +56,9 @@ const shownHeadings = [0, 2];
 /** A profile's body in sections: each paragraph of its opening led by a bold title ("**Who you are.** …"), then the template's first
  * and third "## " sections, what they know and how they work; the project, what they return and their memory are instructions, left
  * out with the frontmatter and the heading. */
-export function profileSections(profile: string): Card["profile"]
+function profileSections(profile: string): Card["profile"]
 {
-    const body = profile.replace(/\r\n/g, "\n").replace(/^\uFEFF?---\n[\s\S]*?\n---\n/, "").replace(/^\s*# [^\n]*\n/, "");
+    const body = normalized(profile).replace(/^---\n[\s\S]*?\n---\n/, "").replace(/^\s*# [^\n]*\n/, "");
     const sections: Card["profile"] = [];
     let headed = 0;
 
@@ -91,7 +91,7 @@ export function profileSections(profile: string): Card["profile"]
 }
 
 /** How long a colleague's MEMORY.md may grow: Claude Code hands them only its beginning, so past this it is compacted into notes. */
-export const memoryLimit = { lines: 80, bytes: 10 * 1024 };
+const memoryLimit = { lines: 80, bytes: 10 * 1024 };
 
 /** A memory's length, and whether it is past what it may hold. */
 export function memorySizeOf(memory: string): { lines: number; bytes: number; isLong: boolean }
@@ -110,7 +110,7 @@ export function memorySizeOf(memory: string): { lines: number; bytes: number; is
  * would keep a memory of its own elsewhere. */
 export function agentSpecFrom(id: string, profile: string, memoryFolder: string): { name: string; description: string; prompt: string; tools?: string[]; model?: string; effort?: string }
 {
-    const text = profile.replace(/^﻿/, "").replace(/\r\n/g, "\n");
+    const text = normalized(profile);
     const tools = listField(text, "tools");
     const model = field(text, "model");
     const effort = field(text, "effort");
@@ -134,7 +134,6 @@ export function colleagueOf(team: Colleague[], subagentType: string): Colleague 
     return team.find(colleague => colleague.id === bare);
 }
 
-/** The heading of the last section of a memory, without its marks: "9 ottobre (notte): mappa del mondo". */
 /** The profile with its effort set, or without the line, so the colleague works at the session's effort; a profile with no
  * frontmatter is left as it is. */
 export function withEffort(profile: string, level: string | undefined): string
@@ -240,8 +239,31 @@ export function backlogOf(tasks: { colleague: string; lines: string[] }[], limit
 
 /** A todo line's parts: `P2 · 2026-10-29 · #matteo-3 · the task (after: #elena-1, T-62) (effort: high)`, each but the words optional:
  * the id is there when other tasks wait for this one, or is the number of the project's backlog task the line is the colleague's part
- * of (`T-61`); `after` names the tasks this one waits for, todo lines or backlog tasks, in any order with the effort. */
+ * of (`T-61`); `after` names the tasks this one waits for, todo lines or backlog tasks, in any order with the effort. Every drawing of
+ * the panel reads every open line, so a line is read once and its parts kept, frozen, while it is open. */
 export function taskOf(colleague: string, line: string): Task
+{
+    const key = `${colleague}\n${line}`;
+    const kept = readTasks.get(key);
+
+    if (kept) {
+        return kept;
+    }
+
+    // Lines closed or changed leave their parts behind: past a bound, all go and the open ones are read again.
+    if (readTasks.size >= readTasksLimit) {
+        readTasks.clear();
+    }
+
+    const task = Object.freeze(partsOf(colleague, line));
+    readTasks.set(key, task);
+    return task;
+}
+
+const readTasks = new Map<string, Task>();
+const readTasksLimit = 20_000;
+
+function partsOf(colleague: string, line: string): Task
 {
     const head = /^(?:(P[1-3]) · )?(?:(\d{4}-\d{2}-\d{2}) · )?(?:(#[\w-]+|[A-Z]+-\d+) · )?/.exec(line);
     let rest = line.slice(head?.[0].length ?? 0);
@@ -434,6 +456,12 @@ function listItems(lines: string[], start: number, end: number): string[]
     }
 
     return items;
+}
+
+// A file's text without its byte order mark, with plain line ends.
+function normalized(text: string): string
+{
+    return text.replace(/^﻿/, "").replace(/\r\n/g, "\n");
 }
 
 function frontmatterOf(text: string): string

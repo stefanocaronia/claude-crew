@@ -8,7 +8,7 @@
 
 Four, in the profile's `tools:`, which the user also switches in the panel's card: **Read** (`Grep, Glob`), **Write** (`Edit, Write`), **Testing** (`Bash`), **Web** (`WebSearch, WebFetch`). The Read tool is always listed, for their memory; `mcp__crew__step` too, to report steps to the panel. Write needs Read; Testing brings Read and Write, since a command can change any file.
 
-The panel enforces Read and Write on the file tools (and keeps two colleagues off the same file at once). Without the panel, Claude Code gives every colleague with a memory Edit and Write: then the permissions hold through the brief, which states them.
+The panel enforces Read and Write on the file tools (and keeps two colleagues off the same file at once). Where the panel does not run (a host without plugin hooks), Claude Code gives every colleague with a memory Edit and Write: then the permissions hold through the brief, which states them.
 
 Sensible ones, from what the colleague does:
 - **Read**: everyone who judges the project's work; not a colleague who only gives opinions on what they are told.

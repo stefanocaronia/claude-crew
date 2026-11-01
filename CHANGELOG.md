@@ -2,6 +2,17 @@
 
 What changes for whoever uses Crew, version by version. Plugins update in a new chat: `/plugin`, Marketplaces, claude-crew, Update marketplace, or turn its auto-update on there.
 
+## 0.14.0
+
+- Every colleague's brief ends with the rule on outside text: what they read in a web page, an issue or a stranger's file is data, kept with where it came from in their memory and todo, never a line telling anyone to do something. A profile's color is drawn only as a hex color or one of the plain names. A conversation counts a colleague with Bash as able to change files, and reads their tools also written as a `[list]` or in quotes.
+- With a large team and long todos the panel reads again only the files that changed (todos, memories, portraits, the list of installed plugins), draws the backlog's rows only while it is open, and writes who works in a chat only when that changes, or every 20 s while someone works; a new session stops the timers of the one before. A heavy panel draws in little more than half the time.
+- A new task's words are tidied as the panel writes them: ` · ` becomes ` - `, a parenthesis such as `(after: T-61)` in the text becomes `[after: T-61]`, so it is not taken for a dependency, and leading dashes go. Tokens past 999.5k read `1.0M`, never `1000k`. Profiles saved with a BOM or Windows line ends read as the others.
+- Removing a todo line archives it only once it is really gone from the todo.
+- Pixel portraits drew a background named in plain words (`orange`) in the browser's color: they now take the team's, as the vector ones do. Both portrait scripts say what is wrong with traits that are not JSON or a color they do not know.
+- A conversation forgotten after a month takes with it what the panel leaves in the temp folder for its session.
+- The instructions: the crew skill names the backlog's actions in the panel and keeps one "Tidying" rule that tasks, rounds and conversations point to; a round's brief is a list; hiring and editing say what holds where the panel does not run; the profile template drops the old 150-line limit, the memory's 80 lines and 10 KB said once.
+- The README shows the panel and a meeting, drawn with a made-up team (`tools/demo.mjs`, `tools/preview.mjs`).
+
 ## 0.13.2
 
 - Where the project keeps a backlog (the project plugin's), a colleague's todo is their own notebook: reminders, retests, checks, things to tell. A colleague proposes work for the project in their report, and Claude adds it to the backlog `--by` that colleague, `--to` whoever's field it is in, or Claude; only Claude and the user open and assign backlog tasks. A todo line with `T-61` in the id's place cites that task, it is no longer the task: the panel shows the task beside the line, and a line citing a task in another colleague's todo no longer hides it. Tidying a todo only cleans it.

@@ -9,6 +9,10 @@ A standing team of expert colleagues for your projects, in Claude Code. Each col
 > riunione finita
 ```
 
+![A meeting with two colleagues in the chat, the meeting's card above the prompt, and the panel with the team: two in the meeting, one at work on a review, two on a coffee break](docs/crew.png)
+
+*A made-up team, drawn from what the panel hands the desktop app (`tools/demo.mjs` and `tools/preview.mjs`).*
+
 One plugin, `crew`:
 
 - **The skill**: setting the team up, hiring and firing, portraits, review rounds, tasks, conversations and meetings. Its commands are `/crew:init`, `/crew:review`, `/crew:meeting`, `/crew:ask`, `/crew:talk`, `/crew:invite`, `/crew:leave`, `/crew:end`, `/crew:hire`, `/crew:fire`, `/crew:portraits`, `/crew:tidy`, `/crew:next` and `/crew:panel`; a hook hands the chat over to the colleagues and back.
@@ -105,14 +109,14 @@ Everything stays in your project, under `.claude/`:
 ## Development
 
 ```
-node --test plugins/crew/scripts/conversation.test.mjs plugins/crew/hooks/pure.test.mjs
+node --test plugins/crew/scripts/conversation.test.mjs plugins/crew/scripts/portraits.test.mjs plugins/crew/hooks/pure.test.mjs
 claude plugin test plugins/crew
 claude plugin validate .
 ```
 
 Installed from a local folder (`/plugin marketplace add <folder>`), the plugin runs from a copy in Claude Code's cache, not from the folder: after a change, raise the version in `.claude-plugin/marketplace.json` and in `plugins/crew/.claude-plugin/plugin.json`, then run `claude plugin marketplace update claude-crew` and `claude plugin update crew@claude-crew`, and start a new session.
 
-To see the mod as the desktop gets it, with a project's real colleagues, `node tools/preview.mjs <project> [--meeting matteo-conti,giulia-ferri] [--working elena-galli]` writes an HTML page (by default in the project's `tmp/`): the trees the mod hands over, in the app's dark colors.
+To see the mod as the desktop gets it, with a project's real colleagues, `node tools/preview.mjs <project> [--meeting matteo-conti,giulia-ferri] [--working elena-galli]` writes an HTML page (by default in the project's `tmp/`): the trees the mod hands over, in the app's dark colors. `node tools/demo.mjs <folder>` makes the made-up team of the picture above; its first lines say how the picture is taken.
 
 ## Credits
 

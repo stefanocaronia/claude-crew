@@ -3,6 +3,6 @@ node_modules/
 # Types Claude Code lays beside a mod it loads from a folder
 plugins/*/.claude-plugin/types/
 
-# The maintainer's own project docs and configuration, kept out of the public repo
-private/
-.claude/
+# The maintainer's own project docs, a private repo of their own, and configuration, kept out of the public repo
+/project/
+/.claude/

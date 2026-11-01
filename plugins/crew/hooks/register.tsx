@@ -530,6 +530,11 @@ export const register: Register = (on, options) => {
                     </Box>
                 )
                 : control);
+            // A button that cannot be pressed now, as one whose command is starting: drawn in a button's shape, gray, and no Button, which
+            // would still take the pointer, the hover and the focus (a Button has no disabled). The terminal draws a Button "[ label ]".
+            const idleButton = (key: string, label: string) => (isDesktop
+                ? <Box key={key} flexShrink={0} borderStyle="round" borderColor={outline} paddingX={1}><Text color={idleColor}>{label}</Text></Box>
+                : <Box key={key} flexShrink={0}><Text dimColor>{`[ ${label} ]`}</Text></Box>);
             const border = isDesktop ? { borderColor: outline } : { borderDimColor: true };
             // Material's outlined card, with the state layer under the pointer.
             const outlined = (key: string, children: (JSX.Element | null)[]) => (
@@ -1064,7 +1069,7 @@ export const register: Register = (on, options) => {
                             {isBusy || !selected.openTasks
                                 ? null
                                 : isNextStarting([selected])
-                                ? <Button key="card-next" label={`⏳ ${say.starting}`} onPress={() => undefined} />
+                                ? idleButton("card-next", `⏳ ${say.starting}`)
                                 : <Button key="card-next" label={`▶ ${say.nextWith(selected.name)}`} onPress={() => startNext([selected])} />}
                             {isBusy ? null : <Button key="card-round" label={`↻ ${say.roundWith(selected.name)}`} onPress={() => runCommand("crew:review", [selected])} />}
                             {retests ? <Button key="card-retest" label={`↻ ${say.retest(retests)}`} onPress={() => send(say.retestPrompt(selected.name))} /> : null}
@@ -1268,7 +1273,7 @@ export const register: Register = (on, options) => {
                         <Button key="act-tidy" label={`✦ ${pickedNames ? say.tidyWith(pickedNames) : say.tidy}`} onPress={() => runCommand("crew:tidy", pickedTeam.length ? pickedTeam : longTodos)} />
                         {pickedNames || colleagues.some(colleague => isFree(colleague) && colleague.openTasks)
                             ? isAnyNextStarting
-                                ? <Button key="act-next" label={`⏳ ${say.starting}`} onPress={() => undefined} />
+                                ? idleButton("act-next", `⏳ ${say.starting}`)
                                 : <Button key="act-next" label={`▶ ${pickedNames ? say.nextWith(pickedNames) : say.next}`} onPress={() => startNext(nextTeam)} />
                             : null}
                         {tip("open-settings", say.panelSettings, <Button key="open-settings" label={"⚙︎"} onPress={openSettings} />)}

@@ -700,10 +700,10 @@ test("▶ on a backlog row starts that task; Next task starts the next one of th
     expect(await ui.find({ type: "Text", text: "⏳ Starting…" })).toBeDefined();
     await ui.press({ key: "act-next" });
     expect(sent.at(-1)).toBe("/crew:next Matteo Sara");
-    expect((await ui.find({ key: "act-next" }))?.props.label).toBe("⏳ Starting…");
-    const count = sent.length;
-    await ui.press({ key: "act-next" });
-    expect(sent.length).toBe(count);
+    // Starting, it is no button at all: nothing to point at, hover or press.
+    expect(await ui.find({ type: "Button", key: "act-next" })).toBeUndefined();
+    expect(await ui.find({ key: "act-next" })).toBeDefined();
+    expect(await ui.find({ type: "Text", text: "⏳ Starting…" })).toBeDefined();
     // Once Sara is at work, her task is no longer starting.
     await $.agent.spawn({ prompt: "Now.", description: "now", subagentType: "sara-lombardi" } as never);
     expect(await ui.find({ type: "Text", text: "⏳ Starting…" })).toBeUndefined();

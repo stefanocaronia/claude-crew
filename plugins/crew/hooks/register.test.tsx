@@ -187,8 +187,8 @@ test("the panel marks who is in the meeting, whose controls stay above the promp
     for (const surface of surfaces) {
         const ui = await $.ui.mount({ plugin, surface, component: "Pane", requestId: "crew", props: { title: "Crew", isFocused: false, bodyColumns: 50, placement: "dock" } as never });
         expect(await ui.find({ key: "close" })).toBeUndefined();
-        expect((await ui.find({ key: "meeting-toggle" }))?.props.label).toBe("▾ ☰ In the meeting · 2");
-        expect((await ui.find({ key: "team-toggle" }))?.props.label).toBe("▾ ☕\uFE0E On a coffee break · 1");
+        expect(await headingOf(ui, "meeting-toggle")).toBe("▾ ☰ In the meeting (2)");
+        expect(await headingOf(ui, "team-toggle")).toBe("▾ ☕\uFE0E On a coffee break (1)");
         expect(await ui.find({ key: "pick-matteo-conti" })).toBeUndefined();
         expect(await ui.find({ key: "pick-sara-lombardi" })).toBeDefined();
 
@@ -209,7 +209,7 @@ test("under the team: the backlog, each task with who holds it and its effort; t
         // The plan's limits are the app's to show; the colleagues' week shows once they work.
         expect(await ui.find({ type: "Text", text: /% used/ })).toBeUndefined();
         expect(await ui.find({ type: "Text", text: "tasks without a priority" })).toBeDefined();
-        expect((await ui.find({ key: "backlog-toggle" }))?.props.label).toBe("▸ Backlog");
+        expect(await headingOf(ui, "backlog-toggle")).toBe("▸ Backlog");
         expect(await ui.find({ type: "Text", text: "retest the parser" })).toBeUndefined();
         await ui.press({ key: "backlog-toggle" });
         expect(await ui.find({ type: "Text", text: "retest the parser" })).toBeDefined();
@@ -304,15 +304,15 @@ test("a colleague is in one section: at work, then finished until sent back, the
     await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
     await $.agent.spawn({ prompt: "Review the parser.", description: "review the parser", subagentType: "matteo-conti" } as never);
     const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: { title: "Crew", isFocused: false, bodyColumns: 50, placement: "dock" } as never });
-    expect((await ui.find({ key: "working-toggle" }))?.props.label).toBe("▾ ⚒\uFE0E Working · 1");
-    expect((await ui.find({ key: "team-toggle" }))?.props.label).toBe("▾ ☕\uFE0E On a coffee break · 2");
+    expect(await headingOf(ui, "working-toggle")).toBe("▾ ⚒\uFE0E Working (1)");
+    expect(await headingOf(ui, "team-toggle")).toBe("▾ ☕\uFE0E On a coffee break (2)");
     await $.turn.complete({ agentId: "a1", reason: "answer", answer: "done", durationMs: 1000, isAborted: false, turnId: "t1" } as never);
     expect(await ui.find({ key: "working-toggle" })).toBeUndefined();
-    expect((await ui.find({ key: "finished" }))?.props.label).toBe("▾ ✓ Finished · 1");
-    expect((await ui.find({ key: "team-toggle" }))?.props.label).toBe("▾ ☕\uFE0E On a coffee break · 2");
+    expect(await headingOf(ui, "finished")).toBe("▾ ✓ Finished (1)");
+    expect(await headingOf(ui, "team-toggle")).toBe("▾ ☕\uFE0E On a coffee break (2)");
     await ui.press({ key: "back-a1" });
     expect(await ui.find({ key: "finished" })).toBeUndefined();
-    expect((await ui.find({ key: "team-toggle" }))?.props.label).toBe("▾ ☕\uFE0E On a coffee break · 3");
+    expect(await headingOf(ui, "team-toggle")).toBe("▾ ☕\uFE0E On a coffee break (3)");
 });
 
 test("a new task for one colleague sends those who had finished back to the coffee break", async ($, on) => {
@@ -322,10 +322,10 @@ test("a new task for one colleague sends those who had finished back to the coff
     await $.agent.spawn({ prompt: "Review the parser.", description: "review the parser", subagentType: "matteo-conti" } as never);
     await $.turn.complete({ agentId: "a1", reason: "answer", answer: "done", durationMs: 1000, isAborted: false, turnId: "t1" } as never);
     const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: { title: "Crew", isFocused: false, bodyColumns: 50, placement: "dock" } as never });
-    expect((await ui.find({ key: "finished" }))?.props.label).toBe("▾ ✓ Finished · 1");
+    expect(await headingOf(ui, "finished")).toBe("▾ ✓ Finished (1)");
     await $.agent.spawn({ prompt: "Think about modes.", description: "modes", subagentType: "sara-lombardi" } as never);
     expect(await ui.find({ key: "finished" })).toBeUndefined();
-    expect((await ui.find({ key: "working-toggle" }))?.props.label).toBe("▾ ⚒\uFE0E Working · 1");
+    expect(await headingOf(ui, "working-toggle")).toBe("▾ ⚒\uFE0E Working (1)");
 });
 
 test("a colleague at work or in the meeting takes no other task, and Claude is told why and how to free them", async ($, on) => {
@@ -370,12 +370,12 @@ test("a meeting that starts sends whoever had finished to the coffee break", asy
     await $.agent.spawn({ prompt: "Review the parser.", description: "review the parser", subagentType: "matteo-conti" } as never);
     await $.turn.complete({ agentId: "a1", reason: "answer", answer: "done", durationMs: 1000, isAborted: false, turnId: "t1" } as never);
     const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: { title: "Crew", isFocused: false, bodyColumns: 50, placement: "dock" } as never });
-    expect((await ui.find({ key: "finished" }))?.props.label).toBe("▾ ✓ Finished · 1");
+    expect(await headingOf(ui, "finished")).toBe("▾ ✓ Finished (1)");
     sent.files["/tmp/claude-crew/s1.json"] = JSON.stringify({ active: ["giulia-ferri"] });
     await $.turn.start({ text: "/crew:talk Giulia", turnId: "t2" } as never);
     expect(await ui.find({ key: "finished" })).toBeUndefined();
-    expect((await ui.find({ key: "meeting-toggle" }))?.props.label).toBe("▾ ☰ In the meeting · 1");
-    expect((await ui.find({ key: "team-toggle" }))?.props.label).toBe("▾ ☕︎ On a coffee break · 2");
+    expect(await headingOf(ui, "meeting-toggle")).toBe("▾ ☰ In the meeting (1)");
+    expect(await headingOf(ui, "team-toggle")).toBe("▾ ☕︎ On a coffee break (2)");
 });
 
 test("a colleague hired in a project that had no .claude/agents/ at the session's start is the panel's agent type, called by their id", async ($, on) => {
@@ -493,7 +493,7 @@ test("the backlog puts a P1 task first, with its priority and its age", async ($
     expect(await ui.find({ type: "Text", text: "P1 high priority" })).toBeDefined();
     // A row opens in place: the task whole, and in chips only what the row does not show, here the day it was written.
     await ui.press({ key: "backlog-open-0" });
-    expect((await ui.find({ key: "backlog-born-0" }))?.text).toBe("created on 2026-10-07");
+    expect(await chipOf(ui, "backlog-born-0")).toBe("created on 2026-10-07");
     await ui.press({ key: "backlog-open-0" });
     expect(await ui.find({ key: "backlog-born-0" })).toBeUndefined();
     await ui.unmount();
@@ -562,6 +562,11 @@ test("a task's words are written again in place, and a new task written in a col
     await ui.input({ key: "backlog-edit-0", text: "now  and · then" });
     expect(files[todo]).toBe("# Sara: todo\n\n- [ ] P1 · 2026-10-07 · #sara-1 · now and - then (effort: high)\n\n## Notes\n");
     await ui.press({ key: "open-sara-lombardi" });
+    await ui.press({ key: "card-new-task" });
+    // The form is a card with its ✕, which closes it.
+    expect(await ui.find({ key: "card-new-task-form" })).toBeDefined();
+    await ui.press({ key: "card-new-task-cancel" });
+    expect(await ui.find({ key: "card-new-task-form" })).toBeUndefined();
     await ui.press({ key: "card-new-task" });
     await ui.input({ key: "card-new-task", text: "the map" });
     expect(files[todo]).toBe("# Sara: todo\n\n- [ ] P1 · 2026-10-07 · #sara-1 · now and - then (effort: high)\n- [ ] P2 · 2026-10-10 · the map\n\n## Notes\n");
@@ -688,8 +693,8 @@ test("a colleague's tasks of the project's backlog are theirs: counted beside th
     await ui.press({ key: "backlog-cycle-2" });
     expect(asked).toContainEqual(["node", "/plugins/project/scripts/backlog.mjs", "set", "T-70", "--p", "P3"]);
     await ui.press({ key: "backlog-open-2" });
-    expect((await ui.find({ key: "backlog-born-2" }))?.text).toBe("created by Stefano on 2026-10-09");
-    expect((await ui.find({ key: "backlog-specs-2" }))?.text).toBe("does S-12");
+    expect(await chipOf(ui, "backlog-born-2")).toBe("created by Stefano on 2026-10-09");
+    expect(await chipOf(ui, "backlog-specs-2")).toBe("does S-12");
     // Its number is on its row: no chip says it again.
     expect(await ui.find({ key: "backlog-id-2" })).toBeUndefined();
     await ui.press({ key: "backlog-edit-text-2" });
@@ -827,7 +832,7 @@ test("a colleague left at work by a lost event is freed from their card, which h
     expect(await ui.find({ key: "card-free" })).toBeUndefined();
     expect(await ui.find({ key: "talk" })).toBeDefined();
     await ui.press({ key: "back" });
-    expect((await ui.find({ key: "finished" }))?.props.label).toBe("▾ ✓ Finished · 1");
+    expect(await headingOf(ui, "finished")).toBe("▾ ✓ Finished (1)");
     expect(await ui.find({ type: "Text", text: "Review the parser" })).toBeDefined();
     expect(await ui.find({ type: "Text", text: "Stopped" })).toBeDefined();
 });
@@ -964,11 +969,11 @@ test("a session that starts again keeps at work a colleague whose agent still ru
     const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
     // /reload-plugins starts the session again while Matteo works.
     await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
-    expect((await ui.find({ key: "working-toggle" }))?.props.label).toBe("▾ ⚒︎ Working · 1");
+    expect(await headingOf(ui, "working-toggle")).toBe("▾ ⚒︎ Working (1)");
     status = "killed";
     await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
     expect(await ui.find({ key: "working-toggle" })).toBeUndefined();
-    expect((await ui.find({ key: "finished" }))?.props.label).toBe("▾ ✓ Finished · 1");
+    expect(await headingOf(ui, "finished")).toBe("▾ ✓ Finished (1)");
 });
 
 test("at a turn's end the team's files are read again only when they changed", async ($, on) => {
@@ -1212,13 +1217,13 @@ test("a colleague who had finished and is resumed by a message is at work again,
     await $.agent.spawn({ prompt: "Review the setup.", description: "review the setup", subagentType: "matteo-conti" } as never);
     await $.turn.complete({ agentId: "a1", reason: "answer", answer: "First look.", durationMs: 1000, isAborted: false, turnId: "t1" } as never);
     const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: { title: "Crew", isFocused: false, bodyColumns: 50, placement: "dock" } as never });
-    expect((await ui.find({ key: "finished" }))?.props.label).toBe("▾ ✓ Finished · 1");
+    expect(await headingOf(ui, "finished")).toBe("▾ ✓ Finished (1)");
     // SendMessage resumes the same agent: its next call shows them at work again.
     await $.tool.call({ tool: "Read", file_path: "/p/.claude/agent-memory/matteo-conti/MEMORY.md", agentId: "a1", tool_use_id: "r1" } as never);
-    expect((await ui.find({ key: "working-toggle" }))?.props.label).toBe("▾ ⚒︎ Working · 1");
+    expect(await headingOf(ui, "working-toggle")).toBe("▾ ⚒︎ Working (1)");
     expect(await ui.find({ key: "finished" })).toBeUndefined();
     await $.turn.complete({ agentId: "a1", reason: "answer", answer: "Second look.", durationMs: 1000, isAborted: false, turnId: "t2" } as never);
-    expect((await ui.find({ key: "finished" }))?.props.label).toBe("▾ ✓ Finished · 1");
+    expect(await headingOf(ui, "finished")).toBe("▾ ✓ Finished (1)");
     expect(Object.keys(files).filter(path => path.includes("/matteo-conti/notes/")).length).toBe(2);
     await ui.unmount();
 });
@@ -1272,7 +1277,7 @@ test("a colleague's first step while their start is still being recorded shows t
         $.tool.call({ tool: "Read", file_path: "/p/.claude/agent-memory/sara-lombardi/todo.md", agentId: "a1", tool_use_id: "r1" } as never),
     ]);
     const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
-    expect((await ui.find({ key: "working-toggle" }))?.props.label).toBe("▾ ⚒︎ Working · 1");
+    expect(await headingOf(ui, "working-toggle")).toBe("▾ ⚒︎ Working (1)");
     await ui.unmount();
 });
 
@@ -1286,7 +1291,23 @@ test("a colleague at work whom the panel never saw start is found among the sess
     await $.tool.call({ tool: "Read", file_path: "/p/README.md", agentId: "x8", tool_use_id: "r0" } as never);
     expect(await ui.find({ key: "working-toggle" })).toBeUndefined();
     await $.tool.call({ tool: "Read", file_path: "/p/.claude/agent-memory/matteo-conti/MEMORY.md", agentId: "x9", tool_use_id: "r1" } as never);
-    expect((await ui.find({ key: "working-toggle" }))?.props.label).toBe("▾ ⚒︎ Working · 1");
+    expect(await headingOf(ui, "working-toggle")).toBe("▾ ⚒︎ Working (1)");
     expect(await ui.find({ type: "Text", text: /Review the setup/ })).toBeDefined();
     await ui.unmount();
 });
+
+// A section's heading as it reads: the words of its drawing on the desktop, of its button on the terminal.
+async function headingOf(ui: { find: (query: { key: string }) => Promise<{ props: unknown; children: unknown[] } | undefined> }, key: string): Promise<string | undefined>
+{
+    const box = await ui.find({ key: `heading-${key}` });
+    const drawn = box?.children.find(child => (child as { type?: string }).type === "Svg") as { props?: { alt?: string } } | undefined;
+    return drawn?.props?.alt ?? ((await ui.find({ key }))?.props as { label?: string } | undefined)?.label;
+}
+
+// A chip's text: on the desktop the words of its drawing, on the terminal its own.
+async function chipOf(ui: { find: (query: { key: string }) => Promise<{ text: string; children: unknown[] } | undefined> }, key: string): Promise<string | undefined>
+{
+    const box = await ui.find({ key });
+    const drawn = box?.children.find(child => (child as { type?: string }).type === "Svg") as { props?: { alt?: string } } | undefined;
+    return drawn?.props?.alt ?? box?.text;
+}

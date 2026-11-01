@@ -2,6 +2,12 @@
 
 What changes for whoever uses Crew, version by version. Plugins update in a new chat: `/plugin`, Marketplaces, claude-crew, Update marketplace, or turn its auto-update on there.
 
+## 0.14.5
+
+- The panel looks as the project plugin's: a section's heading is larger and bold, near black on a light theme and near white on a dark one, its count in brackets, "In the meeting (2)"; a press on it still opens and closes the section. The terminal keeps its buttons.
+- A chip of an open task is drawn whole, its text smaller on its tint with rounded corners. The rounded ends of 0.14.4 were drawings without words, which the desktop app may not draw.
+- In a colleague's card, ＋ New task sits on the heading row of their tasks, on the right; its form is a card like a task's, the text box two lines high at full width, with a ✕ that closes it.
+
 ## 0.14.4
 
 - An open task says only what its row does not (T-12): who holds it, its type and its priority are its marks, each named under the pointer, and its effort and age stay on its row. The rest are chips, as the project plugin draws a task's facts, gray with rounded ends, `[…]` on the terminal: a todo line's id, the due day (orange when near, red when past), since when it is in progress, the specifications it does, and who created it and when.

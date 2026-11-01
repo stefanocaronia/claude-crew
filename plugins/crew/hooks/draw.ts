@@ -173,17 +173,28 @@ export function idleButtonSvg(label: string, ground: string, ink: string): { sou
     return { source: svg(width, height, body, false), width, height };
 }
 
-/** A chip's line, 22 px; its ends 8 px wide, the room its text keeps from them. */
-export const chipEnd = { width: 8, height: 22 };
-
-/** A rounded end of a chip in its tint, corners of 4: the chip's middle is a Box, which has no corner radius. */
-export function chipEndSvg(side: "start" | "end", tint: string): string
+/** A chip whole, as a drawing: its text at 12 px in its color, on its tint, corners of 4, as much room beside the text as above and
+ * below it; a Box could have neither the smaller text nor the round corners. As the project plugin draws its chips. */
+export function chipSvg(label: string, tint: string, color: string): { source: string; width: number; height: number }
 {
-    const { width, height } = chipEnd;
-    const path = side === "start"
-        ? `M${width} 0H4A4 4 0 0 0 0 4V${height - 4}A4 4 0 0 0 4 ${height}H${width}Z`
-        : `M0 0H${width - 4}A4 4 0 0 1 ${width} 4V${height - 4}A4 4 0 0 1 ${width - 4} ${height}H0Z`;
-    return svg(width, height, `<path d="${path}" fill="${tint}"/>`, false);
+    const size = 12;
+    const room = 4;
+    const height = size + 2 * room + 2;
+    const width = Math.ceil(labelWidth(label) * size) + 2 * (room + 2);
+    const body = `<rect width="${width}" height="${height}" rx="4" fill="${tint}"/><text x="${width / 2}" y="${height / 2}" dominant-baseline="central" text-anchor="middle" font-family="${font}" font-size="${size}" fill="${color}">${xml(label)}</text>`;
+    return { source: svg(width, height, body, false), width, height };
+}
+
+/** A section's heading, larger and bold at 17 px, so that it stands apart from what the section holds: near black on a light theme, near
+ * white on a dark one. As the project plugin draws its headings. */
+export function headingSvg(label: string): { source: string; width: number; height: number }
+{
+    const size = 17;
+    const height = 26;
+    const width = Math.ceil(labelWidth(label) * size * 1.08) + 4;
+    const style = "<style>.h{fill:#1f1f1d}@media (prefers-color-scheme: dark){.h{fill:#f1f1ee}}</style>";
+    const body = `${style}<text class="h" x="0" y="${height / 2}" dominant-baseline="central" font-family="${font}" font-size="${size}" font-weight="600">${xml(label)}</text>`;
+    return { source: svg(width, height, body, false), width, height };
 }
 
 /** A wide bar's square middle, filled or the track, stretched to the room it is given: its rounded ends are `barEndSvg`. */

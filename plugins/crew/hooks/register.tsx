@@ -7,7 +7,7 @@ import type { EngineInterface, Register } from "claude-code";
 import type { Activity, Colleague, Meeting, Permissions, Preferences, Run, Speaker, WeeklyCounts } from "../types";
 import type { Task } from "./team.ts";
 
-import { avatarSvg, barEndSvg, blankSvg, checkboxSvg, chipEnd, chipEndSvg, pickedTint, captionSvg, claudeSvg, effortSvg, iconSvg, idleButtonSvg, nameSvg, prioritySvg, thumbnailSvg, typeColor, typeSvg, wideBarSvg } from "./draw.ts";
+import { avatarSvg, barEndSvg, blankSvg, checkboxSvg, chipSvg, headingSvg, pickedTint, captionSvg, claudeSvg, effortSvg, iconSvg, idleButtonSvg, nameSvg, prioritySvg, thumbnailSvg, typeColor, typeSvg, wideBarSvg } from "./draw.ts";
 import { claudeId, segmentsOf, speakersOf } from "./meeting.ts";
 import { imagePathsIn, imageTypeOf, isInside, isOwnMemory, resolvedPath } from "./paths.ts";
 import { cached, dataUri, filesIn, type FileStamp, forgetAll, forgetFiles, projectRoot, tempFolder } from "./files.ts";
@@ -84,6 +84,8 @@ const taskColor = "#2E9AA6";
 const warningColor = "#E2852B";
 // A ▶ that cannot be pressed now: gray, fainter than a dim one.
 const idleColor = "#80808040";
+// A chip's text where it has no color of its own.
+const quietColor = "#888780";
 // A field's button is a mark, as the project plugin's: save, add.
 const saveMark = "✓";
 const addMark = "+";
@@ -97,6 +99,9 @@ const blockedColor = "#C9A227";
 // Material's outline and hover state layer, in grays that read on light and dark themes.
 const outline = "#8080803d";
 const stateLayer = "#80808014";
+// A button's label of blanks, laid over a drawing, as a Button holds no drawing: about as wide as the drawing and never wider, with the
+// room the button keeps around its label, since a label too wide for its room ends in an ellipsis.
+const blanks = (width: number) => "\u00A0".repeat(Math.max(1, Math.floor((width - 24) / 5)));
 // Every card's faint gray, the same for all, and the state layer under the pointer; a picked colleague's in their color.
 const cardTint = "#80808003";
 const tinted = (picked?: string) => (picked ? { backgroundColor: pickedTint(picked), hover: { backgroundColor: pickedTint(picked) } } : { backgroundColor: cardTint, hover: { backgroundColor: stateLayer } });
@@ -542,22 +547,30 @@ export const register: Register = (on, options) => {
                     ? <Box key={key} flexShrink={0}><ui.Svg source={pill.source} alt={label} width={pill.width} height={pill.height} /></Box>
                     : <Box key={key} flexShrink={0}><Text dimColor>{`[ ${label} ]`}</Text></Box>;
             };
-            // A chip, as the project plugin draws a task's facts: one line high on a tint, gray or of its color, with rounded ends, each a
-            // drawing, as a Box has no corner radius; in brackets on the terminal.
+            // A chip, as the project plugin draws a task's facts: on the desktop a drawing whole, its text small on a tint, gray or of its
+            // color, with round corners; in brackets on the terminal.
             const chip = (key: string, text: string, color?: string) => {
                 if (!isDesktop || !("Svg" in ui)) {
                     return <Box key={key} flexShrink={0}><Text color={color} dimColor={!color}>{`[${text}]`}</Text></Box>;
                 }
 
-                const tint = color ? `${color}26` : stateLayer;
-                const end = (side: "start" | "end") => <ui.Svg key={`${key}-${side}`} source={chipEndSvg(side, tint)} alt="" width={chipEnd.width} height={chipEnd.height} />;
-                return (
-                    <Box key={key} flexShrink={0} flexDirection="row">
-                        {end("start")}
-                        <Box flexDirection="row" alignItems="center" backgroundColor={tint}><Text color={color} dimColor={!color}>{text}</Text></Box>
-                        {end("end")}
-                    </Box>
-                );
+                const drawn = chipSvg(text, color ? `${color}26` : stateLayer, color ?? quietColor);
+                return <Box key={key} flexShrink={0} alignSelf="center"><ui.Svg source={drawn.source} alt={text} width={drawn.width} height={drawn.height} /></Box>;
+            };
+            // A section's heading, which opens and closes it: on the desktop a drawing, larger and bold, with a button of blanks over it,
+            // as a Button draws its label in its own color and size; the terminal, the button itself.
+            const heading = (key: string, label: string, onPress: () => unknown) => {
+                const drawn = isDesktop ? headingSvg(label) : undefined;
+                return drawn && "Svg" in ui
+                    ? (
+                        <Box key={`heading-${key}`} flexShrink={1} minWidth={0}>
+                            <ui.Svg key={`${key}-heading`} source={drawn.source} alt={label} width={drawn.width} height={drawn.height} />
+                            <Box position="absolute" top={0} left={0}>
+                                <Button key={key} plain label={blanks(drawn.width)} onPress={() => void onPress()} />
+                            </Box>
+                        </Box>
+                    )
+                    : <Button key={key} plain label={label} onPress={() => void onPress()} />;
             };
             // On the desktop a button is its mark alone, its words under the pointer; the terminal, which shows no hint, keeps them.
             const iconButton = (key: string, mark: string, words: string, onPress: () => unknown, color?: string) => {
@@ -1043,6 +1056,7 @@ export const register: Register = (on, options) => {
                 // Their tasks as the backlog draws them, by priority and age: the first ones, or all of them when the user asks.
                 const isCardTasksOpen = Boolean(panel.isCardTasksOpen);
                 const cardTasks = details ? shown(backlogOf([{ colleague: selected.id, lines: details.openTasks }], isCardTasksOpen ? details.openTasks.length : cardTaskLimit, held)) : [];
+                const isAdding = panel.editing === `new:${selected.id}`;
                 // How many open tasks of each priority, beside their name.
                 const priorityCounts = ["P1", "P2", "P3"].flatMap(priority => {
                     const count = (details?.openTasks ?? []).filter(line => todoTask("", line).priority === priority).length;
@@ -1112,14 +1126,26 @@ export const register: Register = (on, options) => {
                         {details
                             ? (
                                 <Box key="card-tasks" flexDirection="column" gap={1}>
+                                    {/* The button that opens the new task's form sits on the heading's row, on the right, as the project plugin's. */}
                                     <Box flexDirection="row" justifyContent="space-between" alignItems="center">
                                         <Text bold>{say.tasks}</Text>
-                                        {isBusy ? null : <Button key="card-tidy" label={`✦ ${say.tidy}`} plain dimColor onPress={() => runCommand("crew:tidy", [selected])} />}
+                                        <Box flexDirection="row" columnGap={2} alignItems="center">
+                                            {"Input" in ui && !isAdding
+                                                ? <Button key="card-new-task" label={`＋ ${say.newTask}`} plain dimColor onPress={() => update($, view, now => ({ ...now, editing: `new:${selected.id}` }))} />
+                                                : null}
+                                            {isBusy ? null : <Button key="card-tidy" label={`✦ ${say.tidy}`} plain dimColor onPress={() => runCommand("crew:tidy", [selected])} />}
+                                        </Box>
                                     </Box>
-                                    {"Input" in ui
-                                        ? panel.editing === `new:${selected.id}`
-                                            ? <ui.Input key="card-new-task" placeholder={say.newTaskHint} autoFocus submitLabel={addMark} onSubmit={(value: string) => addTask(selected, value)} />
-                                            : <Button key="card-new-task" label={`＋ ${say.newTask}`} plain dimColor onPress={() => update($, view, now => ({ ...now, editing: `new:${selected.id}` }))} />
+                                    {/* The form, a card like a task's: the text box at full width, then its ✕ on the right. */}
+                                    {"Input" in ui && isAdding
+                                        ? (
+                                            <Box key="card-new-task-form" flexDirection="column" borderStyle="round" {...border} paddingX={1} {...(isDesktop ? tinted() : {})}>
+                                                <ui.Input key="card-new-task" placeholder={say.newTaskHint} rows={2} autoFocus submitLabel={addMark} onSubmit={(value: string) => addTask(selected, value)} />
+                                                <Box flexDirection="row" justifyContent="flex-end" marginTop={1}>
+                                                    {iconButton("card-new-task-cancel", "✕", say.cancel, () => update($, view, now => ({ ...now, editing: undefined })))}
+                                                </Box>
+                                            </Box>
+                                        )
                                         : null}
                                     {cardTasks.length ? cardTasks.map((task, index) => taskRow("card-task", index, task, selected, null)) : <Text key="card-no-tasks" dimColor>{say.toDo(0)}</Text>}
                                     {details.openTasks.length > cardTaskLimit
@@ -1235,7 +1261,7 @@ export const register: Register = (on, options) => {
                 ? (
                     <Box key={key} flexDirection="column" gap={1}>
                         <Box flexDirection="row" flexWrap="wrap" columnGap={2} alignItems="center">
-                            <Button key={key === "finished-section" ? "finished" : `${key}-toggle`} label={`${isClosed ? "▸" : "▾"} ${icon} ${title} · ${items.length}`} plain onPress={() => update($, view, toggle)} />
+                            {heading(key === "finished-section" ? "finished" : `${key}-toggle`, `${isClosed ? "▸" : "▾"} ${icon} ${title} (${items.length})`, () => update($, view, toggle))}
                             {extra}
                         </Box>
                         {isClosed ? null : <Box key={`${key}-grid`} flexDirection="row" flexWrap="wrap" gap={1}>{items}</Box>}
@@ -1316,7 +1342,7 @@ export const register: Register = (on, options) => {
                         ? (
                             <Box key="backlog" flexDirection="column" gap={1}>
                                 <Box flexDirection="row" justifyContent="space-between" alignItems="center">
-                                    <Button key="backlog-toggle" label={`${panel.isBacklogOpen ? "▾" : "▸"} ${say.backlog}`} plain onPress={() => update($, view, current => ({ ...current, isBacklogOpen: !current.isBacklogOpen }))} />
+                                    {heading("backlog-toggle", `${panel.isBacklogOpen ? "▾" : "▸"} ${say.backlog}`, () => update($, view, current => ({ ...current, isBacklogOpen: !current.isBacklogOpen })))}
                                     <Text dimColor>{`${Math.min(backlogSize, openCount)}/${openCount}`}</Text>
                                 </Box>
                                 {panel.isBacklogOpen ? backlogRows : null}

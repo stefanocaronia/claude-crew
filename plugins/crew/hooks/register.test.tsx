@@ -210,6 +210,8 @@ test("under the team: the backlog, each task with who holds it and its effort; t
         expect(await ui.find({ type: "Text", text: /% used/ })).toBeUndefined();
         expect(await ui.find({ type: "Text", text: "tasks without a priority" })).toBeDefined();
         expect(await headingOf(ui, "backlog-toggle")).toBe("▸ Backlog");
+        // On the desktop only the arrow is a button, so no state layer lights under the pointer on the heading's drawing.
+        expect((await ui.find({ key: "backlog-toggle" }))?.props.label).toBe(surface === "desktop" ? "▸" : "▸ Backlog");
         expect(await ui.find({ type: "Text", text: "retest the parser" })).toBeUndefined();
         await ui.press({ key: "backlog-toggle" });
         expect(await ui.find({ type: "Text", text: "retest the parser" })).toBeDefined();

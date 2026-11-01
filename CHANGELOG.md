@@ -2,6 +2,10 @@
 
 What changes for whoever uses Crew, version by version. Plugins update in a new chat: `/plugin`, Marketplaces, claude-crew, Update marketplace, or turn its auto-update on there.
 
+## 0.14.6
+
+- A section's heading no longer lights up under the pointer, as the project plugin's: on the desktop only its arrow, ▾ or ▸, is a button that opens and closes the section, and the heading's words beside it are a drawing, 24 px high. The terminal keeps the whole heading as its button.
+
 ## 0.14.5
 
 - The panel looks as the project plugin's: a section's heading is larger and bold, near black on a light theme and near white on a dark one, its count in brackets, "In the meeting (2)"; a press on it still opens and closes the section. The terminal keeps its buttons.

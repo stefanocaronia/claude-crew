@@ -99,9 +99,6 @@ const blockedColor = "#C9A227";
 // Material's outline and hover state layer, in grays that read on light and dark themes.
 const outline = "#8080803d";
 const stateLayer = "#80808014";
-// A button's label of blanks, laid over a drawing, as a Button holds no drawing: about as wide as the drawing and never wider, with the
-// room the button keeps around its label, since a label too wide for its room ends in an ellipsis.
-const blanks = (width: number) => "\u00A0".repeat(Math.max(1, Math.floor((width - 24) / 5)));
 // Every card's faint gray, the same for all, and the state layer under the pointer; a picked colleague's in their color.
 const cardTint = "#80808003";
 const tinted = (picked?: string) => (picked ? { backgroundColor: pickedTint(picked), hover: { backgroundColor: pickedTint(picked) } } : { backgroundColor: cardTint, hover: { backgroundColor: stateLayer } });
@@ -557,20 +554,20 @@ export const register: Register = (on, options) => {
                 const drawn = chipSvg(text, color ? `${color}26` : stateLayer, color ?? quietColor);
                 return <Box key={key} flexShrink={0} alignSelf="center"><ui.Svg source={drawn.source} alt={text} width={drawn.width} height={drawn.height} /></Box>;
             };
-            // A section's heading, which opens and closes it: on the desktop a drawing, larger and bold, with a button of blanks over it,
-            // as a Button draws its label in its own color and size; the terminal, the button itself.
-            const heading = (key: string, label: string, onPress: () => unknown) => {
+            // A section's heading: on the desktop its arrow, the button that opens and closes it, then a drawing, larger and bold, as a
+            // Button draws its label in its own color and size; the drawing takes no press, so no state layer lights under the pointer
+            // but the arrow's, as the project plugin's. The terminal, the button itself.
+            const heading = (key: string, isOpen: boolean, label: string, onPress: () => unknown) => {
+                const arrow = isOpen ? "▾" : "▸";
                 const drawn = isDesktop ? headingSvg(label) : undefined;
                 return drawn && "Svg" in ui
                     ? (
-                        <Box key={`heading-${key}`} flexShrink={1} minWidth={0}>
-                            <ui.Svg key={`${key}-heading`} source={drawn.source} alt={label} width={drawn.width} height={drawn.height} />
-                            <Box position="absolute" top={0} left={0}>
-                                <Button key={key} plain label={blanks(drawn.width)} onPress={() => void onPress()} />
-                            </Box>
+                        <Box key={`heading-${key}`} flexDirection="row" alignItems="center" columnGap={1} flexShrink={1} minWidth={0}>
+                            <Button key={key} plain label={arrow} onPress={() => void onPress()} />
+                            <ui.Svg source={drawn.source} alt={`${arrow} ${label}`} width={drawn.width} height={drawn.height} />
                         </Box>
                     )
-                    : <Button key={key} plain label={label} onPress={() => void onPress()} />;
+                    : <Button key={key} plain label={`${arrow} ${label}`} onPress={() => void onPress()} />;
             };
             // On the desktop a button is its mark alone, its words under the pointer; the terminal, which shows no hint, keeps them.
             const iconButton = (key: string, mark: string, words: string, onPress: () => unknown, color?: string) => {
@@ -1261,7 +1258,7 @@ export const register: Register = (on, options) => {
                 ? (
                     <Box key={key} flexDirection="column" gap={1}>
                         <Box flexDirection="row" flexWrap="wrap" columnGap={2} alignItems="center">
-                            {heading(key === "finished-section" ? "finished" : `${key}-toggle`, `${isClosed ? "▸" : "▾"} ${icon} ${title} (${items.length})`, () => update($, view, toggle))}
+                            {heading(key === "finished-section" ? "finished" : `${key}-toggle`, !isClosed, `${icon} ${title} (${items.length})`, () => update($, view, toggle))}
                             {extra}
                         </Box>
                         {isClosed ? null : <Box key={`${key}-grid`} flexDirection="row" flexWrap="wrap" gap={1}>{items}</Box>}
@@ -1342,7 +1339,7 @@ export const register: Register = (on, options) => {
                         ? (
                             <Box key="backlog" flexDirection="column" gap={1}>
                                 <Box flexDirection="row" justifyContent="space-between" alignItems="center">
-                                    {heading("backlog-toggle", `${panel.isBacklogOpen ? "▾" : "▸"} ${say.backlog}`, () => update($, view, current => ({ ...current, isBacklogOpen: !current.isBacklogOpen })))}
+                                    {heading("backlog-toggle", Boolean(panel.isBacklogOpen), say.backlog, () => update($, view, current => ({ ...current, isBacklogOpen: !current.isBacklogOpen })))}
                                     <Text dimColor>{`${Math.min(backlogSize, openCount)}/${openCount}`}</Text>
                                 </Box>
                                 {panel.isBacklogOpen ? backlogRows : null}

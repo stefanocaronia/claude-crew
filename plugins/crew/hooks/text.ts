@@ -1335,6 +1335,35 @@ export function slugOf(text: string, length = 50): string
     return slug.slice(0, length).replace(/-+$/, "") || "report";
 }
 
+/** A web address in a text, as a link draws it: where it goes and its words. */
+export type WebLink = { href: string; label: string };
+
+/** A text's web addresses apart from the words around them, so each can be drawn as a link: Markdown's [words](https://…) and bare
+ * http(s) addresses, which leave to the sentence the punctuation that ends it and a parenthesis they did not open. */
+export function linksIn(text: string): (string | WebLink)[]
+{
+    const parts: (string | WebLink)[] = [];
+    let last = 0;
+
+    for (const match of text.matchAll(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)|https?:\/\/[^\s<>"'`]+/g)) {
+        const [whole, label, linked] = match;
+        let href = linked ?? whole.replace(/[.,;:!?»"'\]}]+$/, "");
+
+        while (!linked && href.endsWith(")") && (href.match(/\(/g)?.length ?? 0) < (href.match(/\)/g)?.length ?? 0)) {
+            href = href.slice(0, -1).replace(/[.,;:!?»"'\]}]+$/, "");
+        }
+
+        if (match.index > last) {
+            parts.push(text.slice(last, match.index));
+        }
+
+        parts.push({ href, label: label ?? href });
+        last = match.index + (linked ? whole.length : href.length);
+    }
+
+    return last < text.length ? [...parts, text.slice(last)] : parts;
+}
+
 /** A moment's local date: "2026-10-11". */
 export function dateOf(at: number): string
 {

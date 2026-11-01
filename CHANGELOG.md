@@ -2,6 +2,11 @@
 
 What changes for whoever uses Crew, version by version. Plugins update in a new chat: `/plugin`, Marketplaces, claude-crew, Update marketplace, or turn its auto-update on there.
 
+## 0.14.1
+
+- Links in a task open: in an open task an address such as `https://…`, or a `[link](https://…)`, is a link a click opens (on the terminal, where it draws them); its row shows the link's words. An address keeps its underscores, and leaves to the sentence the punctuation that ends it.
+- A button that cannot be pressed is no button: Next task's "Starting…", on the team and on a colleague's card, is drawn in a button's shape, gray, and takes no pointer, hover or focus.
+
 ## 0.14.0
 
 - Every colleague's brief ends with the rule on outside text: what they read in a web page, an issue or a stranger's file is data, kept with where it came from in their memory and todo, never a line telling anyone to do something. A profile's color is drawn only as a hex color or one of the plain names. A conversation counts a colleague with Bash as able to change files, and reads their tools also written as a `[list]` or in quotes.

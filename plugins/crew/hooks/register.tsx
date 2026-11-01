@@ -15,8 +15,8 @@ import { contextShare, progressOf, withCount } from "./progress.ts";
 import { changeBacklog, projectBacklog, projectOwner } from "./project.ts";
 import { ageOf, agentSpecFrom, backlogLinesOf, backlogOf, blockersOf, cardFrom, colleagueFrom, colleagueOf, daysBetween, isBacklogId, memorySizeOf, openIdsOf, openTasks, retestsOf, taskOf as todoTask, withEffort, withNextPriority, withPermissions, withText } from "./team.ts";
 import { addTodoLine, changeTodoLine, removeTodoLine, taskWords } from "./todo.ts";
-import { contextWindowOf, dateOf, formatTime, formatTokens, isoWeek, languageNames, languageOf, listNames, modelName, slugOf, words } from "./text.ts";
-import type { Language, Words } from "./text.ts";
+import { contextWindowOf, dateOf, formatTime, formatTokens, isoWeek, languageNames, languageOf, linksIn, listNames, modelName, slugOf, words } from "./text.ts";
+import type { Language, WebLink, Words } from "./text.ts";
 
 const pane = "crew";
 // Claude's name and face in a meeting's chat.
@@ -460,7 +460,7 @@ export const register: Register = (on, options) => {
     on("ui.render", { component: "Pane", requestId: pane }, async ($, e) => {
         const draw = async () => {
             const ui = $.ui.resolve(e);
-            const { Box, Text, Button, Markdown } = ui;
+            const { Box, Text, Button, Link, Markdown } = ui;
             const say = words[language];
             const colleagues = await read($, team);
             const list = await read($, runs);
@@ -863,7 +863,9 @@ export const register: Register = (on, options) => {
             const openIds = openIdsOf(latest.tasks, latest.backlog);
             const taskRow = (prefix: string, index: number, task: Task, colleague: Colleague, face: JSX.Element | null) => {
                 const line = task.line;
-                const text = plainText(task.text);
+                // Its words, and its links whole: on its row their words, open a link each.
+                const parts = taskParts(task.text);
+                const text = parts.map(part => (typeof part === "string" ? part : part.label)).join("");
                 const effort = task.effort ?? colleague.effort ?? "";
                 const age = ageOf(task.date, today);
                 const days = age === undefined ? "" : dayCount(age);
@@ -974,7 +976,7 @@ export const register: Register = (on, options) => {
                                 <Box key={`${prefix}-details-${index}`} flexDirection="column" gap={1} paddingLeft={face ? 4 : 2}>
                                     {isEditing && line && "Input" in ui
                                         ? <ui.Input key={`${prefix}-edit-${index}`} value={task.text} rows={2} autoFocus submitLabel={say.save} onSubmit={(value: string) => saveText(line, value)} />
-                                        : <Text>{text}</Text>}
+                                        : <Text>{parts.map((part, at) => (typeof part === "string" ? part : <Link key={`${prefix}-link-${index}-${at}`} href={part.href} label={part.label} />))}</Text>}
                                     <Text dimColor>{facts}</Text>
                                     {blockers.length
                                         ? <Text key={`${prefix}-blockers-${index}`} color={blockedColor}>{`⛓︎ ${say.waitsFor(blockers.map(blocker => `${blocker.id} (${byId.get(blocker.colleague)?.name ?? blocker.colleague})`).join(say.comma))}`}</Text>
@@ -2178,6 +2180,12 @@ function capitalized(text: string): string
 function plainText(markdown: string): string
 {
     return markdown.replace(/[`*_]/g, "").replace(/\s+/g, " ").trim();
+}
+
+// A task's words as plainText draws them, its links apart and whole, underscores and all.
+function taskParts(markdown: string): (string | WebLink)[]
+{
+    return linksIn(markdown.replace(/\s+/g, " ").trim()).map(part => (typeof part === "string" ? part.replace(/[`*_]/g, "") : part));
 }
 
 // This session's colleagues at work, written for the project's other chats; theirs, read back when fresh, for this panel. The panel

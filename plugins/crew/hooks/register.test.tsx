@@ -496,6 +496,20 @@ test("the backlog puts a P1 task first, with its priority and its age", async ($
     await ui.unmount();
 });
 
+test("a task's links: their words on its row, each a link once it is open, whole, underscores and all", async ($, on) => {
+    const sent = world(on, []);
+    sent.files["/p/.claude/agent-memory/sara-lombardi/todo.md"] = "- [ ] P1 · 2026-10-07 · Read *[the guide](https://claude.com/docs/directory/publish)* and https://example.com/a_b_c.\n";
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+    const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
+    await ui.press({ key: "backlog-toggle" });
+    expect(await ui.find({ type: "Text", text: "▸ Read the guide and https://example.com/a_b_c." })).toBeDefined();
+    expect(await ui.findAll({ type: "Link" })).toHaveLength(0);
+    await ui.press({ key: "backlog-open-0" });
+    const links = (await ui.findAll({ type: "Link" })).map(link => [(link.props as { href: string }).href, (link.props as { label: string }).label]);
+    expect(links).toEqual([["https://claude.com/docs/directory/publish", "the guide"], ["https://example.com/a_b_c", "https://example.com/a_b_c"]]);
+    await ui.unmount();
+});
+
 test("a colleague's card: their tasks as rows, the first ten until all are asked, the memory closed under its heading", async ($, on) => {
     const sent = world(on, []);
     sent.files["/p/.claude/agent-memory/matteo-conti/todo.md"] = Array.from({ length: 12 }, (_, index) => `- [ ] P2 · 2026-10-0${(index % 9) + 1} · task ${index + 1}`).join("\n");

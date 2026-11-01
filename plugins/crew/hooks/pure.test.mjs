@@ -7,7 +7,7 @@ import { imagePathsIn, isInside, isOwnMemory, resolvedPath } from "./paths.ts";
 import { withCount } from "./progress.ts";
 import { ageOf, agentSpecFrom, backlogLinesOf, backlogOf, blockersOf, daysBetween, cardFrom, colleagueFrom, colleagueOf, memorySizeOf, openIdsOf, openTasks, permissionsOf, retestsOf, taskOf, withEffort, withNextPriority, withPermissions, withText } from "./team.ts";
 import { taskWords } from "./todo.ts";
-import { dateOf, formatTokens, isoWeek, languageOf, listNames, modelName, slugOf, words } from "./text.ts";
+import { dateOf, formatTokens, isoWeek, languageOf, linksIn, listNames, modelName, slugOf, words } from "./text.ts";
 
 const profile = "---\r\nname: matteo-conti\r\ndescription: \"Matteo Conti, architetto TypeScript. Usalo per le revisioni.\"\r\ntools: Read\r\nmemory: project\r\neffort: high\r\ncolor: red\r\n---\r\n\r\n# Matteo Conti, architetto TypeScript\r\n\r\nChi sei.";
 const matteo = colleagueFrom("matteo-conti", profile, "# todo\n- [ ] uno\n- [x] fatto\n- [ ] due\n", 7);
@@ -331,5 +331,14 @@ describe("words typed in the panel", () => {
         assert.equal(taskWords("  the  legend\n· soon "), "the legend - soon");
         assert.equal(taskWords("--to Sara the board (after: T-61) (effort: high)"), "to Sara the board [after: T-61] [effort: high]");
         assert.equal(taskWords("a (small) note"), "a (small) note");
+    });
+});
+
+describe("a text's links", () => {
+    it("sets bare addresses and Markdown's links apart, leaving the sentence its punctuation", () => {
+        assert.deepEqual(linksIn("see https://claude.com/docs/directory/publish."), ["see ", { href: "https://claude.com/docs/directory/publish", label: "https://claude.com/docs/directory/publish" }, "."]);
+        assert.deepEqual(linksIn("[the guide](https://a.io/x_y) now"), [{ href: "https://a.io/x_y", label: "the guide" }, " now"]);
+        assert.deepEqual(linksIn("(on https://en.wikipedia.org/wiki/Go_(game)), then"), ["(on ", { href: "https://en.wikipedia.org/wiki/Go_(game)", label: "https://en.wikipedia.org/wiki/Go_(game)" }, "), then"]);
+        assert.deepEqual(linksIn("no link, ftp://old.io"), ["no link, ftp://old.io"]);
     });
 });

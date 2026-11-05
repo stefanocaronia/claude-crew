@@ -809,6 +809,58 @@ test("two tasks for one colleague at the same moment: one starts, the other is r
     expect((third as { deny?: string }).deny).toMatch(/already at work/);
 });
 
+test("a colleague at work in another chat of the project takes no task here, nor a meeting; another project's chat is not in the way", async ($, on) => {
+    const { files } = world(on, []);
+    on("tool.call", () => ({ result: "ran" }) as never);
+    const at = Date.UTC(2026, 9, 10, 9, 0);
+    const run = { agentId: "x1", colleague: "sara-lombardi", task: "Translate the menus", model: "claude-opus-5-5", status: "running", startedAt: at, contextTokens: 0, contextMax: 200000, tokens: 0 };
+    files["/tmp/claude-crew/work-other.json"] = JSON.stringify({ root: "/p", at, runs: [run] });
+    files["/tmp/claude-crew/work-elsewhere.json"] = JSON.stringify({ root: "/q", at, runs: [{ ...run, agentId: "x2", colleague: "matteo-conti" }], meeting: ["matteo-conti"] });
+    // A chat with a meeting going on and nobody at work.
+    files["/tmp/claude-crew/work-meeting.json"] = JSON.stringify({ root: "/p", at, runs: [], meeting: ["giulia-ferri"] });
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+    const giulia = await $.agent.spawn({ prompt: "Read the playtest.", description: "read the playtest", subagentType: "giulia-ferri" } as never);
+    expect((giulia as { deny?: string }).deny).toMatch(/^Giulia is in a meeting with the user in another chat of this project, and a colleague is in one place at a time\. Give them this task once they have left it \(\/crew:leave Giulia or \/crew:end there\)/);
+    const meet = await $.tool.call({ tool: "Bash", command: "node /x/conversation.mjs talk Giulia Matteo" } as never);
+    expect((meet as { deny?: string }).deny).toMatch(/^Giulia \(in a meeting in another chat\): a colleague at work on a task, or in a meeting in another chat, joins no meeting here until that ends\./);
+    const sara = await $.agent.spawn({ prompt: "Think about modes.", description: "modes", subagentType: "sara-lombardi" } as never);
+    expect((sara as { deny?: string }).deny).toMatch(/^Sara is already at work on "Translate the menus" in another chat of this project, and a colleague takes one task at a time, wherever it comes from\. Give this one to them once that task is done/);
+    const talk = await $.tool.call({ tool: "Bash", command: "node /x/conversation.mjs talk Sara" } as never);
+    expect((talk as { deny?: string }).deny).toMatch(/Sara \(at work on "Translate the menus" in another chat\)/);
+    const matteo = await $.agent.spawn({ prompt: "Review the parser.", description: "review the parser", subagentType: "matteo-conti" } as never);
+    expect((matteo as { agentId?: string }).agentId).toBe("a1");
+    // The project's other chats learn of it at once.
+    expect(JSON.parse(files["/tmp/claude-crew/work-s1.json"] ?? "{}").runs?.[0]?.colleague).toBe("matteo-conti");
+});
+
+test("a chat shares who is in its meeting, so the project's other chats give them no task", async ($, on) => {
+    const { files } = world(on, ["giulia-ferri"]);
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+    await $.agent.spawn({ prompt: "Read the playtest.", description: "read the playtest", subagentType: "giulia-ferri" } as never);
+    expect(JSON.parse(files["/tmp/claude-crew/work-s1.json"] ?? "{}").meeting).toEqual(["giulia-ferri"]);
+});
+
+test("a message that wakes a colleague's finished run is refused while they are at work on another, and otherwise wakes that run", async ($, on) => {
+    world(on, []);
+    on("turn.complete", () => ({ text: "" }) as never);
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+    await $.agent.spawn({ prompt: "Review the setup.", description: "review the setup", subagentType: "matteo-conti" } as never);
+    await $.turn.complete({ agentId: "a1", reason: "answer", answer: "First look.", durationMs: 1000, isAborted: false, turnId: "t1" } as never);
+    await $.agent.spawn({ prompt: "Review the parser.", description: "review the parser", subagentType: "matteo-conti" } as never);
+    const woken = await $.agent.spawn({ prompt: "One more look.", description: "review the setup", subagentType: "matteo-conti", resume: { agentId: "a1" } } as never);
+    expect((woken as { deny?: string }).deny).toMatch(/^Matteo is already at work on "review the parser"/);
+    await $.turn.complete({ agentId: "a2", reason: "answer", answer: "Parser holds.", durationMs: 1000, isAborted: false, turnId: "t2" } as never);
+    const again = await $.agent.spawn({ prompt: "One more look.", description: "review the setup", subagentType: "matteo-conti", resume: { agentId: "a1" } } as never);
+    expect((again as { deny?: string }).deny).toBeUndefined();
+    const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
+    expect(await headingOf(ui, "working-toggle")).toBe("▾ ⚒︎ Working (1)");
+    expect(await ui.find({ type: "Text", text: /^Review the setup/ })).toBeDefined();
+    // The wake is the same run: two tasks this week, not three, and the wake refused counted.
+    await ui.press({ key: "open-matteo-conti" });
+    expect(await ui.find({ type: "Text", text: "This week: 2 tasks, 1 refusal" })).toBeDefined();
+    await ui.unmount();
+});
+
 test("a meeting command of any shell names a colleague at work as the script reads names", async ($, on) => {
     world(on, []);
     on("tool.call", () => ({ result: "ran" }) as never);

@@ -29,7 +29,9 @@ let sharedDrawnAt = 0;
 // What this chat last shared, and when: written again only when it changed, or while someone is at work, to stay fresh.
 let sharedLast: { outline: string; at: number } | undefined;
 // The other chats' shared files as last read, by name: read again only when their time or size changed.
-const sharedFiles = new Map<string, { stamp: string; shared: { root?: string; at?: number; runs?: Run[] } }>();
+const sharedFiles = new Map<string, { stamp: string; shared: { root?: string; at?: number; runs?: Run[]; meeting?: string[] } }>();
+// Who is in a meeting in the project's other chats, by id, as last read: they take no task and no meeting here.
+let meetingsElsewhere: string[] = [];
 // While someone is at work, a chat writes what it shares at least this often: the others take a file a minute old for a closed chat.
 const shareFreshEvery = 20_000;
 // The panel's timers: a session that starts again (at /reload-plugins) stops those it started before.
@@ -339,8 +341,10 @@ export const register: Register = (on, options) => {
             return next(e);
         }
 
-        // One thing at a time: a colleague at work, being started or in the meeting takes no other task. The mark is set before any
-        // wait, so a second spawn at the same moment finds it.
+        // A message that wakes a colleague's finished run (SendMessage) puts them to work too, on the same run.
+        const resumed = e.resume?.agentId;
+        // One thing at a time: a colleague at work, here or in the project's other chats, being started or in the meeting takes no
+        // other task. The mark is set before any wait, so a second spawn at the same moment finds it.
         const startingTask = starting.get(colleague.id);
 
         if (startingTask !== undefined) {
@@ -351,16 +355,30 @@ export const register: Register = (on, options) => {
         starting.set(colleague.id, e.description);
 
         try {
-            const reason = await busyReason($, colleague);
+            const reason = await busyReason($, colleague, resumed);
 
             if (reason) {
                 return { deny: reason };
+            }
+
+            if (resumed) {
+                // The run's own words: a resume takes no rewrite, and is no new task for the week.
+                const woken = await next(e);
+
+                if (woken.deny === undefined) {
+                    await resume($, resumed);
+                    await shareWork($).catch(() => undefined);
+                }
+
+                return woken;
             }
 
             const started = await next({ ...e, prompt: `${e.prompt}\n\n${outsideTextRule}` });
 
             if (started.deny === undefined && started.agentId) {
                 await recordRun($, colleague, e.description, started.agentId, started.model);
+                // The project's other chats learn of it now, not at the next share.
+                await shareWork($).catch(() => undefined);
             }
 
             return started;
@@ -1846,10 +1864,13 @@ async function meetingRefusal($: EngineInterface, command: string): Promise<stri
     const fold = (word: string) => word.normalize("NFC").toLocaleLowerCase();
     const names = (call[1] ?? "").replace(/["']/g, " ").split(/\s+--(?:\s|$)/)[0] ?? "";
     const words = names.split(/[\s,;:.!?()"«»]+|\s+(?:e|ed|and|&)\s+/u).filter(Boolean).map(fold);
-    const working = (await read($, runs)).filter(run => run.status === "running");
+    // At work here or in the project's other chats, these read now.
+    await shareWork($).catch(() => undefined);
+    const working = [...(await read($, runs)).filter(run => run.status === "running"), ...(await read($, elsewhere))];
     const busy = (await read($, team)).flatMap(colleague => {
         const run = working.find(each => each.colleague === colleague.id);
-        return run && (words.includes(fold(colleague.name)) || words.includes(colleague.id)) ? [{ colleague, run }] : [];
+        const isNamed = words.includes(fold(colleague.name)) || words.includes(colleague.id);
+        return !isNamed ? [] : run ? [{ colleague, why: `at work on "${run.task}"${run.isElsewhere ? " in another chat" : ""}` }] : meetingsElsewhere.includes(colleague.id) ? [{ colleague, why: "in a meeting in another chat" }] : [];
     });
 
     for (const { colleague } of busy) {
@@ -1857,7 +1878,7 @@ async function meetingRefusal($: EngineInterface, command: string): Promise<stri
     }
 
     return busy.length
-        ? `${busy.map(({ colleague, run }) => `${colleague.name} (at work on "${run.task}")`).join(", ")}: a colleague at work on a task joins no meeting until it ends. Ask the user whether to wait, or to meet without them.`
+        ? `${busy.map(({ colleague, why }) => `${colleague.name} (${why})`).join(", ")}: a colleague at work on a task, or in a meeting in another chat, joins no meeting here until that ends. Ask the user whether to wait, or to meet without them.`
         : undefined;
 }
 
@@ -2259,14 +2280,16 @@ async function shareWork($: EngineInterface): Promise<void>
     }
 
     const mine = (await read($, runs)).filter(run => run.status === "running" && !run.isElsewhere);
-    const outline = JSON.stringify(mine);
+    const members = (await read($, meeting)).members;
+    const outline = JSON.stringify([mine, members]);
 
-    if (outline !== sharedLast?.outline || (mine.length && at - sharedLast.at >= shareFreshEvery)) {
-        await $.fs.write(`${folder}/work-${session}.json`, JSON.stringify({ root, at, runs: mine }));
+    if (outline !== sharedLast?.outline || ((mine.length || members.length) && at - sharedLast.at >= shareFreshEvery)) {
+        await $.fs.write(`${folder}/work-${session}.json`, JSON.stringify({ root, at, runs: mine, meeting: members }));
         sharedLast = { outline, at };
     }
 
     const others: Run[] = [];
+    const meetings: string[] = [];
 
     // The files of chats closed long ago stay in the folder: unchanged, they are not read again.
     for (const entry of await $.fs.list(folder)) {
@@ -2290,8 +2313,11 @@ async function shareWork($: EngineInterface): Promise<void>
         // A chat that no longer writes has closed: what it left is not shown.
         if (shared.root === root && typeof shared.at === "number" && at - shared.at < 60_000) {
             others.push(...(shared.runs ?? []).map(run => ({ ...run, isElsewhere: true })));
+            meetings.push(...(shared.meeting ?? []));
         }
     }
+
+    meetingsElsewhere = meetings;
 
     // Every redraw loses the click that lands on the drawing it replaces.
     const outlineOf = (list: Run[]) => JSON.stringify(list.map(run => [run.agentId, run.task, run.stepDone, run.stepTotal, run.stepNote]));
@@ -2359,16 +2385,28 @@ async function setMeeting($: EngineInterface, members: string[], pending?: Meeti
     }
 
     await update($, meeting, () => ({ members, pending }));
+    // The project's other chats learn of it now, not at the next share.
+    await shareWork($).catch(() => undefined);
 }
 
-// Why a colleague cannot take a task now, for Claude: who, busy with what, and how to free them.
-async function busyReason($: EngineInterface, colleague: Colleague): Promise<string | undefined>
+// Why a colleague cannot take a task now, for Claude: who, busy with what, and how to free them. A run being woken is not in the way
+// of itself.
+async function busyReason($: EngineInterface, colleague: Colleague, resumed?: string): Promise<string | undefined>
 {
-    const working = (await read($, runs)).find(run => run.colleague === colleague.id && run.status === "running");
+    const working = (await read($, runs)).find(run => run.colleague === colleague.id && run.status === "running" && run.agentId !== resumed);
 
     if (working) {
         await countWeek($, colleague.id, "refusals");
         return atWork(colleague, working.task);
+    }
+
+    // A person is in one place at a time: at work in another chat of the project, read now rather than at the panel's next share.
+    await shareWork($).catch(() => undefined);
+    const away = (await read($, elsewhere)).find(run => run.colleague === colleague.id && run.agentId !== resumed);
+
+    if (away) {
+        await countWeek($, colleague.id, "refusals");
+        return atWork(colleague, away.task, true);
     }
 
     await refreshMeeting($);
@@ -2379,14 +2417,23 @@ async function busyReason($: EngineInterface, colleague: Colleague): Promise<str
             + `run /crew:leave ${colleague.name} first (the others stay), then give them this task again.`;
     }
 
+    if (meetingsElsewhere.includes(colleague.id)) {
+        await countWeek($, colleague.id, "refusals");
+        return `${colleague.name} is in a meeting with the user in another chat of this project, and a colleague is in one place at a time. Give them this task once `
+            + `they have left it (/crew:leave ${colleague.name} or /crew:end there), to another colleague of the field, or do it yourself; ask the user if it matters which.`;
+    }
+
     return undefined;
 }
 
 // Why a colleague at work takes no other task, and where the task can go instead.
-function atWork(colleague: Colleague, task: string): string
+function atWork(colleague: Colleague, task: string, isElsewhere = false): string
 {
-    return `${colleague.name} is already at work on "${task}", and a colleague takes one task at a time. Give this one to them when that task's result comes back, `
-        + "to another colleague of the field, or do it yourself; ask the user if it matters which.";
+    return isElsewhere
+        ? `${colleague.name} is already at work on "${task}" in another chat of this project, and a colleague takes one task at a time, wherever it comes from. `
+            + "Give this one to them once that task is done (the panel shows them at work until then), to another colleague of the field, or do it yourself; ask the user if it matters which."
+        : `${colleague.name} is already at work on "${task}", and a colleague takes one task at a time. Give this one to them when that task's result comes back, `
+            + "to another colleague of the field, or do it yourself; ask the user if it matters which.";
 }
 
 // The colleagues plugin's hook keeps who is in the conversation in the system's temp folder, by session.

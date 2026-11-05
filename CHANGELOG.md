@@ -2,6 +2,12 @@
 
 What changes for whoever uses Crew, version by version. Plugins update in a new chat: `/plugin`, Marketplaces, claude-crew, Update marketplace, or turn its auto-update on there.
 
+## 0.14.7
+
+- A colleague is in one place at a time, across the project's chats, as a person would be. One at work in another chat takes no task here, and joins no meeting here; one in a meeting in another chat takes no task here, and joins no other meeting. Claude is told where they are and where the task can go instead: to them once they are free, to another colleague of the field, or to Claude.
+- A message that wakes a colleague's finished task (SendMessage) is work too: refused while they are at work on another task, here or in another chat; otherwise it is the same task again, at work in the panel, not a new one for the week.
+- A chat tells the project's other chats at once who starts work or joins or leaves a meeting there, no longer within the next few seconds.
+
 ## 0.14.6
 
 - A section's heading no longer lights up under the pointer, as the project plugin's: on the desktop only its arrow, ▾ or ▸, is a button that opens and closes the section, and the heading's words beside it are a drawing, 24 px high. The terminal keeps the whole heading as its button.

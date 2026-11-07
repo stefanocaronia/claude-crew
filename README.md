@@ -20,30 +20,21 @@ Everything lives in your project's `.claude/` folder: each colleague's profile, 
 
 ## Install
 
-You need **Claude Code** and **Node.js 20 or later**. If you don't have Node.js, install it from [nodejs.org](https://nodejs.org) and check it with `node -v` in a terminal.
+You need **Claude Code**, in the desktop app or in the terminal, and **Node.js 20 or later** ([nodejs.org](https://nodejs.org)).
 
-1. Open a terminal in your project's folder and start Claude Code (the desktop app's Code tab does not take `/plugin install`):
+1. In a Claude Code chat, paste:
    ```
-   claude
+   Install the plugin "crew": run `claude plugin marketplace add stefanocaronia/claude-crew` and `claude plugin install crew@claude-crew`, then tell me to open a new chat.
    ```
-2. In the chat, add the plugin's marketplace:
+2. Open a new chat in your project's folder (the plugin loads when a chat starts) and paste:
    ```
-   /plugin marketplace add stefanocaronia/claude-crew
+   Set up a team of colleagues for this project.
    ```
-3. Install the plugin:
-   ```
-   /plugin install crew@claude-crew
-   ```
-4. Close the chat and start a new one, so the plugin loads.
-5. Set the team up:
-   ```
-   /crew:init
-   ```
-   Claude reads the project, proposes a few roles, and you pick who joins.
+   Claude reads the project, proposes a few roles, and you pick who joins. If the project already has reviewer agents, Claude adopts them as colleagues.
 
-The panel opens beside the chat by itself, in the terminal and in the desktop app's Code tab; `/crew-panel` shows or hides it.
+The panel opens beside the chat by itself. When Claude asks to run `node`, allow it: the plugin runs on it.
 
-When Claude asks to run `node`, allow it: the plugin's commands run on it.
+Made for Claude Code. Codex, Gemini and Antigravity are not tested.
 
 ## Use it
 
@@ -59,8 +50,6 @@ Claude hands the colleagues work in their field as it goes, one task at a time e
 
 **Each colleague at work spends your plan's usage** as Claude does: fewer colleagues and narrower rounds spend less.
 
-**Already have reviewer agents?** `/crew:init` adopts them as colleagues.
-
 **Working with [Project](https://github.com/stefanocaronia/claude-project)?** The colleagues hold its backlog's tasks and propose new ones. Project is optional.
 
 ## Settings
@@ -69,15 +58,11 @@ Each colleague's card in the panel sets their effort and their permissions: **Re
 
 Claude knows the rest: ask it to change a setting.
 
-## Development
+## Learn more
 
-```
-node --test plugins/crew/scripts/conversation.test.mjs plugins/crew/scripts/portraits.test.mjs plugins/crew/hooks/pure.test.mjs
-claude plugin test plugins/crew
-claude plugin validate .
-```
-
-`node tools/demo.mjs <folder>` and `node tools/preview.mjs <folder>` make this README's picture again. Installed from a local folder (`/plugin marketplace add <folder>`), the plugin runs from a copy in Claude Code's cache: after a change, raise the version in `.claude-plugin/marketplace.json` and `plugins/crew/.claude-plugin/plugin.json`, run `claude plugin marketplace update claude-crew` and `claude plugin update crew@claude-crew`, and start a new chat. Each version is tagged on its commit, `git tag -a vX.Y.Z -m vX.Y.Z` and `git push --follow-tags`. The changes are in [CHANGELOG.md](CHANGELOG.md).
+- [Guide](docs/guide.md): commands, files, tasks, permissions, the panel, working with Project.
+- [Contributing](CONTRIBUTING.md): trying it locally, tests, preview, releases.
+- [Changelog](CHANGELOG.md): what changed, version by version.
 
 ## Credits
 

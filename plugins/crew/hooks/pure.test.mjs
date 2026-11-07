@@ -5,7 +5,7 @@ import { describe, it } from "node:test";
 import { segmentsOf, speakersOf } from "./meeting.ts";
 import { imagePathsIn, isInside, isOwnMemory, resolvedPath } from "./paths.ts";
 import { withCount } from "./progress.ts";
-import { ageOf, agentSpecFrom, backlogLinesOf, backlogOf, blockersOf, daysBetween, cardFrom, colleagueFrom, colleagueOf, memorySizeOf, openIdsOf, openTasks, permissionsOf, retestsOf, taskOf, withEffort, withNextPriority, withPermissions, withText } from "./team.ts";
+import { ageOf, agentSpecFrom, backlogLinesOf, backlogOf, blockersOf, daysBetween, cardFrom, colleagueFrom, colleagueOf, memorySizeOf, openIdsOf, openTasks, permissionsOf, retestsOf, taskOf, typesOf, withEffort, withNextPriority, withPermissions, withText } from "./team.ts";
 import { taskWords } from "./todo.ts";
 import { dateOf, formatTokens, isoWeek, languageOf, linksIn, listNames, modelName, slugOf, words } from "./text.ts";
 
@@ -340,5 +340,14 @@ describe("a text's links", () => {
         assert.deepEqual(linksIn("[the guide](https://a.io/x_y) now"), [{ href: "https://a.io/x_y", label: "the guide" }, " now"]);
         assert.deepEqual(linksIn("(on https://en.wikipedia.org/wiki/Go_(game)), then"), ["(on ", { href: "https://en.wikipedia.org/wiki/Go_(game)", label: "https://en.wikipedia.org/wiki/Go_(game)" }, "), then"]);
         assert.deepEqual(linksIn("no link, ftp://old.io"), ["no link, ftp://old.io"]);
+    });
+});
+
+describe("the task types a project adds", () => {
+    it("reads them inline or as lines beneath types:, quoted or not, without comments", () => {
+        assert.deepEqual(typesOf("docs: project\ntypes: { design: Design, docs: \"Docs\" }\n"), { design: "Design", docs: "Docs" });
+        assert.deepEqual(typesOf("types:  # our own\r\n  design: Design  # the look\r\n  feature: 'Funzione nuova'\r\npeople: [Claude]\r\n"), { design: "Design", feature: "Funzione nuova" });
+        assert.deepEqual(typesOf("docs: project\n"), {});
+        assert.deepEqual(typesOf("types: {}\n"), {});
     });
 });

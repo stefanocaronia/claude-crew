@@ -674,7 +674,7 @@ test("a colleague's tasks of the project's backlog are theirs: counted beside th
     on("turn.complete", () => ({ text: "" }) as never);
     files["/home/.claude/plugins/installed_plugins.json"] = JSON.stringify({ plugins: { "project@claude-project": [{ installPath: "/plugins/project" }] } });
     files["/plugins/project/scripts/backlog.mjs"] = "";
-    files["/p/.claude/project.yaml"] = "docs: project\npeople: [Claude, Stefano]\n";
+    files["/p/.claude/project.yaml"] = "docs: project\npeople: [Claude, Stefano]\ntypes: { design: Design }\n";
     files["/p/project/TASKS.md"] = "- T-61\n- T-70";
     // Sara's todo cites T-61: her own reminder, beside the task.
     files["/p/.claude/agent-memory/sara-lombardi/todo.md"] = "- [ ] P1 · 2026-10-07 · T-61 · retest once it is done\n";
@@ -709,12 +709,20 @@ test("a colleague's tasks of the project's backlog are theirs: counted beside th
     await ui.press({ key: "backlog-remove-2" });
     expect(asked).toContainEqual(["node", "/plugins/project/scripts/backlog.mjs", "archive", "T-70"]);
     expect(files["/p/.claude/agent-memory/sara-lombardi/todo.md"]).toBe("- [ ] P1 · 2026-10-07 · T-61 · retest once it is done\n");
-    // A new task in her card is the backlog's, held by her, created by the project's owner.
+    // A new task in her card is the backlog's, held by her, created by the project's owner, of a type: feature, or the one picked
+    // among the five and the project's own.
     await ui.press({ key: "open-sara-lombardi" });
     await ui.press({ key: "card-new-task" });
+    const type = await ui.find({ key: "card-new-task-type" });
+    expect(type?.props.value).toBe("feature");
+    expect((type?.props.options as { value: string; label: string }[]).map(option => option.label)).toEqual(["bug", "feature", "chore", "research", "test", "Design"]);
+    await ui.input({ key: "card-new-task", text: "the board's colors" });
+    expect(asked).toContainEqual(["node", "/plugins/project/scripts/backlog.mjs", "add", "the board's colors", "--type", "feature", "--to", "Sara", "--by", "Stefano"]);
+    await ui.press({ key: "card-new-task" });
+    await ui.select({ key: "card-new-task-type", value: "design" });
     // Typed words are one line, never read as an option by the backlog's command.
     await ui.input({ key: "card-new-task", text: "--the  legend · soon (after: T-61)" });
-    expect(asked).toContainEqual(["node", "/plugins/project/scripts/backlog.mjs", "add", "the legend - soon [after: T-61]", "--to", "Sara", "--by", "Stefano"]);
+    expect(asked).toContainEqual(["node", "/plugins/project/scripts/backlog.mjs", "add", "the legend - soon [after: T-61]", "--type", "design", "--to", "Sara", "--by", "Stefano"]);
     await ui.unmount();
 });
 

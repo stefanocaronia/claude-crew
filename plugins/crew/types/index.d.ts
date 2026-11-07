@@ -89,6 +89,8 @@ export type Board = {
     /** The lines of `tasks` that are backlog tasks a colleague holds, not lines of their todo, as "<colleague id>:<line>": the backlog's
      * own commands change them. */
     fromBacklog?: string[];
+    /** The task types the project adds or renames (`types:` of .claude/project.yaml), by key, where it keeps a backlog. */
+    types?: Record<string, string>;
     /** Why the last reading of the team failed, shown in the panel. */
     error?: string;
     checkedAt: number;
@@ -113,6 +115,8 @@ export type PanelView = {
     removing?: string;
     /** What the user is writing: "new:<colleague id>" for a new task, a task as "<colleague>:<its words>" for its text. */
     editing?: string;
+    /** The type a new backlog task is given in a colleague's card, by key; feature until the user picks another. */
+    newTaskType?: string;
     /** The tasks' places kept for a moment after a priority turned, by "<colleague>:<its words>", until `until`. */
     frozen?: { until: number; rank: Record<string, number> };
     /** What the user just asked to start, by key (a task as "<colleague>:<its words>", or "next:<colleague ids>"), with when: its

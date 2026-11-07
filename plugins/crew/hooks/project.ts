@@ -2,7 +2,7 @@
 import type { EngineInterface } from "claude-code";
 
 import { cached, filesIn, type FileStamp, projectRoot } from "./files.ts";
-import type { BacklogTask } from "./team.ts";
+import { type BacklogTask, typesOf } from "./team.ts";
 
 // The project backlog's open tasks as last asked, and what the project's docs were then.
 let backlogRead: { signature: string; tasks: BacklogTask[] | undefined } | undefined;
@@ -120,4 +120,10 @@ export async function projectOwner($: EngineInterface): Promise<string | undefin
     const inline = /^people:\s*\[([^\]]*)\]/m.exec(config)?.[1]?.split(",");
     const listed = inline ?? [.../^people:\s*\n((?:[ \t]+-.*\n?)*)/m.exec(config)?.[1]?.matchAll(/^[ \t]+-\s*(.+)$/gm) ?? []].map(match => match[1] ?? "");
     return listed.map(name => name.trim().replace(/^["']|["']$/g, "")).find(name => name && name !== "Claude");
+}
+
+// The task types the project adds or renames, `types:` of .claude/project.yaml, by key; empty without them.
+export async function projectTypes($: EngineInterface, root: string): Promise<Record<string, string>>
+{
+    return typesOf(await $.fs.read(`${root}/.claude/project.yaml`).catch(() => ""));
 }

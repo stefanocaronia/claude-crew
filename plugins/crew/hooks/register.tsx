@@ -12,7 +12,7 @@ import { claudeId, segmentsOf, speakersOf } from "./meeting.ts";
 import { imagePathsIn, imageTypeOf, isInside, isOwnMemory, resolvedPath } from "./paths.ts";
 import { cached, dataUri, filesIn, type FileStamp, forgetAll, forgetFiles, projectRoot, tempFolder } from "./files.ts";
 import { contextShare, progressOf, withCount } from "./progress.ts";
-import { changeBacklog, projectBacklog, projectOwner } from "./project.ts";
+import { changeBacklog, projectBacklog, projectOwner, projectTypes } from "./project.ts";
 import { ageOf, agentSpecFrom, backlogLinesOf, backlogOf, blockersOf, cardFrom, colleagueFrom, colleagueOf, daysBetween, isBacklogId, memorySizeOf, openIdsOf, openTasks, retestsOf, taskOf as todoTask, withEffort, withNextPriority, withPermissions, withText } from "./team.ts";
 import { addTodoLine, changeTodoLine, removeTodoLine, taskWords } from "./todo.ts";
 import { contextWindowOf, dateOf, formatTime, formatTokens, isoWeek, languageNames, languageOf, linksIn, listNames, modelName, slugOf, words } from "./text.ts";
@@ -869,8 +869,12 @@ export const register: Register = (on, options) => {
                     await readCard($, colleague.id);
                 }
             };
-            // A new task written in a colleague's card: a task of the project's backlog held by them, created by the project's owner, or
-            // without a backlog a line of their todo.
+            // The types a new backlog task may take: the five every project has, in the panel's language, then those the project adds or
+            // renames; feature first picked.
+            const taskTypes = { ...say.typeNames, ...(latest.types ?? {}) };
+            const newTaskType = panel.newTaskType && panel.newTaskType in taskTypes ? panel.newTaskType : "feature";
+            // A new task written in a colleague's card: a task of the project's backlog held by them, of the type picked, created by the
+            // project's owner, or without a backlog a line of their todo.
             const addTask = async (colleague: Colleague, value: string) => {
                 const written = taskWords(value);
                 await update($, view, now => ({ ...now, editing: undefined }));
@@ -881,7 +885,7 @@ export const register: Register = (on, options) => {
 
                 if (latest.backlog) {
                     const owner = await projectOwner($);
-                    await changeBacklogTask(colleague, ["add", written, "--to", colleague.name, ...(owner ? ["--by", owner] : [])]);
+                    await changeBacklogTask(colleague, ["add", written, "--type", newTaskType, "--to", colleague.name, ...(owner ? ["--by", owner] : [])]);
                     return;
                 }
 
@@ -1151,12 +1155,26 @@ export const register: Register = (on, options) => {
                                             {isBusy ? null : <Button key="card-tidy" label={`✦ ${say.tidy}`} plain dimColor onPress={() => runCommand("crew:tidy", [selected])} />}
                                         </Box>
                                     </Box>
-                                    {/* The form, a card like a task's: the text box at full width, then its ✕ on the right. */}
+                                    {/* The form, a card like a task's: the text box at full width, then the task's type, where the project keeps
+                                        a backlog, and its ✕ on the right. */}
                                     {"Input" in ui && isAdding
                                         ? (
                                             <Box key="card-new-task-form" flexDirection="column" borderStyle="round" {...border} paddingX={1} {...(isDesktop ? tinted() : {})}>
                                                 <ui.Input key="card-new-task" placeholder={say.newTaskHint} rows={2} autoFocus submitLabel={addMark} onSubmit={(value: string) => addTask(selected, value)} />
-                                                <Box flexDirection="row" justifyContent="flex-end" marginTop={1}>
+                                                <Box flexDirection="row" justifyContent={latest.backlog ? "space-between" : "flex-end"} alignItems="center" marginTop={1}>
+                                                    {latest.backlog
+                                                        ? (
+                                                            <Box key="card-new-task-type-row" flexDirection="row" alignItems="center" columnGap={1}>
+                                                                <Text dimColor>{say.taskType}</Text>
+                                                                {"Select" in ui
+                                                                    ? <ui.Select key="card-new-task-type" value={newTaskType} options={Object.entries(taskTypes).map(([value, label]) => ({ value, label }))} onSelect={(value: string) => update($, view, now => ({ ...now, newTaskType: value }))} />
+                                                                    : <Button key="card-new-task-type" label={taskTypes[newTaskType] ?? newTaskType} plain onPress={() => {
+                                                                        const keys = Object.keys(taskTypes);
+                                                                        return update($, view, now => ({ ...now, newTaskType: keys[(keys.indexOf(newTaskType) + 1) % keys.length] }));
+                                                                    }} />}
+                                                            </Box>
+                                                        )
+                                                        : null}
                                                     {iconButton("card-new-task-cancel", "✕", say.cancel, () => update($, view, now => ({ ...now, editing: undefined })))}
                                                 </Box>
                                             </Box>
@@ -1716,6 +1734,7 @@ async function refresh($: EngineInterface): Promise<void>
 
     // The tasks of the project's backlog a colleague holds join their open tasks, written as todo lines, and count as theirs.
     const backlog = await projectBacklog($, root);
+    const types = backlog ? await projectTypes($, root) : undefined;
     const fromBacklog: string[] = [];
 
     for (const [id, lines] of backlogLinesOf(backlog ?? [], loaded)) {
@@ -1743,9 +1762,9 @@ async function refresh($: EngineInterface): Promise<void>
     // Every write redraws the panel, and a click that lands on a drawing already replaced is lost: write only what changed.
     if (previous.hasCommands !== hasCommands || previous.error || JSON.stringify(previous.tasks) !== JSON.stringify(sortedTasks) || JSON.stringify(previous.heavy ?? []) !== JSON.stringify(heavy)
         || JSON.stringify(previous.longMemories ?? []) !== JSON.stringify(longMemories) || JSON.stringify(previous.backlog) !== JSON.stringify(backlog)
-        || JSON.stringify(previous.fromBacklog ?? []) !== JSON.stringify(fromBacklog)) {
+        || JSON.stringify(previous.fromBacklog ?? []) !== JSON.stringify(fromBacklog) || JSON.stringify(previous.types) !== JSON.stringify(types)) {
         const checkedAt = await $.clock.now();
-        await update($, board, current => ({ ...current, hasCommands, tasks: sortedTasks, heavy, longMemories, backlog, fromBacklog, error: undefined, checkedAt }));
+        await update($, board, current => ({ ...current, hasCommands, tasks: sortedTasks, heavy, longMemories, backlog, fromBacklog, types, error: undefined, checkedAt }));
     }
 
     const signature = [...kept, ...small].map(([id, uri]) => `${id}:${uri.length}`).join("|");

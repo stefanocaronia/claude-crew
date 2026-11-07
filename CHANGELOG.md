@@ -2,6 +2,11 @@
 
 What changes for whoever uses Crew, version by version. Plugins update in a new chat: `/plugin`, Marketplaces, claude-crew, Update marketplace, or turn its auto-update on there.
 
+## 0.14.8
+
+- In a project with Project's backlog, a new task written in a colleague's card has a type: feature, or the one picked beside the text box, among bug, feature, chore, research, test and the project's own. Project's next version refuses a task without one.
+- Claude gives a type to every task it adds to the backlog for the colleagues: their proposals, and the tasks it hands them.
+
 ## 0.14.7
 
 - A colleague is in one place at a time, across the project's chats, as a person would be. One at work in another chat takes no task here, and joins no meeting here; one in a meeting in another chat takes no task here, and joins no other meeting. Claude is told where they are and where the task can go instead: to them once they are free, to another colleague of the field, or to Claude.

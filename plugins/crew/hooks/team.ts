@@ -468,3 +468,18 @@ function frontmatterOf(text: string): string
 {
     return /^---\n([\s\S]*?)\n---/.exec(text)?.[1] ?? "";
 }
+
+/** The task types a project adds or renames, `types:` of its .claude/project.yaml, by key: `types: { design: Design }`, or the
+ * `key: Name` lines beneath it. Empty without them. */
+export function typesOf(config: string): Record<string, string>
+{
+    const text = config.replace(/\r\n/g, "\n");
+    const inline = /^types:[ \t]*\{([^}]*)\}/m.exec(text)?.[1];
+    const pairs = inline !== undefined ? inline.split(",") : (/^types:[ \t]*(?:#.*)?\n((?:[ \t]+.*(?:\n|$))*)/m.exec(text)?.[1] ?? "").split("\n");
+    const unquoted = (value: string) => value.trim().replace(/^["']|["']$/g, "");
+    return Object.fromEntries(pairs.flatMap(pair => {
+        const match = /^\s*([\w-]+)\s*:\s*(.*?)\s*$/.exec(pair.replace(/\s+#.*$/, ""));
+        const name = unquoted(match?.[2] ?? "");
+        return match?.[1] && name ? [[match[1], name] as const] : [];
+    }));
+}

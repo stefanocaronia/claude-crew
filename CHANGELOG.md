@@ -2,6 +2,13 @@
 
 What changes for whoever uses Crew, version by version. Plugins update in a new chat: `/plugin`, Marketplaces, claude-crew, Update marketplace, or turn its auto-update on there.
 
+## 0.15.3
+
+- **An international team**: unless you ask otherwise, about half the colleagues come from your country and background and half from other countries, and each new hire keeps that balance.
+- **One name is enough**: a colleague or the coordinator can have a single name, with no surname (Vaniglio, id `vaniglio`); first and last names work as before.
+- **No name in front outside a meeting**: the coordinator's turns in the plain chat no longer start with `[Name]`, even after a meeting in the same chat.
+- **The portrait's original is kept**: `avatar-full.png`, the picture a painted portrait is cut from, stays beside it and goes into git with it.
+
 ## 0.15.2
 
 - **The coordinator's section is called Coordinator**, under the team, whatever their name; their card still says they are the Claude of this chat.

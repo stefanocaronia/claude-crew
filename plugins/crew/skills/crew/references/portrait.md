@@ -23,7 +23,7 @@ Realistic and anime need an image generator (a connector or Codex); pixel art an
 
 **The files**, in `.claude/agent-memory/<id>/`:
 
-- `avatar.jpg`: the portrait, square, 128 px a side, quality about 80, under 6 KB. Generators make large pictures: scale the result down and keep only this, unless the user wants the original too (`avatar-full.png`, kept out of git). The panel carries every portrait inside its drawing, and the desktop drops a drawing that is too heavy, so a heavier portrait is drawn as initials.
+- `avatar.jpg`: the portrait, square, 128 px a side, quality about 80, under 6 KB. Generators make large pictures: keep the picture as it came, `avatar-full.png`, and scale it down to this one. The original stays with the portrait and goes into git as they do, never ignored: it is what a new crop or a new size starts from. The panel carries every portrait inside its drawing, and the desktop drops a drawing that is too heavy, so a heavier portrait is drawn as initials.
 - `avatar-small.jpg`: 32 px a side, under 2 KB, for the backlog's rows: one on each task. Without it the rows use a light `avatar.svg`, or initials.
 
 Scale them with what the machine has: Python's Pillow, `sips`, ImageMagick, PowerShell's `System.Drawing`. A portrait drawn by Claude is `avatar.svg` alone, under 8 KB. A new portrait replaces the old files.

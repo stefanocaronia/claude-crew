@@ -255,7 +255,10 @@ describe("meetings in the chat", () => {
         assert.deepEqual(speakersOf("[Claude] Fatto.\n\n[Elena] Sì.\n\n[Matteo] Regge.", [matteo, elena]).map(speaker => speaker.id), ["matteo-conti"]);
     });
 
-    it("reads a profile as the project plugin does: the heading's name, else the id's first part; names alike without case or accents", () => {
+    it("reads a profile as the project plugin does: the heading's name, one alone too, else the id's first part; names alike without case or accents", () => {
+        const vaniglio = colleagueFrom("vaniglio", "# Vaniglio, il tuo assistente\n", "", 0);
+        assert.deepEqual([vaniglio.name, vaniglio.fullName, vaniglio.role], ["Vaniglio", "Vaniglio", "il tuo assistente"]);
+        assert.deepEqual([colleagueFrom("vaniglio", "No heading.\n", "", 0).name, colleagueFrom("vaniglio", "No heading.\n", "", 0).fullName], ["Vaniglio", "Vaniglio"]);
         const nameless = colleagueFrom("nicolo-ferri", "---\ncolor: \"#123abc\"\n---\n\nNo heading.\n", "", 0);
         assert.deepEqual([nameless.name, nameless.fullName, nameless.role, nameless.color], ["Nicolo", "Nicolo", "", "#123abc"]);
         assert.equal(colleagueFrom("x", "---\ncolor: teal\n---\n# Nicolò Ferri, typographer\n", "", 0).color, "#888780");

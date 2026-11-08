@@ -215,7 +215,7 @@ function isCoordinator(profile)
     return /^coordinator:[ \t]*true[ \t]*$/m.test(/^---\r?\n([\s\S]*?)\r?\n---/.exec(profile)?.[1] ?? "");
 }
 
-// The first word of the heading, `# <First> <Last>, <role>`, the name the user calls them by; without a heading, the id's first part,
+// The first word of the heading, `# <Name>, <role>`, the name the user calls them by; without a heading, the id's first part,
 // capitalized, as the panel and the project plugin read it too.
 function firstNameOf(id, profile)
 {

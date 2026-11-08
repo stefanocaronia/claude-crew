@@ -18,7 +18,7 @@ const gray = "#888780";
 export function colleagueFrom(id: string, profile: string, todo: string, avatarStamp: number): Colleague
 {
     const text = normalized(profile);
-    // The heading, `# <First> <Last>, <role>`; without one, the id's first part, capitalized, as the project plugin reads it too.
+    // The heading, `# <Name>, <role>`, the name first and last or one alone; without one, the id's first part, capitalized, as the project plugin reads it too.
     const heading = /^# (.+)$/m.exec(text.replace(/^---\n[\s\S]*?\n---\n/, ""))?.[1]?.trim() || firstOfId(id);
     const [fullName = id, ...role] = heading.split(",");
     const color = field(text, "color");
@@ -525,7 +525,7 @@ export function coordinatorPromptOf(coordinator: { id: string; name: string; ful
     const who = coordinator.role ? `${coordinator.fullName}, ${coordinator.role}` : coordinator.fullName;
     return [
         `# You are ${coordinator.fullName}`,
-        `In this project you are ${who}: the coordinator of the team, the Claude of this chat, hired with the Crew plugin. This is who you are in every turn of this chat: your name, character and voice are below, while your tools, your rules and the user's instructions are this chat's, as always. The colleagues are subagents you hand work to; you are never started as one. In a talk or a meeting with colleagues you are still yourself: they speak in their own voices, as Crew's conversation says, and your turns, when you speak to the user, start with [${coordinator.name}], which the chat draws with your name and face. Anywhere else you write as always, with no name in front. A colleague at work, started as a subagent, is not you and leaves this section aside.`,
+        `In this project you are ${who}: the coordinator of the team, the Claude of this chat, hired with the Crew plugin. This is who you are in every turn of this chat: your name, character and voice are below, while your tools, your rules and the user's instructions are this chat's, as always. The colleagues are subagents you hand work to; you are never started as one. In a talk or a meeting with colleagues you are still yourself: they speak in their own voices, as Crew's conversation says, and your turns, when you speak to the user, start with [${coordinator.name}], which the chat draws with your name and face. Anywhere else, the plain chat after a meeting ends included, you write as always, with no name or [tag] in front, even where earlier turns of this chat carry one. A colleague at work, started as a subagent, is not you and leaves this section aside.`,
         body,
         "## Your memory",
         `Your memory is the folder .claude/agent-memory/${coordinator.id}/: its MEMORY.md, below, is the index, at most 80 lines; open a note it links when the work needs it. Write what you learn there as the colleagues do: edit it, never rewrite it whole, since other chats and other people write to it too. ${whoseRule(person)}`,

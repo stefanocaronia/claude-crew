@@ -21,7 +21,7 @@ describe("colleagues from their files", () => {
 
     it("makes an agent type from a profile Claude Code has not loaded, naming their memory folder in the prompt", () => {
         const spec = agentSpecFrom("matteo-conti", profile, "/p/.claude/agent-memory/matteo-conti");
-        assert.deepEqual({ ...spec, prompt: undefined }, { name: "matteo-conti", description: "Matteo Conti, architetto TypeScript. Usalo per le revisioni.", tools: ["Read"], effort: "high", prompt: undefined });
+        assert.deepEqual({ ...spec, prompt: undefined }, { name: "matteo-conti", description: "Matteo Conti, architetto TypeScript. Usalo per le revisioni.", tools: ["Read", "Edit", "Write"], effort: "high", prompt: undefined });
         assert.match(spec.prompt, /^# Matteo Conti, architetto TypeScript\n\nChi sei\.\n\nYour memory is the folder \/p\/\.claude\/agent-memory\/matteo-conti\/:/);
         assert.equal(agentSpecFrom("giulia-ferri", "---\ncolor: purple\n---\n# Giulia\n", "/m").tools, undefined);
     });

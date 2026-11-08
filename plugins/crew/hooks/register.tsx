@@ -1438,7 +1438,7 @@ export const register: Register = (on, options) => {
                     {fold("working", sectionIcons.working, say.working, running.map(runRow), Boolean(panel.isWorkingCollapsed), current => ({ ...current, isWorkingCollapsed: !current.isWorkingCollapsed }))}
                     {fold("finished-section", sectionIcons.finished, say.finished, finished.map(runRow), panel.isFinishedCollapsed, current => ({ ...current, isFinishedCollapsed: !current.isFinishedCollapsed }), <Button key="all-back" label={`↩ ${say.allBack}`} plain dimColor onPress={() => sendBack(finished.map(run => run.colleague))} />)}
                     {fold("team", sectionIcons.resting, say.resting, idle.map(colleague => teamRow(colleague)), Boolean(panel.isTeamCollapsed), current => ({ ...current, isTeamCollapsed: !current.isTeamCollapsed }))}
-                    {fold("chat", sectionIcons.chat, capitalized(say.coordinatorAbout), chatRows, Boolean(panel.isChatCollapsed), current => ({ ...current, isChatCollapsed: !current.isChatCollapsed }))}
+                    {fold("chat", sectionIcons.chat, say.coordinatorSection, chatRows, Boolean(panel.isChatCollapsed), current => ({ ...current, isChatCollapsed: !current.isChatCollapsed }))}
                     <Box key="actions" flexDirection="row" flexWrap="wrap" gap={1}>
                         <Button key="act-round" variant="primary" label={`↻ ${pickedNames ? say.roundWith(pickedNames) : say.startRound}`} onPress={() => runCommand("crew:review", pickedTeam)} />
                         {canMeet ? <Button key="act-meeting" label={`☰ ${pickedNames ? say.meetWith(pickedNames) : say.meetAll}`} onPress={() => runCommand("crew:meeting", pickedTeam.length ? pickedTeam : free)} /> : null}

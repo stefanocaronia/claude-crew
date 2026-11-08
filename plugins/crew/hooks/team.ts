@@ -119,6 +119,9 @@ export function memorySizeOf(memory: string): { lines: number; bytes: number; is
     return { lines, bytes, isLong: lines > memoryLimit.lines || bytes > memoryLimit.bytes };
 }
 
+// The tools a colleague's memory needs, whatever their permissions.
+const memoryTools = ["Read", "Edit", "Write"];
+
 /** A colleague as an agent type the panel defines, for a profile Claude Code has not loaded: its frontmatter's description, tools,
  * model and effort, and its body as the prompt. Their memory folder is named in the prompt, since a type of the panel's own
  * would keep a memory of its own elsewhere. */
@@ -135,7 +138,9 @@ export function agentSpecFrom(id: string, profile: string, memoryFolder: string)
         name: id,
         description: field(text, "description") ?? id,
         prompt: `${body}\n\n${memory}`,
-        ...(tools === undefined ? {} : { tools: toolsOf(tools) }),
+        // Their memory is always theirs to read and write, as Claude Code gives a profile with `memory: project`: without the
+        // permissions the panel refuses the rest of the project (register.tsx, refusalFor).
+        ...(tools === undefined ? {} : { tools: [...new Set([...toolsOf(tools), ...memoryTools])] }),
         ...(model ? { model } : {}),
         ...(effort ? { effort } : {}),
     };

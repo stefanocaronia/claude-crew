@@ -39,7 +39,7 @@ Where several people work on one project, each with their own Claude, the memori
 
 ## The coordinator
 
-The Claude of your chat can have a personality, a name, a character and a memory: ask Claude to hire a coordinator. There is still one Claude in the chat, and the coordinator is who it is. Their role is «your assistant», unless you pick another when hiring them. Their profile says `coordinator: true`, and the panel puts it in the chat's system prompt at every turn, with their memory's index, and draws them after the team, in a section of their own, with Claude's tasks of the backlog, with their portrait or, without one, Claude's face.
+The Claude of your chat can have a personality, a name, a character and a memory: ask Claude to hire a coordinator. There is still one Claude in the chat, and the coordinator is who it is. Their role is «your assistant», unless you pick another when hiring them. Their profile says `coordinator: true`, and the panel puts it in the chat's system prompt at every turn, with their memory's index, and draws them after the team, in a section of their own, Coordinator, with Claude's tasks of the backlog, with their portrait or, without one, Claude's face.
 
 They are not a colleague: never started as a subagent, never in a round, and nobody holds a talk or a meeting with them, since they are the chat. Outside a meeting you talk with them in the chat as you always did with Claude. In a meeting the colleagues speak, and when Claude speaks to you it is the coordinator, under their name, with their face and color; without a coordinator, it is Claude. Fire them and the chat is plain Claude again.
 

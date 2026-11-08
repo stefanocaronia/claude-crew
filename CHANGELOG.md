@@ -2,6 +2,11 @@
 
 What changes for whoever uses Crew, version by version. Plugins update in a new chat: `/plugin`, Marketplaces, claude-crew, Update marketplace, or turn its auto-update on there.
 
+## 0.15.2
+
+- **The coordinator's section is called Coordinator**, under the team, whatever their name; their card still says they are the Claude of this chat.
+- **A colleague always writes their own memory**: started as the panel's agent type (`crew:<id>`), a colleague without the permission to write could not update their memory and todo, while the same colleague loaded by Claude Code could. Now both write their own folder, and the panel refuses, as before, their writing anywhere else.
+
 ## 0.15.1
 
 - **The coordinator is the Claude of your chat, one person everywhere**: you talk with them in the chat as you always did with Claude, in plain messages; in a meeting, Claude's turns are theirs, under their first name, with their face and color; without a coordinator, Claude speaks as Claude, as before. Asking to talk with them says they are here already.

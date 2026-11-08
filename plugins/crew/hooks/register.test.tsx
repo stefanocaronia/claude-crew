@@ -400,7 +400,8 @@ test("a colleague hired in a project that had no .claude/agents/ at the session'
     hired.forEach(([path, text]) => (files[path] = text));
     await $.turn.complete({ reason: "answer", answer: "", durationMs: 1000, isAborted: false, turnId: "t1" } as never);
     expect(defined.map(spec => spec.name).sort()).toEqual(["giulia-ferri", "matteo-conti", "sara-lombardi"]);
-    expect(defined.find(spec => spec.name === "matteo-conti")?.tools).toEqual(["Read"]);
+    // Read only for the project, and their memory theirs to write all the same.
+    expect(defined.find(spec => spec.name === "matteo-conti")?.tools).toEqual(["Read", "Edit", "Write"]);
     expect(defined.find(spec => spec.name === "matteo-conti")?.prompt).toMatch(/^# Matteo Conti, code review\n\nYour memory is the folder \/p\/\.claude\/agent-memory\/matteo-conti\//);
     await $.tool.call({ tool: "Agent", subagent_type: "matteo-conti", prompt: "Review.", description: "review", tool_use_id: "t2" } as never);
     await $.tool.call({ tool: "Agent", subagent_type: "Explore", prompt: "Find.", description: "find", tool_use_id: "t3" } as never);
@@ -770,6 +771,17 @@ test("a colleague without reading or writing works only in their own memory fold
     expect((note as { deny?: string }).deny).toBeUndefined();
     const claude = await $.tool.call({ tool: "Read", file_path: "/p/src/index.ts" } as never);
     expect((claude as { deny?: string }).deny).toBeUndefined();
+});
+
+test("started as the panel's agent type, a colleague without writing still writes their own memory, and nothing else", async ($, on) => {
+    world(on, []);
+    on("tool.call", () => ({ result: "ran" }) as never);
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+    await $.agent.spawn({ prompt: "Think about modes.", description: "modes", subagentType: "crew:sara-lombardi" } as never);
+    const note = await $.tool.call({ tool: "Write", file_path: "/p/.claude/agent-memory/sara-lombardi/MEMORY.md", content: "# Sara: memory\n", agentId: "a1" } as never);
+    expect((note as { deny?: string }).deny).toBeUndefined();
+    const change = await $.tool.call({ tool: "Write", file_path: "/p/src/index.ts", content: "x", agentId: "a1" } as never);
+    expect((change as { deny?: string }).deny).toMatch(/Sara changes only their own memory and todo/);
 });
 
 test("a colleague at work on a task is kept out of a meeting, with why", async ($, on) => {
@@ -1395,7 +1407,7 @@ test("the coordinator is the chat's Claude: on top of the team with the backlog'
         const ui = await $.ui.mount({ plugin, surface, component: "Pane", requestId: "crew", props: pane });
         expect(await ui.find({ key: "coordinator-elena-rossi" })).toBeDefined();
         // After the team, in a section of their own.
-        expect(await headingOf(ui, "chat-toggle")).toBe("▾ 💬 The Claude of this chat (1)");
+        expect(await headingOf(ui, "chat-toggle")).toBe("▾ 💬 Coordinator (1)");
         expect(await ui.find({ type: "Text", text: "2 to do" })).toBeDefined();
         // Not one of the team: no row among them, nobody to pick for a meeting.
         expect(await ui.find({ key: "idle-elena-rossi" })).toBeUndefined();
@@ -1447,7 +1459,7 @@ test("the coordinator is the backlog's Claude, the first of the project's people
     sent.files["/p/.claude/project.yaml"] = "docs: project\npeople: [Max, Anna]\n";
     await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
     const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
-    expect(await headingOf(ui, "chat-toggle")).toBe("▾ 💬 The Claude of this chat (1)");
+    expect(await headingOf(ui, "chat-toggle")).toBe("▾ 💬 Coordinator (1)");
     expect(await ui.find({ type: "Text", text: "2 to do" })).toBeDefined();
     await ui.press({ key: "open-elena-rossi" });
     await ui.press({ key: "card-new-task" });

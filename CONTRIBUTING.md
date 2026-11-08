@@ -16,7 +16,7 @@ Claude Code runs a copy from its cache: after a change, raise the version (below
 ## Test
 
 ```
-node --test plugins/crew/scripts/conversation.test.mjs plugins/crew/scripts/portraits.test.mjs plugins/crew/hooks/pure.test.mjs
+node --test plugins/crew/scripts/conversation.test.mjs plugins/crew/scripts/portraits.test.mjs plugins/crew/scripts/folders.test.mjs plugins/crew/hooks/pure.test.mjs
 claude plugin test plugins/crew
 claude plugin validate .
 ```

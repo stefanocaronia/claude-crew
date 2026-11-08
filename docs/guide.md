@@ -9,7 +9,7 @@ You rarely type them: ask in your own words, in any language, or press the panel
 | Command | What it does |
 |---|---|
 | `/crew:init` | Sets the team up, or adopts the reviewer agents the project already has |
-| `/crew:hire`, `/crew:fire` | Hires a colleague after a short interview; fires one, keeping their profile and memory |
+| `/crew:hire`, `/crew:fire` | Hires a colleague, or the coordinator, after a short interview; fires one, keeping their profile and memory |
 | `/crew:portraits` | New portraits, in one style for the team |
 | `/crew:review` | A review round: the colleagues whose field it touches review in parallel |
 | `/crew:ask` | A quick question, answered at once in the chat |
@@ -32,6 +32,16 @@ agent-memory/matteo-conti/
     notes/                          reports and longer notes
 agent-memory/_former/               colleagues who left
 ```
+
+Where [Project](https://github.com/stefanocaronia/claude-project) keeps its docs in a git repo of their own, the team lives among them, in `<docs>/crew/agents` and `<docs>/crew/memory`: private, and shared with whoever works on the docs. `.claude/agents` and `.claude/agent-memory` are links to them, which Crew makes and keeps out of your code's repo: on another machine the panel links them by itself, and a team still in `.claude` moves there with one press in the panel.
+
+Where several people work on one project, each with their own Claude, the memories are shared: they say whose each preference, decision or request is, by name, never "the user". The name is the one Project gives you (`me:`), else git's `user.name`.
+
+## The coordinator
+
+The Claude of your chat can have a name, a character and a memory: ask Claude to hire a coordinator. Their profile says `coordinator: true`, and the panel puts it in the chat's system prompt at every turn, with their memory's index, and draws them on top of the team with Claude's tasks of the backlog.
+
+They are not a colleague: never started as a subagent, never in a round or a meeting. When you talk with colleagues, the colleagues speak; the coordinator is back when the conversation ends. Fire them and the chat is plain Claude again.
 
 ## Tasks
 
@@ -83,13 +93,16 @@ It shows in the terminal and in the desktop app's Code tab, from Claude Code 2.1
 
 Painted by an image-generation connector, or by the Codex CLI logged in with ChatGPT. Without either, Claude draws them in SVG.
 
-## With Project
+## Project and Crew
 
-With the [Project](https://github.com/stefanocaronia/claude-project) plugin, the work lives in its backlog of numbered tasks:
+[Crew](https://github.com/stefanocaronia/claude-crew) gives the project colleagues; Project keeps the work they do. They are two plugins, each working alone and both together, and what one reads and writes of the other is this contract, written in both guides in the same words.
 
-- **Backlog tasks** a colleague holds show among their tasks, with their number.
-- **New work** a colleague finds comes as a proposal in their report; Claude adds it to the backlog.
-- **Their todo** becomes their own notebook: reminders, retests, things to tell. A line may cite a backlog task, `T-61`.
+- **Crew reads of Project**: `.claude/project.yaml`, its `docs:` (`project` when it does not say), `prefixes:`, `people:` and `types:`; `.claude/project.local.yaml`, its `me:`; the backlog through `backlog.mjs list --atomic --json` and `show`.
+- **Crew writes of Project**: the backlog only through `backlog.mjs`: `add "<text>" --type <type> --to <who> --by <who>`, `comment --by <who>`, `set`, `archive`.
+- **Project reads of Crew**: the colleagues' profiles, `.claude/agents/<id>.md` (the first name from the id, the full name and role from `description:`, `color:`, and `coordinator: true` for the coordinator); their portraits, `.claude/agent-memory/<id>/avatar-small.jpg`, or `avatar.svg`; their `todo.md` and its done and archived notes.
+- **Shared folders**: where the docs are a repo of their own, Crew keeps the colleagues in `<docs>/crew/agents` and `<docs>/crew/memory`, with `.claude/agents` and `.claude/agent-memory` as links that Crew makes and keeps out of the code's repo. Project's sync commits and pushes them with the docs: the memories and todos merge line by line, a profile changed by two at once is a clash to mend.
+- **The coordinator**: Crew hires them. In the backlog they are Claude: `--to <their name>` is Claude's, the panel and the page draw Claude's tasks with their name and portrait, and no ▶ hands them a task as a colleague.
+- **Colleagues** hold tasks by first name. Their `todo.md` is their own notebook; a line that is work for the project becomes a task when you tidy the backlog.
 
 ## Cost
 

@@ -3,7 +3,7 @@
 **When**: at a milestone (a step of the plan done, a feature finished, a playtest, a release), or when the user asks.
 
 0. **Ask what to review**, when the request does not say (`/crew:review`, which the panel's buttons run, asks the same way): one question with the host's question tool (`AskUserQuestion` in Claude Code), else a short numbered list. Three subjects drawn from the session's work (the step just done, the latest commits, the files changed) and from the colleagues' open todo lines (retests, lines waiting for this event), each with one line on what it covers and whose field it touches; the user's own answer is the fourth (Claude Code adds it). With names in the request, the subjects are in their fields.
-1. **Who**: only the colleagues whose field the work touches, each with a narrow scope. A round costs one subagent each.
+1. **Who**: only the colleagues whose field the work touches, each with a narrow scope. A round costs one subagent each. Never the coordinator: they are the chat, and gather the round.
 2. **Before calling one**, read their `MEMORY.md` and `todo.md`: if they already answered on the matter, or noted an idea about it, start from there and skip the call, unless the context has changed.
 3. **The brief**:
    - what changed (commits, files), the scope, the questions;

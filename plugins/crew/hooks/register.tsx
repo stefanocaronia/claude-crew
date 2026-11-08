@@ -12,8 +12,8 @@ import { claudeId, segmentsOf, speakersOf } from "./meeting.ts";
 import { imagePathsIn, imageTypeOf, isInside, isOwnMemory, resolvedPath } from "./paths.ts";
 import { cached, dataUri, filesIn, type FileStamp, forgetAll, forgetFiles, projectRoot, tempFolder } from "./files.ts";
 import { contextShare, progressOf, withCount } from "./progress.ts";
-import { changeBacklog, projectBacklog, projectOwner, projectTypes } from "./project.ts";
-import { ageOf, agentSpecFrom, backlogLinesOf, backlogOf, blockersOf, cardFrom, colleagueFrom, colleagueOf, daysBetween, isBacklogId, memorySizeOf, openIdsOf, openTasks, retestsOf, taskOf as todoTask, withEffort, withNextPriority, withPermissions, withText } from "./team.ts";
+import { changeBacklog, projectBacklog, projectMe, projectOwner, projectTypes } from "./project.ts";
+import { ageOf, agentSpecFrom, backlogLinesOf, backlogOf, blockersOf, cardFrom, colleagueFrom, colleagueOf, coordinatorPromptOf, daysBetween, isBacklogId, isCoordinatorProfile, memorySizeOf, openIdsOf, openTasks, retestsOf, taskOf as todoTask, whoseRule, withEffort, withNextPriority, withPermissions, withText } from "./team.ts";
 import { addTodoLine, changeTodoLine, removeTodoLine, taskWords } from "./todo.ts";
 import { contextWindowOf, dateOf, formatTime, formatTokens, isoWeek, languageNames, languageOf, linksIn, listNames, modelName, slugOf, words } from "./text.ts";
 import type { Language, WebLink, Words } from "./text.ts";
@@ -38,6 +38,7 @@ const shareFreshEvery = 20_000;
 let timers: { cancel: () => void }[] = [];
 const panelTool = "mcp__crew__panel";
 const team = atom({ plugin: "crew", key: "team" } as const, []);
+const coordinator = atom({ plugin: "crew", key: "coordinator" } as const, null);
 const speakers = atom({ plugin: "crew", key: "speakers" } as const, []);
 const runs = atom({ plugin: "crew", key: "runs" } as const, []);
 const elsewhere = atom({ plugin: "crew", key: "elsewhere" } as const, []);
@@ -59,6 +60,12 @@ let portraitsRead = "";
 let language: Language = "en";
 // The language the options, Claude Code and the system ask for: what "automatic" means in the panel's settings.
 let detectedLanguage: Language = "en";
+// The coordinator's section of the chat's system prompt, written at every reading of the team; undefined without a coordinator. And
+// whether this load has read the team yet: after /reload-plugins the session does not start again.
+let coordinatorText: string | undefined;
+let isTeamRead = false;
+// Who is in this chat, for the memories: the project plugin's `me:`, else git's user name; asked once a load.
+let personRead: Promise<string | undefined> | undefined;
 // The desktop drops a drawing that carries more than about 110 KB: a portrait's characters as a data URI, and all the pictures of
 // one drawing (the panel, a message) together.
 const portraitLimit = 24_000;
@@ -170,6 +177,9 @@ export const register: Register = (on, options) => {
     lateTypes.clear();
     sharedFiles.clear();
     sharedLast = undefined;
+    coordinatorText = undefined;
+    isTeamRead = false;
+    personRead = undefined;
     on("session.start", async ($, e, next) => {
         const started = await next(e);
         // When this session last loaded the panel's code, at its start, at /reload-plugins or at a hot reload: what tells a load that took.
@@ -219,6 +229,9 @@ export const register: Register = (on, options) => {
         }
 
         await safeRefresh($);
+        // Where the docs are a repo of their own, the colleagues' folders among them: linked on a machine that has them there, and the
+        // move of a team still in .claude offered in the panel. In the background: git and a process take a moment.
+        void placeFolders($).catch(() => undefined);
 
         // Five minutes after finishing, a colleague goes back to the coffee break. Checked once a minute, and the panel is redrawn only
         // when someone goes: a redraw loses the click that lands on the drawing it replaces.
@@ -245,7 +258,7 @@ export const register: Register = (on, options) => {
         void shareWork($).catch(() => undefined);
 
         // The team is there to be seen from the start: the panel opens once, where the surface docks it beside the chat.
-        if ((await read($, team)).length) {
+        if ((await read($, team)).length || (await read($, coordinator))) {
             await openOnce($);
         }
 
@@ -335,6 +348,13 @@ export const register: Register = (on, options) => {
     });
 
     on("agent.spawn", async ($, e, next) => {
+        // The coordinator is the chat itself, never started as a subagent.
+        const chat = await read($, coordinator);
+
+        if (chat && colleagueOf([chat], e.subagentType)) {
+            return { deny: `${chat.name} is the coordinator: the Claude of this chat, never started as a subagent. Do this yourself, or give it to a colleague of the field.` };
+        }
+
         const colleague = colleagueOf(await read($, team), e.subagentType);
 
         if (!colleague) {
@@ -373,7 +393,7 @@ export const register: Register = (on, options) => {
                 return woken;
             }
 
-            const started = await next({ ...e, prompt: `${e.prompt}\n\n${outsideTextRule}` });
+            const started = await next({ ...e, prompt: `${e.prompt}\n\n${outsideTextRule}\n\n[Crew] ${whoseRule(await personOf($))}` });
 
             if (started.deny === undefined && started.agentId) {
                 await recordRun($, colleague, e.description, started.agentId, started.model);
@@ -385,6 +405,23 @@ export const register: Register = (on, options) => {
         } finally {
             starting.delete(colleague.id);
         }
+    });
+
+    // The coordinator in the chat's system prompt, at every turn and past a compaction: who they are and their memory's index, the
+    // notes read when the work needs them. Only the chat's own prompt, which offers the Agent tool: a colleague at work has none, and a
+    // teammate's render of it is the teammate's.
+    on("prompt.compose", async ($, e, next) => {
+        const composed = await next(e);
+
+        if (!e.tools.includes("Agent") || e.traits.includes("teammate")) {
+            return composed;
+        }
+
+        if (!isTeamRead) {
+            await safeRefresh($);
+        }
+
+        return coordinatorText ? { sections: [...composed.sections, { id: "crew:coordinator", text: coordinatorText, scope: "session" as const }] } : composed;
     });
 
     // Each model request of a colleague at work: how full their context is, the tokens, the effort.
@@ -486,6 +523,7 @@ export const register: Register = (on, options) => {
             const { Box, Text, Button, Link, Markdown } = ui;
             const say = words[language];
             const colleagues = await read($, team);
+            const chat = await read($, coordinator);
             const list = await read($, runs);
             const talk = await read($, meeting);
             const panel = await read($, view);
@@ -493,7 +531,7 @@ export const register: Register = (on, options) => {
             const latest = await read($, board);
             // The latest moment the state knows of, for the times drawn: a start, a step, an end, a reading of the files.
             const at = Math.max(latest.checkedAt, ...list.map(run => Math.max(run.startedAt, run.steppedAt ?? 0, run.endedAt ?? 0)), 0);
-            const byId = new Map(colleagues.map(colleague => [colleague.id, colleague]));
+            const byId = new Map([...colleagues, ...(chat ? [chat] : [])].map(colleague => [colleague.id, colleague]));
             // Each colleague in one section: in the meeting; at work while a task runs; finished, with their latest task, until the user
             // sends them back or something new starts; on a coffee break otherwise.
             // At work here, then in the project's other chats.
@@ -806,9 +844,10 @@ export const register: Register = (on, options) => {
                 );
             }
 
-            if (!colleagues.length) {
+            if (!colleagues.length && !chat) {
                 return (
                     <Box flexDirection="column" gap={1} alignItems="flex-start">
+                        {latest.folders?.due === "conflict" ? <Text key="folders" color={warningColor}>{say.foldersConflict(latest.folders.docs)}</Text> : null}
                         <Text key="empty" dimColor>{say.empty}</Text>
                         {latest.hasCommands
                             ? <Button key="act-init" label={`+ ${say.setUp}`} onPress={() => $.command.run({ command: "crew:init", args: "" })} />
@@ -884,8 +923,11 @@ export const register: Register = (on, options) => {
                 }
 
                 if (latest.backlog) {
-                    const owner = await projectOwner($);
-                    await changeBacklogTask(colleague, ["add", written, "--type", newTaskType, "--to", colleague.name, ...(owner ? ["--by", owner] : [])]);
+                    // Created by who is in this chat as the project names them, else by the project's owner.
+                    const owner = (await projectMe($, await projectRoot($))) ?? (await projectOwner($));
+                    // The coordinator's tasks are Claude's in the backlog, as the project plugin names them.
+                    const holder = colleague.id === chat?.id ? "Claude" : colleague.name;
+                    await changeBacklogTask(colleague, ["add", written, "--type", newTaskType, "--to", holder, ...(owner ? ["--by", owner] : [])]);
                     return;
                 }
 
@@ -924,7 +966,7 @@ export const register: Register = (on, options) => {
             const dayCount = (count: number) => `${count}${say.units.gap.replace(" ", " ")}${say.units.day}`;
             const todayDate = dateOf(today);
             // Every open task with an id, by who holds it: what a task waits for is found there, without asking anyone.
-            const openIds = openIdsOf(latest.tasks, latest.backlog);
+            const openIds = openIdsOf(chat && latest.chatTasks?.length ? [...latest.tasks, { colleague: chat.id, lines: latest.chatTasks }] : latest.tasks, latest.backlog);
             const taskRow = (prefix: string, index: number, task: Task, colleague: Colleague, face: JSX.Element | null) => {
                 const line = task.line;
                 // Its words, and its links whole: on its row their words, open a link each.
@@ -1027,12 +1069,14 @@ export const register: Register = (on, options) => {
                             </Box>
                             {status}
                             {effortCell(`${prefix}-effort-${index}`, effort)}
-                            {!isFree(colleague)
+                            {colleague.id === chat?.id
+                                ? null
+                                : !isFree(colleague)
                                 // A ▶ that cannot be pressed now keeps its place, gray, its reason under the pointer.
-                                ? tip(`${prefix}-idle-${index}`, idleReason, <Box key={`${prefix}-idle-${index}`} flexShrink={0}><Text color={isDesktop ? idleColor : undefined} dimColor={!isDesktop}>▶</Text></Box>, { isAbove: true })
-                                : isStarting(`${colleague.id}:${startText}`, [colleague.id])
-                                ? <Box key={`${prefix}-starting-${index}`} flexShrink={0}><Text dimColor wrap="truncate">{`⏳ ${say.starting}`}</Text></Box>
-                                : <Button key={`${prefix}-start-${index}`} label="▶" plain dimColor onPress={() => startTask(colleague, startText)} />}
+                                    ? tip(`${prefix}-idle-${index}`, idleReason, <Box key={`${prefix}-idle-${index}`} flexShrink={0}><Text color={isDesktop ? idleColor : undefined} dimColor={!isDesktop}>▶</Text></Box>, { isAbove: true })
+                                    : isStarting(`${colleague.id}:${startText}`, [colleague.id])
+                                    ? <Box key={`${prefix}-starting-${index}`} flexShrink={0}><Text dimColor wrap="truncate">{`⏳ ${say.starting}`}</Text></Box>
+                                    : <Button key={`${prefix}-start-${index}`} label="▶" plain dimColor onPress={() => startTask(colleague, startText)} />}
                         </Box>
                         {isOpen
                             ? (
@@ -1065,6 +1109,8 @@ export const register: Register = (on, options) => {
             };
 
             if (selected) {
+                // The coordinator's card: who they are, their tasks, memory and profile; nothing that starts or sets a colleague.
+                const isChat = selected.id === chat?.id;
                 const details = (await read($, card))?.id === selected.id ? await read($, card) : null;
                 // A run left at work by an event that never came keeps the colleague busy: the user can free them.
                 const stuck = list.filter(run => run.colleague === selected.id && run.status === "running").map(run => run.agentId);
@@ -1099,6 +1145,7 @@ export const register: Register = (on, options) => {
                             <Box flexDirection="column" flexShrink={1}>
                                 {name("card-name", selected, cardNameSize)}
                                 <Text dimColor>{roleOf(selected)}</Text>
+                                {isChat ? <Text key="card-coordinator" dimColor>{capitalized(say.coordinatorAbout)}</Text> : null}
                                 <Box flexDirection="row" flexWrap="wrap" alignItems="center">
                                     <Text dimColor>{[presence(selected), say.toDo(selected.openTasks), selected.model ? modelName(selected.model) : ""].filter(Boolean).join(" · ")}</Text>
                                 </Box>
@@ -1130,7 +1177,7 @@ export const register: Register = (on, options) => {
                                 </Box>
                             )
                             : null}
-                        <Box key="card-actions" flexDirection="row" flexWrap="wrap" gap={1}>
+                        {isChat ? null : <Box key="card-actions" flexDirection="row" flexWrap="wrap" gap={1}>
                             {isBusy ? null : <Button key="talk" variant="primary" label={`☰ ${say.talk(selected.name)}`} onPress={() => talkWith(selected)} />}
                             <Button key="card-ask" label={`? ${say.ask(selected.name)}`} onPress={() => askOf(selected)} />
                             {isBusy || !selected.openTasks
@@ -1141,7 +1188,7 @@ export const register: Register = (on, options) => {
                             {isBusy ? null : <Button key="card-round" label={`↻ ${say.roundWith(selected.name)}`} onPress={() => runCommand("crew:review", [selected])} />}
                             {retests ? <Button key="card-retest" label={`↻ ${say.retest(retests)}`} onPress={() => send(say.retestPrompt(selected.name))} /> : null}
                             {stuck.length ? <Button key="card-free" label={say.markFree} plain onPress={markFree} /> : null}
-                        </Box>
+                        </Box>}
                         {details
                             ? (
                                 <Box key="card-tasks" flexDirection="column" gap={1}>
@@ -1216,7 +1263,7 @@ export const register: Register = (on, options) => {
                                 </Box>
                             )
                             : null}
-                        <Box key="card-settings" flexDirection="column">
+                        {isChat ? null : <Box key="card-settings" flexDirection="column">
                             <Text bold>{say.settings}</Text>
                             {outlined("card-settings-list", [
                                 <Box key="effort-row" flexDirection="row" flexWrap="wrap" alignItems="center" columnGap={1}>
@@ -1235,7 +1282,7 @@ export const register: Register = (on, options) => {
                                     ))}
                                 </Box>,
                             ])}
-                        </Box>
+                        </Box>}
                         <Box key="card-manage" flexDirection="row" flexWrap="wrap" gap={1}>
                             {portraitButton("card-portrait", say.portrait, [selected])}
                             {fireButton("card-fire", [selected])}
@@ -1333,7 +1380,9 @@ export const register: Register = (on, options) => {
             ];
             const backlog = shown(backlogOf(latest.tasks, backlogSize, held));
             // The colleagues whose todo is past the 15 open lines it keeps: with nobody picked, the tidy button gives them the task.
-            const longTodos = colleagues.filter(colleague => latest.tasks.some(group => group.colleague === colleague.id && group.lines.length > todoLimit) || (latest.longMemories ?? []).includes(colleague.id));
+            // The coordinator among them, whom Claude tidies itself.
+            const longTodos = [...colleagues, ...(chat ? [chat] : [])].filter(colleague => latest.tasks.some(group => group.colleague === colleague.id && group.lines.length > todoLimit)
+                || (colleague.id === chat?.id && (latest.chatTasks?.length ?? 0) > todoLimit) || (latest.longMemories ?? []).includes(colleague.id));
             // Who the team's Next task button starts: the colleagues picked, or everyone free with something to do.
             const nextTeam = pickedTeam.length ? pickedTeam : colleagues.filter(colleague => isFree(colleague) && colleague.openTasks);
             // One weight for the whole panel: the team's portraits first, then one small portrait a row with what is left; past that,
@@ -1347,9 +1396,41 @@ export const register: Register = (on, options) => {
             });
             const openCount = latest.tasks.reduce((sum, group) => sum + group.lines.length, 0);
             const heavy = (latest.heavy ?? []).map(id => byId.get(id)?.name ?? id);
+            // The team still in .claude where the docs are a repo of their own: moved among them at the user's press.
+            const moveFolders = async () => {
+                try {
+                    await runFolders($, ["move"]);
+                } catch (error) {
+                    await $.ui.toast(error instanceof Error ? error.message : String(error));
+                }
+
+                await placeFolders($);
+                await safeRefresh($);
+            };
+            const folders = latest.folders?.due === "move"
+                ? outlined("folders", [
+                    <Text key="folders-text">{say.foldersMove(latest.folders.docs)}</Text>,
+                    <Box key="folders-actions" flexDirection="row" marginTop={1}><Button key="folders-move" label={`⇢ ${say.foldersMoveButton}`} onPress={moveFolders} /></Box>,
+                ])
+                : latest.folders?.due === "conflict"
+                ? <Text key="folders" color={warningColor}>{say.foldersConflict(latest.folders.docs)}</Text>
+                : null;
+            // The coordinator, apart from the team and on top: the Claude of this chat, whose card opens as a colleague's.
+            const chatRow = chat
+                ? colleagueCard(`coordinator-${chat.id}`, [
+                    face(chat, 40, true),
+                    <Box key={`lines-${chat.id}`} flexDirection="column" flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
+                        {nameRow(`open-${chat.id}`, chat, [opener(`open-${chat.id}`, chat)])}
+                        <Text key={`role-${chat.id}`} dimColor wrap="truncate-end">{roleOf(chat)}</Text>
+                        <Text key={`about-${chat.id}`} dimColor wrap="truncate-end">{`${capitalized(say.coordinatorAbout)} · ${about(chat)}`}</Text>
+                    </Box>,
+                ], chat.color)
+                : null;
             return (
                 <Box flexDirection="column" gap={1}>
                     {latest.error ? <Text key="error" dimColor>{say.readError(latest.error)}</Text> : null}
+                    {folders}
+                    {chatRow}
                     {heavy.length ? <Text key="heavy" dimColor>{say.heavyPortraits(listNames(heavy, say.and, say.comma))}</Text> : null}
                     {latest.hasCommands ? null : <Text key="install" dimColor>{say.installSkill}</Text>}
                     {colleagues.length ? <Box key="dash" flexDirection="row" flexWrap="wrap" gap={1}>{tiles}</Box> : null}
@@ -1671,19 +1752,27 @@ async function refresh($: EngineInterface): Promise<void>
     const tasks: { colleague: string; lines: string[] }[] = [];
     const longMemories: string[] = [];
     const profiles = new Map<string, string>();
+    // The coordinator, `coordinator: true` in their profile: the first one, apart from the team, with their profile and memory.
+    let chat: Colleague | null = null;
+    let chatProfile = "";
+    let chatMemory = "";
+    const chatTasks: string[] = [];
 
     for (const [name, profile] of (await $.fs.exists(agents)) ? await filesIn($, agents) : new Map<string, FileStamp>()) {
         const id = name.endsWith(".md") ? name.slice(0, -".md".length) : "";
         const folder = `${root}/.claude/agent-memory/${id}`;
         const files = id ? await filesIn($, folder).catch(() => undefined) : undefined;
         const todoFile = files?.get("todo.md");
+        const readProfile = () => cached(`${agents}/${name}`, profile, () => $.fs.read(`${agents}/${name}`));
+        // The coordinator needs no todo of their own: the backlog's tasks of Claude are theirs.
+        const isChat = Boolean(id) && !chat && isCoordinatorProfile(await readProfile());
 
-        if (!files || !todoFile) {
+        if (!isChat && (!files || !todoFile)) {
             continue;
         }
 
-        const portrait = await portraitIn($, folder, files);
-        const todo = await cached(`${folder}/todo.md`, todoFile, () => $.fs.read(`${folder}/todo.md`));
+        const portrait = files ? await portraitIn($, folder, files) : undefined;
+        const todo = todoFile ? await cached(`${folder}/todo.md`, todoFile, () => $.fs.read(`${folder}/todo.md`)) : "";
         const lines = openTasks(todo);
 
         if (portrait) {
@@ -1697,18 +1786,32 @@ async function refresh($: EngineInterface): Promise<void>
             small.set(id, smallUri);
         }
 
+        const memoryFile = files?.get("MEMORY.md");
+        const memory = memoryFile ? await cached(`${folder}/MEMORY.md`, memoryFile, () => $.fs.read(`${folder}/MEMORY.md`)) : "";
+        const text = await readProfile();
+
+        if (isChat) {
+            chat = colleagueFrom(id, text, todo, portrait?.stamp ?? 0);
+            chatProfile = text;
+            chatMemory = memory;
+            chatTasks.push(...lines);
+
+            if (memorySizeOf(memory).isLong) {
+                longMemories.push(id);
+            }
+
+            continue;
+        }
+
         if (lines.length) {
             tasks.push({ colleague: id, lines });
         }
 
         // A memory past what it may hold: Claude Code hands its colleague only the beginning.
-        const memoryFile = files.get("MEMORY.md");
-
-        if (memoryFile && memorySizeOf(await cached(`${folder}/MEMORY.md`, memoryFile, () => $.fs.read(`${folder}/MEMORY.md`))).isLong) {
+        if (memorySizeOf(memory).isLong) {
             longMemories.push(id);
         }
 
-        const text = await cached(`${agents}/${name}`, profile, () => $.fs.read(`${agents}/${name}`));
         loaded.push(colleagueFrom(id, text, todo, portrait?.stamp ?? 0));
         profiles.set(id, text);
     }
@@ -1737,7 +1840,17 @@ async function refresh($: EngineInterface): Promise<void>
     const types = backlog ? await projectTypes($, root) : undefined;
     const fromBacklog: string[] = [];
 
-    for (const [id, lines] of backlogLinesOf(backlog ?? [], loaded)) {
+    // The backlog's tasks of Claude are the coordinator's: the project plugin writes them so, whatever name they were given by.
+    const holders = chat ? [...loaded, { id: chat.id, name: "Claude" }, { id: chat.id, name: chat.name }] : loaded;
+
+    for (const [id, lines] of backlogLinesOf(backlog ?? [], holders)) {
+        fromBacklog.push(...lines.map(line => `${id}:${line}`));
+
+        if (chat && id === chat.id) {
+            chat = { ...chat, openTasks: chat.openTasks + lines.length };
+            continue;
+        }
+
         const group = tasks.find(one => one.colleague === id);
 
         if (group) {
@@ -1746,7 +1859,6 @@ async function refresh($: EngineInterface): Promise<void>
             tasks.push({ colleague: id, lines });
         }
 
-        fromBacklog.push(...lines.map(line => `${id}:${line}`));
         const holder = loaded.findIndex(one => one.id === id);
         const colleague = loaded[holder];
 
@@ -1762,9 +1874,10 @@ async function refresh($: EngineInterface): Promise<void>
     // Every write redraws the panel, and a click that lands on a drawing already replaced is lost: write only what changed.
     if (previous.hasCommands !== hasCommands || previous.error || JSON.stringify(previous.tasks) !== JSON.stringify(sortedTasks) || JSON.stringify(previous.heavy ?? []) !== JSON.stringify(heavy)
         || JSON.stringify(previous.longMemories ?? []) !== JSON.stringify(longMemories) || JSON.stringify(previous.backlog) !== JSON.stringify(backlog)
-        || JSON.stringify(previous.fromBacklog ?? []) !== JSON.stringify(fromBacklog) || JSON.stringify(previous.types) !== JSON.stringify(types)) {
+        || JSON.stringify(previous.fromBacklog ?? []) !== JSON.stringify(fromBacklog) || JSON.stringify(previous.types) !== JSON.stringify(types)
+        || JSON.stringify(previous.chatTasks ?? []) !== JSON.stringify(chatTasks)) {
         const checkedAt = await $.clock.now();
-        await update($, board, current => ({ ...current, hasCommands, tasks: sortedTasks, heavy, longMemories, backlog, fromBacklog, types, error: undefined, checkedAt }));
+        await update($, board, current => ({ ...current, hasCommands, tasks: sortedTasks, chatTasks, heavy, longMemories, backlog, fromBacklog, types, error: undefined, checkedAt }));
     }
 
     const signature = [...kept, ...small].map(([id, uri]) => `${id}:${uri.length}`).join("|");
@@ -1783,6 +1896,14 @@ async function refresh($: EngineInterface): Promise<void>
         await update($, team, () => sorted);
     }
 
+    coordinatorText = chat ? coordinatorPromptOf(chat, chatProfile, chatMemory, await personOf($)) : undefined;
+    isTeamRead = true;
+
+    if (JSON.stringify(chat) !== JSON.stringify(await read($, coordinator))) {
+        const shown = chat;
+        await update($, coordinator, () => shown);
+    }
+
     // Every message in the chat draws its speakers: they are written apart from the team, and only when they changed.
     const voices: Speaker[] = sorted.map(({ id, name, fullName, role, color }) => ({ id, name, fullName, role, color }));
 
@@ -1792,6 +1913,72 @@ async function refresh($: EngineInterface): Promise<void>
 
 
     await refreshMeeting($);
+}
+
+// The colleagues' folders among the project plugin's docs, where those are a repo of their own (scripts/folders.mjs): linked at once
+// where the docs' folders are there and .claude's are not, as on a second machine; a team still in .claude, or in both places, is
+// shown in the panel, whose press moves it.
+async function placeFolders($: EngineInterface): Promise<void>
+{
+    const root = await projectRoot($);
+
+    if (!(await $.fs.exists(`${root}/.claude/project.yaml`))) {
+        return;
+    }
+
+    let places = await runFolders($, ["status"]);
+
+    if (places?.mode === "shared" && places.due === "link") {
+        places = await runFolders($, ["link"]);
+        forgetAll();
+        await safeRefresh($);
+
+        if ((await read($, team)).length || (await read($, coordinator))) {
+            await openOnce($);
+        }
+    }
+
+    const due = places?.mode === "shared" && (places.due === "move" || places.due === "conflict") ? places.due : undefined;
+    const docs = (places?.docs ?? "").replace(/\\/g, "/");
+    const folders = due ? { due, docs: docs.toLowerCase().startsWith(`${root.toLowerCase()}/`) ? docs.slice(root.length + 1) : docs } : undefined;
+
+    if (JSON.stringify(folders) !== JSON.stringify((await read($, board)).folders)) {
+        await update($, board, current => ({ ...current, folders }));
+    }
+}
+
+// The folders script of this plugin, its JSON answer; a refusal (a move the user must settle first) as an error with its words.
+async function runFolders($: EngineInterface, args: string[]): Promise<{ mode?: string; due?: string; docs?: string } | undefined>
+{
+    const root = await projectRoot($);
+    const ran = await $.process.run(["node", `${$.plugin.root.replace(/\\/g, "/")}/scripts/folders.mjs`, ...args, "--root", root], { cwd: root, timeoutMs: 30_000 });
+
+    if (ran.exitCode !== 0 && !ran.stdout.trim()) {
+        throw new Error(ran.stderr.trim() || `folders.mjs ${args.join(" ")} failed`);
+    }
+
+    try {
+        return JSON.parse(ran.stdout) as { mode?: string; due?: string; docs?: string };
+    } catch {
+        return undefined;
+    }
+}
+
+// Who is in this chat, for the memories: the project plugin's `me:`, else git's user name; undefined without either. Asked once a load.
+async function personOf($: EngineInterface): Promise<string | undefined>
+{
+    personRead ??= (async () => {
+        const root = await projectRoot($);
+        const me = await projectMe($, root);
+
+        if (me) {
+            return me;
+        }
+
+        const named = await $.process.run(["git", "config", "user.name"], { cwd: root, timeoutMs: 5000 }).catch(() => undefined);
+        return named?.exitCode === 0 ? named.stdout.trim() || undefined : undefined;
+    })();
+    return personRead;
 }
 
 // The portrait as a data URI (avatar.jpg, .webp, .png or .svg) with the file's time, so a new one is drawn again, and the 32 px

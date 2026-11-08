@@ -6,3 +6,5 @@
 4. **Archive**: move `.claude/agents/<id>.md` to `.claude/agent-memory/_former/<id>/profile.md`, and the content of `.claude/agent-memory/<id>/` beside it; with `git mv` where `.claude/` is under git. Nothing is deleted, and outside `.claude/agents/` the profile is no longer an agent.
 5. **Team table**: remove the row.
 6. Rehiring is the same move backwards, with a `## <date>: back` line.
+
+**The coordinator** leaves the same way; where the project keeps a backlog there are no open tasks to hand over, since Claude's tasks stay Claude's. From the next message the chat's Claude is plain Claude again.

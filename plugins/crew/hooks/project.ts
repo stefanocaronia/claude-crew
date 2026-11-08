@@ -122,6 +122,14 @@ export async function projectOwner($: EngineInterface): Promise<string | undefin
     return listed.map(name => name.trim().replace(/^["']|["']$/g, "")).find(name => name && name !== "Claude");
 }
 
+// Who is in this chat as the project plugin names them, `me:` of .claude/project.local.yaml, which it writes at the start of a
+// session from the GitHub login; undefined without it.
+export async function projectMe($: EngineInterface, root: string): Promise<string | undefined>
+{
+    const local = await $.fs.read(`${root}/.claude/project.local.yaml`).catch(() => "");
+    return /^me:[ \t]*["']?([^"'#\r\n]+?)["']?[ \t]*(?:#.*)?$/m.exec(local)?.[1]?.trim() || undefined;
+}
+
 // The task types the project adds or renames, `types:` of .claude/project.yaml, by key; empty without them.
 export async function projectTypes($: EngineInterface, root: string): Promise<Record<string, string>>
 {

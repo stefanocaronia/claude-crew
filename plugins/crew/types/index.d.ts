@@ -86,11 +86,16 @@ export type Board = {
     /** The open tasks of the project's backlog (the project plugin's), by number with who holds each: a task that waits for `T-62` is
      * blocked while it is open there. */
     backlog?: { id: string; to: string; priority?: string; date?: string; text?: string; after?: string[]; type?: string; due?: string; by?: string; started?: string; state?: string; specs?: string[] }[];
+    /** The coordinator's own open todo lines, apart from the team's `tasks`: a colleague's task may wait for one of them. */
+    chatTasks?: string[];
     /** The lines of `tasks` that are backlog tasks a colleague holds, not lines of their todo, as "<colleague id>:<line>": the backlog's
      * own commands change them. */
     fromBacklog?: string[];
     /** The task types the project adds or renames (`types:` of .claude/project.yaml), by key, where it keeps a backlog. */
     types?: Record<string, string>;
+    /** Where the docs are a repo of their own (the project plugin's) and the team is still in .claude: the move the user may ask for,
+     * or the two places both holding files; with the docs' folder, as the project names it. */
+    folders?: { due: "move" | "conflict"; docs: string };
     /** Why the last reading of the team failed, shown in the panel. */
     error?: string;
     checkedAt: number;
@@ -170,6 +175,9 @@ declare module "claude-code" {
     interface PluginState {
         "crew": {
             team: Colleague[];
+            /** The coordinator, `coordinator: true` in their profile: the Claude of the chat, apart from the team; null without one. Their
+             * open tasks count their todo's lines and the backlog's tasks of Claude. */
+            coordinator: Colleague | null;
             speakers: Speaker[];
             runs: Run[];
             /** The colleagues at work in the project's other chats, as their panels share them. */

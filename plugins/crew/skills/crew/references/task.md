@@ -1,6 +1,6 @@
 # Giving a colleague a task
 
-Claude uses the colleagues as subagents whenever it helps, not only in rounds: a check, a piece of research, a test, a change in their field. A colleague in a meeting or at work on a task takes no other one.
+Claude uses the colleagues as subagents whenever it helps, not only in rounds: a check, a piece of research, a test, a change in their field. A colleague in a meeting or at work on a task takes no other one. The coordinator is no colleague: they are the chat, and do their work themselves.
 
 1. **Who**: the colleague whose field the task is in, among those whose permissions allow it. The permissions bind, read from the profile's `tools:`:
    - **Read** (`Grep`, `Glob`): reading the project's files. Without it, put the material itself in the brief, not paths.

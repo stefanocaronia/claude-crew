@@ -645,12 +645,13 @@ test("a task that waits for a task of the project's backlog (T-62) shows who hol
     const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
     await ui.press({ key: "backlog-toggle" });
     expect(await ui.find({ type: "Text", text: "⛓︎ waits for Claude" })).toBeDefined();
-    expect(asked.at(-1)).toEqual(["node", "C:/plugins/project/scripts/backlog.mjs", "list", "--atomic", "--json"]);
+    const backlogAsked = () => asked.filter(args => args[1]?.endsWith("/backlog.mjs"));
+    expect(backlogAsked().at(-1)).toEqual(["node", "C:/plugins/project/scripts/backlog.mjs", "list", "--atomic", "--json"]);
     await ui.unmount();
     // The backlog is asked again only once its files change; T-62 done, Sara's task is free.
-    const count = asked.length;
+    const count = backlogAsked().length;
     await $.turn.complete({ reason: "answer", answer: "", durationMs: 1000, isAborted: false, turnId: "t1" } as never);
-    expect(asked.length).toBe(count);
+    expect(backlogAsked().length).toBe(count);
     open = [];
     files["/p/project/TASKS.md"] = "- T-62 done";
     await $.turn.complete({ reason: "answer", answer: "", durationMs: 1000, isAborted: false, turnId: "t2" } as never);
@@ -1359,7 +1360,203 @@ test("a colleague at work whom the panel never saw start is found among the sess
 });
 
 // A section's heading as it reads: the words of its drawing on the desktop, of its button on the terminal.
-async function headingOf(ui: { find: (query: { key: string }) => Promise<{ props: unknown; children: unknown[] } | undefined> }, key: string): Promise<string | undefined>
+// The coordinator's profile: the Claude of the chat, with no todo of their own.
+const coordinatorProfile = "---\nname: elena-rossi\ndescription: \"Elena Rossi, coordinator. The Claude of the chat: never start her as a subagent.\"\ncoordinator: true\ncolor: blue\n---\n\n# Elena Rossi, coordinator\n\n**Who you are.** Calm and precise.\n";
+
+// The project plugin's backlog with a coordinator: a task of Claude and one given to Elena by name, both hers.
+function withCoordinator(sent: ReturnType<typeof world>, on: On, extra: (argv: readonly string[]) => { exitCode: number; stdout: string; stderr: string } | undefined = () => undefined): string[][]
+{
+    const { files } = sent;
+    const asked: string[][] = [];
+    files["/p/.claude/agents/elena-rossi.md"] = coordinatorProfile;
+    files["/p/.claude/agent-memory/elena-rossi/MEMORY.md"] = "# Elena: memory\n\n- [the plan](notes/plan.md)\n";
+    files["/home/.claude/plugins/installed_plugins.json"] = JSON.stringify({ plugins: { "project@claude-project": [{ installPath: "/plugins/project" }] } });
+    files["/plugins/project/scripts/backlog.mjs"] = "";
+    files["/p/.claude/project.yaml"] = "docs: project\npeople: [Claude, Anna]\n";
+    files["/p/project/TASKS.md"] = "- T-80\n- T-81";
+    on("process.run", (_, e) => {
+        asked.push([...e.argv]);
+        const open = [
+            { id: 80, to: "Claude", priority: "P2", created: "2026-10-09", text: "the release", after: [], type: "chore" },
+            { id: 81, to: "Elena", priority: "P1", created: "2026-10-09", text: "the guide", after: [] },
+        ];
+        return { value: extra(e.argv) ?? { exitCode: 0, stdout: e.argv.includes("list") ? JSON.stringify(open) : "", stderr: "" } } as never;
+    });
+    return asked;
+}
+
+test("the coordinator is the chat's Claude: on top of the team with the backlog's tasks of Claude, a card that neither starts nor sets them, never started as a subagent", async ($, on) => {
+    const sent = world(on, []);
+    sent.files["/p/.claude/project.local.yaml"] = "me: Stefano  # from GitHub\n";
+    const asked = withCoordinator(sent, on);
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+
+    for (const surface of surfaces) {
+        const ui = await $.ui.mount({ plugin, surface, component: "Pane", requestId: "crew", props: pane });
+        expect(await ui.find({ key: "coordinator-elena-rossi" })).toBeDefined();
+        expect(await ui.find({ type: "Text", text: "The Claude of this chat · 2 to do" })).toBeDefined();
+        // Not one of the team: no row among them, nobody to pick for a meeting.
+        expect(await ui.find({ key: "idle-elena-rossi" })).toBeUndefined();
+        expect(await ui.find({ key: "pick-elena-rossi" })).toBeUndefined();
+        await ui.unmount();
+    }
+
+    const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
+    await ui.press({ key: "open-elena-rossi" });
+    expect(await ui.find({ type: "Text", text: "The Claude of this chat" })).toBeDefined();
+    // Nothing that hands them work, starts a talk or sets them up: they are the chat.
+    for (const key of ["talk", "card-ask", "card-next", "card-round", "card-effort", "permission-read"]) {
+        expect(await ui.find({ key })).toBeUndefined();
+    }
+
+    // Their portrait, their tidying (which Claude does itself) and firing them stay.
+    expect(await ui.find({ key: "card-tidy" })).toBeDefined();
+    expect(await ui.find({ key: "card-fire" })).toBeDefined();
+    // Their tasks are the backlog's, of Claude and of their name; none has a ▶, since nobody starts the chat.
+    expect(await ui.find({ type: "Text", text: "▸ the release" })).toBeDefined();
+    expect(await ui.find({ type: "Text", text: "▸ the guide" })).toBeDefined();
+    expect(await ui.find({ key: "card-task-start-0" })).toBeUndefined();
+    expect(await ui.find({ key: "card-task-idle-0" })).toBeUndefined();
+    // A task written in their card is Claude's in the backlog, created by who is in this chat (me:), not the project's owner.
+    await ui.press({ key: "card-new-task" });
+    await ui.input({ key: "card-new-task", text: "the notes" });
+    expect(asked).toContainEqual(["node", "/plugins/project/scripts/backlog.mjs", "add", "the notes", "--type", "feature", "--to", "Claude", "--by", "Stefano"]);
+    await ui.unmount();
+    // Claude Code would start them as a subagent of the same name: refused, with what to do instead.
+    const spawned = await $.agent.spawn({ prompt: "Plan the release.", description: "plan", subagentType: "elena-rossi" } as never);
+    expect((spawned as { deny?: string }).deny).toBe("Elena is the coordinator: the Claude of this chat, never started as a subagent. Do this yourself, or give it to a colleague of the field.");
+    expect(sent.briefs).toEqual([]);
+});
+
+test("without a backlog, the coordinator's own todo: a colleague's task waits for their line, and Tidy takes them when it is long", async ($, on) => {
+    const sent = world(on, []);
+    const { files } = sent;
+    files["/p/.claude/agents/elena-rossi.md"] = coordinatorProfile;
+    files["/p/.claude/agent-memory/elena-rossi/MEMORY.md"] = `# Elena: memory\n\n${Array.from({ length: 90 }, (_, index) => `- line ${index + 1}`).join("\n")}\n`;
+    files["/p/.claude/agent-memory/elena-rossi/todo.md"] = "- [ ] P1 · 2026-10-07 · #elena-1 · plan the release\n";
+    files["/p/.claude/agent-memory/sara-lombardi/todo.md"] = "- [ ] P2 · 2026-10-08 · the notes (after: #elena-1)\n";
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+    const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
+    await ui.press({ key: "backlog-toggle" });
+    expect(await ui.find({ type: "Text", text: "⛓︎ waits for Elena" })).toBeDefined();
+    // Her memory is past 80 lines: Tidy with nobody picked takes her, whom Claude tidies itself.
+    await ui.press({ key: "act-tidy" });
+    expect(sent.at(-1)).toBe("/crew:tidy Elena");
+    await ui.press({ key: "open-elena-rossi" });
+    await ui.press({ key: "card-tidy" });
+    expect(sent.at(-1)).toBe("/crew:tidy Elena");
+    await ui.unmount();
+});
+
+test("a panel with no team read says when the team's two places both hold files", async ($, on) => {
+    const sent = world(on, []);
+
+    for (const path of Object.keys(sent.files).filter(path => path.startsWith("/p/.claude/"))) {
+        delete sent.files[path];
+    }
+
+    sent.files["/p/.claude/project.yaml"] = "docs: project\n";
+    on("process.run", (_, e) => ({ value: { exitCode: 0, stdout: e.argv.some(arg => arg.endsWith("/scripts/folders.mjs")) ? JSON.stringify({ mode: "shared", docs: "/p/project", due: "conflict" }) : "", stderr: "" } }) as never);
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+    await sent.clock.advance(10);
+    const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
+    expect(await ui.find({ type: "Text", text: "The team's files are both in .claude and in project/crew: ask Claude to merge them." })).toBeDefined();
+    expect(await ui.find({ type: "Text", text: "No colleagues in this project yet." })).toBeDefined();
+    await ui.unmount();
+});
+
+// What a system prompt is composed from, but for its tools and traits.
+const facts = { model: "claude-opus-5-5", promptModel: "claude-opus-5-5", surfaces: [], outputStyle: null } as const;
+
+test("the coordinator is in the chat's system prompt, with their memory's index; never in a colleague's, nor without a coordinator", async ($, on) => {
+    const sent = world(on, []);
+    sent.files["/p/.claude/project.local.yaml"] = "me: Stefano\n";
+    withCoordinator(sent, on);
+    on("turn.complete", () => ({ text: "" }) as never);
+    on("prompt.compose", () => ({ sections: [{ id: "intro", text: "You are Claude.", scope: "shared" }] }) as never);
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+    const chat = await $.prompt.compose({ ...facts, tools: ["Agent", "Read"], traits: [] });
+    const section = chat.sections.find(one => one.id === "crew:coordinator");
+    expect(section?.scope).toBe("session");
+    expect(chat.sections.at(-1)?.id).toBe("crew:coordinator");
+    expect(section?.text).toMatch(/^# You are Elena Rossi\n/);
+    expect(section?.text).toMatch(/\*\*Who you are\.\*\* Calm and precise\./);
+    expect(section?.text).toMatch(/The person in this chat is Stefano\.\n\n# Elena: memory\n\n- \[the plan\]\(notes\/plan\.md\)$/);
+    // A colleague at work has no Agent tool; a teammate renders its lead's prompt as its own.
+    expect((await $.prompt.compose({ ...facts, tools: ["Read"], traits: [] })).sections.some(one => one.id === "crew:coordinator")).toBe(false);
+    expect((await $.prompt.compose({ ...facts, tools: ["Agent"], traits: ["teammate"] })).sections.some(one => one.id === "crew:coordinator")).toBe(false);
+    // Fired, the chat is plain Claude again at the next reading.
+    delete sent.files["/p/.claude/agents/elena-rossi.md"];
+    await $.turn.complete({ reason: "answer", answer: "", durationMs: 1000, isAborted: false, turnId: "t1" } as never);
+    expect((await $.prompt.compose({ ...facts, tools: ["Agent"], traits: [] })).sections.some(one => one.id === "crew:coordinator")).toBe(false);
+});
+
+test("a colleague's brief says whose each memory is, by the name of who is in this chat: the project's me:, else git's", async ($, on) => {
+    const sent = world(on, []);
+    on("process.run", (_, e) => ({ value: { exitCode: 0, stdout: e.argv.join(" ") === "git config user.name" ? "Anna Bianchi\n" : "", stderr: "" } }) as never);
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+    await $.agent.spawn({ prompt: "Think about modes.", description: "modes", subagentType: "sara-lombardi" } as never);
+    expect(sent.briefs.at(-1)).toMatch(/\n\n\[Crew\] Several people may work on this project, each with their own Claude, and the memories are shared: write whose each preference, decision or request is, by name \("Anna Bianchi prefers…"\), never "the user"\. The person in this chat is Anna Bianchi\.$/);
+});
+
+test("where the docs are a repo of their own, the panel offers to move the team there, and says when both places hold files", async ($, on) => {
+    const sent = world(on, []);
+    let due = "move";
+    const asked = withCoordinator(sent, on, argv => {
+        if (!argv.some(arg => arg.endsWith("/scripts/folders.mjs"))) {
+            return undefined;
+        }
+
+        const root = argv[argv.indexOf("--root") + 1] ?? "";
+
+        if (argv.includes("move")) {
+            due = "none";
+        }
+
+        return { exitCode: 0, stdout: JSON.stringify({ mode: "shared", docs: `${root}/project`, due }), stderr: "" };
+    });
+    const folders = () => asked.filter(argv => argv.some(arg => arg.endsWith("/scripts/folders.mjs"))).map(argv => argv[2]);
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+    await sent.clock.advance(10);
+    const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
+    expect(await ui.find({ type: "Text", text: "The team can move to project/crew: private, and shared with whoever works on the docs." })).toBeDefined();
+    await ui.press({ key: "folders-move" });
+    expect(folders()).toEqual(["status", "move", "status"]);
+    expect(await ui.find({ key: "folders-move" })).toBeUndefined();
+    await ui.unmount();
+    due = "conflict";
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+    await sent.clock.advance(10);
+    const again = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
+    expect(await again.find({ type: "Text", text: "The team's files are both in .claude and in project/crew: ask Claude to merge them." })).toBeDefined();
+    expect(await again.find({ key: "folders-move" })).toBeUndefined();
+    await again.unmount();
+});
+
+test("on a machine whose docs hold the team and .claude does not, the folders are linked at the start, with nothing to press", async ($, on) => {
+    const sent = world(on, []);
+    let due = "link";
+    const asked = withCoordinator(sent, on, argv => {
+        if (!argv.some(arg => arg.endsWith("/scripts/folders.mjs"))) {
+            return undefined;
+        }
+
+        if (argv.includes("link")) {
+            due = "none";
+        }
+
+        return { exitCode: 0, stdout: JSON.stringify({ mode: "shared", docs: "/p/project", due }), stderr: "" };
+    });
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+    await sent.clock.advance(10);
+    expect(asked.filter(argv => argv.some(arg => arg.endsWith("/scripts/folders.mjs"))).map(argv => argv[2])).toEqual(["status", "link"]);
+    const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
+    expect(await ui.find({ key: "folders-move" })).toBeUndefined();
+    expect(await ui.find({ key: "coordinator-elena-rossi" })).toBeDefined();
+    await ui.unmount();
+});
+
+async function headingOf(ui:{ find: (query: { key: string }) => Promise<{ props: unknown; children: unknown[] } | undefined> }, key: string): Promise<string | undefined>
 {
     const box = await ui.find({ key: `heading-${key}` });
     const drawn = box?.children.find(child => (child as { type?: string }).type === "Svg") as { props?: { alt?: string } } | undefined;

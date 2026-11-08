@@ -2,6 +2,13 @@
 
 What changes for whoever uses Crew, version by version. Plugins update in a new chat: `/plugin`, Marketplaces, claude-crew, Update marketplace, or turn its auto-update on there.
 
+## 0.15.0
+
+- **A coordinator**: the Claude of your chat can have a name, a character and a memory. Ask Claude to hire a coordinator: their profile says `coordinator: true`, and the panel puts it in the chat's system prompt at every turn, with their memory's index, never in a colleague's. They are drawn on top of the team, their card with their tasks, memory and profile, and nothing that starts them or sets them up; they are never started as a subagent, nor in a round or a meeting. With Project, Claude's tasks of the backlog are theirs, and a task written in their card is Claude's. Fire them and the chat is plain Claude again.
+- **The team among Project's docs**: where Project keeps its docs in a git repo of their own, the team lives in `<docs>/crew/agents` and `<docs>/crew/memory`, private and shared with whoever works on the docs, and `.claude/agents` and `.claude/agent-memory` are links to them, kept out of the code's repo. The first hire makes them; on another machine the panel links them at the start of a chat; a team still in `.claude` moves there with the panel's Move the team, and one in both places is shown, for Claude to merge.
+- **Whose each memory is**: several people may work on one project, each with their own Claude, and the memories are shared. Every colleague's brief, and the coordinator, now say to write whose each preference, decision or request is, by name, never "the user": the name Project gives the person in the chat (`me:`), else git's `user.name`. A task written in a card is created by that person too, else by the project's owner.
+- The skills ask, next, panel and tidy load whole again: their descriptions held a colon that broke their frontmatter, so Claude Code dropped it, the settings that keep next and tidy for the panel's buttons and the user included.
+
 ## 0.14.8
 
 - In a project with Project's backlog, a new task written in a colleague's card has a type: feature, or the one picked beside the text box, among bug, feature, chore, research, test and the project's own. Project's next version refuses a task without one.

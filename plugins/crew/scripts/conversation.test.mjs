@@ -114,6 +114,14 @@ describe("the commands", () => {
         assert.equal(hook({ hook_event_name: "UserPromptSubmit", session_id: "four", prompt: "ciao" }), "");
     });
 
+    it("never hands the chat to the coordinator, who is the chat itself", () => {
+        writeColleague("elena-rossi", "Elena Rossi, coordinator", "Elena remembers the plan.", "- [ ] the release", { coordinator: true });
+        assert.match(run("ten", "talk", "Elena"), /No colleague named Elena/);
+        assert.doesNotMatch(run("ten", "talk", "Pippo"), /Elena/);
+        rmSync(join(project, ".claude", "agents", "elena-rossi.md"));
+        rmSync(join(project, ".claude", "agent-memory", "elena-rossi"), { recursive: true });
+    });
+
     it("reads the permissions as the panel does: a tools list in brackets, and commands that change files", () => {
         writeColleague("luca-neri", "Luca Neri, tester", "Luca remembers the flaky test.", "", { tools: "[Read, Bash]" });
         assert.match(run("nine", "talk", "Luca"), /Their permissions, binding: Luca changes its files and runs commands\./);
@@ -206,7 +214,7 @@ function writeAgent(id, heading, body = "", quirks = {})
     const folder = join(project, ".claude", "agents");
     mkdirSync(folder, { recursive: true });
     const file = [
-        "---", `name: ${id}`, ...(quirks.comment ? ["# a yaml comment"] : []), ...(quirks.watches ? [`watches: ${quirks.watches}`] : []), `description: "${heading}."`, `tools: ${quirks.tools ?? "Read, Grep, Glob"}`, "memory: project", "---", "",
+        "---", `name: ${id}`, ...(quirks.comment ? ["# a yaml comment"] : []), ...(quirks.watches ? [`watches: ${quirks.watches}`] : []), ...(quirks.coordinator ? ["coordinator: true"] : []), `description: "${heading}."`, `tools: ${quirks.tools ?? "Read, Grep, Glob"}`, "memory: project", "---", "",
         `# ${heading}`, "", "**Who you are.** Someone.", body, "", "## How you work", "", "- Carefully.", "",
         "## What you return", "", "REPORT FORMAT", "", "## Your memory", "", "MEMORY RULES", "",
     ];

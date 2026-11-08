@@ -469,6 +469,51 @@ function frontmatterOf(text: string): string
     return /^---\n([\s\S]*?)\n---/.exec(text)?.[1] ?? "";
 }
 
+/** Whether a profile is the coordinator's, `coordinator: true` in its frontmatter: the Claude of the chat, hired as a colleague, never
+ * started as a subagent. */
+export function isCoordinatorProfile(profile: string): boolean
+{
+    return /^coordinator:[ \t]*true[ \t]*$/m.test(frontmatterOf(normalized(profile)));
+}
+
+/** The rule on whose a memory is, for the coordinator and the colleagues alike: several people may work on the project, each with their
+ * own Claude, and share the memories. */
+export function whoseRule(person?: string): string
+{
+    return person
+        ? `Several people may work on this project, each with their own Claude, and the memories are shared: write whose each preference, decision or request is, by name ("${person} prefers…"), never "the user". The person in this chat is ${person}.`
+        : "Several people may work on this project, each with their own Claude, and the memories are shared: write whose each preference, decision or request is, by name when you know it, never \"the user\".";
+}
+
+/** A memory's index as Claude Code hands it to a colleague: its first 80 lines, within 10 KB. */
+export function memoryIndexOf(memory: string): string
+{
+    const lines = normalized(memory).replace(/\n+$/, "").split("\n").slice(0, memoryLimit.lines);
+
+    while (lines.length && memorySizeOf(lines.join("\n")).bytes > memoryLimit.bytes) {
+        lines.pop();
+    }
+
+    return lines.join("\n").trim();
+}
+
+/** The coordinator's section of the chat's system prompt: who they are, from their profile without its frontmatter and heading, and
+ * their memory's index, the rest read when the work needs it. */
+export function coordinatorPromptOf(coordinator: { id: string; fullName: string; role: string }, profile: string, memory: string, person?: string): string
+{
+    const body = normalized(profile).replace(/^---\n[\s\S]*?\n---\n/, "").replace(/^\s*# [^\n]*\n/, "").trim();
+    const index = memoryIndexOf(memory);
+    const who = coordinator.role ? `${coordinator.fullName}, ${coordinator.role}` : coordinator.fullName;
+    return [
+        `# You are ${coordinator.fullName}`,
+        `In this project you are ${who}: the coordinator of the team, the Claude of this chat, hired with the Crew plugin. This is who you are in every turn of this chat: your name, character and voice are below, while your tools, your rules and the user's instructions are this chat's, as always. The colleagues are subagents you hand work to; you are never started as one. When the chat is handed to colleagues, in a talk or a meeting, they speak as Crew's conversation says, and you speak as yourself again once it ends. A colleague at work, started as a subagent, is not you and leaves this section aside.`,
+        body,
+        "## Your memory",
+        `Your memory is the folder .claude/agent-memory/${coordinator.id}/: its MEMORY.md, below, is the index, at most 80 lines; open a note it links when the work needs it. Write what you learn there as the colleagues do: edit it, never rewrite it whole, since other chats and other people write to it too. ${whoseRule(person)}`,
+        index || "(Nothing yet.)",
+    ].filter(Boolean).join("\n\n");
+}
+
 /** The task types a project adds or renames, `types:` of its .claude/project.yaml, by key: `types: { design: Design }`, or the
  * `key: Name` lines beneath it. Empty without them. */
 export function typesOf(config: string): Record<string, string>

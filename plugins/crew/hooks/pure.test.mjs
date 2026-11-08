@@ -5,7 +5,7 @@ import { describe, it } from "node:test";
 import { segmentsOf, speakersOf } from "./meeting.ts";
 import { imagePathsIn, isInside, isOwnMemory, resolvedPath } from "./paths.ts";
 import { withCount } from "./progress.ts";
-import { ageOf, agentSpecFrom, backlogLinesOf, backlogOf, blockersOf, daysBetween, cardFrom, colleagueFrom, colleagueOf, memorySizeOf, openIdsOf, openTasks, permissionsOf, retestsOf, taskOf, typesOf, withEffort, withNextPriority, withPermissions, withText } from "./team.ts";
+import { ageOf, agentSpecFrom, backlogLinesOf, backlogOf, blockersOf, coordinatorPromptOf, daysBetween, cardFrom, colleagueFrom, colleagueOf, isCoordinatorProfile, memoryIndexOf, memorySizeOf, openIdsOf, openTasks, permissionsOf, retestsOf, taskOf, typesOf, whoseRule, withEffort, withNextPriority, withPermissions, withText } from "./team.ts";
 import { taskWords } from "./todo.ts";
 import { dateOf, formatTokens, isoWeek, languageOf, linksIn, listNames, modelName, slugOf, words } from "./text.ts";
 
@@ -281,6 +281,10 @@ describe("paths", () => {
         assert.equal(isOwnMemory("F:/Work/.Claude/Agent-Memory/SARA/notes/x.md", "f:/work", "Sara"), true);
         assert.equal(isOwnMemory("/p/.claude/agent-memory/sara-lombardi/x", "/p", "sara"), false);
         assert.equal(isOwnMemory("/q/.claude/agent-memory/sara/todo.md", "/p", "sara"), false);
+        // Where the folder is a link to the project's docs, its target is theirs too, and only theirs.
+        assert.equal(isOwnMemory("/p/project/crew/memory/sara/todo.md", "/p", "sara"), true);
+        assert.equal(isOwnMemory("/p/project/crew/memory/sara-lombardi/todo.md", "/p", "sara"), false);
+        assert.equal(isOwnMemory("/p/project/crew/agents/sara.md", "/p", "sara"), false);
         assert.equal(isInside("/pq/x", "/p"), false);
     });
 
@@ -349,5 +353,40 @@ describe("the task types a project adds", () => {
         assert.deepEqual(typesOf("types:  # our own\r\n  design: Design  # the look\r\n  feature: 'Funzione nuova'\r\npeople: [Claude]\r\n"), { design: "Design", feature: "Funzione nuova" });
         assert.deepEqual(typesOf("docs: project\n"), {});
         assert.deepEqual(typesOf("types: {}\n"), {});
+    });
+});
+
+describe("the coordinator", () => {
+    const elena = "---\r\nname: elena-rossi\r\ndescription: \"Elena Rossi, coordinator. The Claude of the chat: never start her as a subagent.\"\r\ncoordinator: true\r\ncolor: blue\r\n---\r\n\r\n# Elena Rossi, coordinator\r\n\r\n**Who you are.** Calm and precise.\r\n";
+
+    it("is the profile whose frontmatter says coordinator: true, and nobody else", () => {
+        assert.equal(isCoordinatorProfile(elena), true);
+        assert.equal(isCoordinatorProfile(profile), false);
+        assert.equal(isCoordinatorProfile("---\nname: x\ncoordinator: false\n---\n"), false);
+        assert.equal(isCoordinatorProfile("---\nname: x\n---\n\ncoordinator: true\n"), false);
+    });
+
+    it("is in the chat's system prompt with their profile, without frontmatter and heading, and their memory's index", () => {
+        const text = coordinatorPromptOf({ id: "elena-rossi", fullName: "Elena Rossi", role: "coordinator" }, elena, "# Elena: memory\n\n- [the plan](notes/plan.md)\n", "Stefano");
+        assert.match(text, /^# You are Elena Rossi\n\nIn this project you are Elena Rossi, coordinator: the coordinator of the team, the Claude of this chat/);
+        assert.match(text, /you are never started as one/);
+        assert.match(text, /\*\*Who you are\.\*\* Calm and precise\./);
+        assert.doesNotMatch(text, /coordinator: true|# Elena Rossi, coordinator/);
+        assert.match(text, /## Your memory\n\nYour memory is the folder \.claude\/agent-memory\/elena-rossi\/: its MEMORY\.md, below, is the index/);
+        assert.match(text, /The person in this chat is Stefano\.\n\n# Elena: memory\n\n- \[the plan\]\(notes\/plan\.md\)$/);
+        assert.match(coordinatorPromptOf({ id: "elena-rossi", fullName: "Elena Rossi", role: "" }, elena, ""), /In this project you are Elena Rossi: the coordinator[\s\S]*by name when you know it, never "the user"\.\n\n\(Nothing yet\.\)$/);
+    });
+
+    it("hands Claude the memory's index as Claude Code does: 80 lines at most, within 10 KB", () => {
+        const long = Array.from({ length: 100 }, (_, index) => `- line ${index + 1}`).join("\n");
+        assert.equal(memoryIndexOf(long).split("\n").length, 80);
+        const heavy = Array.from({ length: 60 }, () => "x".repeat(300)).join("\n");
+        assert.ok(new TextEncoder().encode(memoryIndexOf(heavy)).length <= 10 * 1024);
+        assert.equal(memoryIndexOf("\r\n# m\r\n\r\n"), "# m");
+    });
+
+    it("has every memory say whose each thing is, by name, never the user", () => {
+        assert.match(whoseRule("Anna"), /by name \("Anna prefers…"\), never "the user"\. The person in this chat is Anna\.$/);
+        assert.doesNotMatch(whoseRule(), /The person in this chat/);
     });
 });

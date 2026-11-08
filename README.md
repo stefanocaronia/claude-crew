@@ -15,8 +15,9 @@ A plugin for [Claude Code](https://claude.com/claude-code) that gives your proje
 - **Conversations**: a quick question, a talk with one of them, or a meeting, each answering in their own voice.
 - **A panel** beside the chat with the team, who is at work and on what, their reports and their tasks.
 - **Portraits**, painted by an image connector or the Codex CLI, or drawn by Claude.
+- **A coordinator**, if you want one: the Claude of your chat with a name, a character and a memory.
 
-Everything lives in your project's `.claude/` folder: each colleague's profile, memory, todo and notes.
+Everything lives in your project's `.claude/` folder: each colleague's profile, memory, todo and notes. With Project's docs in a private repo of their own, the team lives there, shared with whoever works on them.
 
 ## Install
 
@@ -45,12 +46,13 @@ Just talk to Claude:
 - "ask Giulia whether the menu is clear"
 - "I want to talk to Matteo and Giulia", then "back to Claude"
 - "start the next task for Matteo"
+- "hire a coordinator"
 
 Claude hands the colleagues work in their field as it goes, one task at a time each, and their findings come to you as proposals: you decide.
 
 **Each colleague at work spends your plan's usage** as Claude does: fewer colleagues and narrower rounds spend less.
 
-**Working with [Project](https://github.com/stefanocaronia/claude-project)?** The colleagues hold its backlog's tasks and propose new ones. Project is optional.
+**Working with [Project](https://github.com/stefanocaronia/claude-project)?** The colleagues hold its backlog's tasks and propose new ones, and the coordinator holds Claude's. Project is optional.
 
 ## Settings
 
@@ -60,7 +62,7 @@ Claude knows the rest: ask it to change a setting.
 
 ## Learn more
 
-- [Guide](docs/guide.md): commands, files, tasks, permissions, the panel, working with Project.
+- [Guide](docs/guide.md): commands, files, the coordinator, tasks, permissions, the panel, working with Project.
 - [Contributing](CONTRIBUTING.md): trying it locally, tests, preview, releases.
 - [Changelog](CHANGELOG.md): what changed, version by version.
 

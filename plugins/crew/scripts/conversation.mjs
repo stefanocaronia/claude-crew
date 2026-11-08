@@ -170,7 +170,8 @@ function onSessionStart(input, colleagues)
     return introduce(present, present, opening);
 }
 
-// A colleague is an agent of .claude/agents/ with a todo.md in its memory folder; the first word of its heading is its name.
+// A colleague is an agent of .claude/agents/ with a todo.md in its memory folder; the first word of its heading is its name. The
+// coordinator, `coordinator: true` in their profile, is the chat itself: never a colleague the chat is handed to.
 function loadColleagues()
 {
     const agentsFolder = join(root, ".claude", "agents");
@@ -181,6 +182,7 @@ function loadColleagues()
 
     return readdirSync(agentsFolder)
         .filter(file => file.endsWith(".md") && existsSync(join(root, memoryPath(file.slice(0, -".md".length)), "todo.md")))
+        .filter(file => !/^coordinator:[ \t]*true[ \t]*$/m.test(/^---\r?\n([\s\S]*?)\r?\n---/.exec(read(agentPath(file.slice(0, -".md".length))))?.[1] ?? ""))
         .map(file => {
             const id = file.slice(0, -".md".length);
             const profile = read(agentPath(id));

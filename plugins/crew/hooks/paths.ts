@@ -35,10 +35,12 @@ export function isInside(path: string, folder: string): boolean
 }
 
 /** Whether a resolved path, under the project's root, lies in a colleague's own memory folder: `.claude/agent-memory/<id>/` at any
- * depth, so a link's target such as `private/.claude/agent-memory/<id>/` counts too. */
+ * depth, so a link's target such as `private/.claude/agent-memory/<id>/` counts too, and `crew/memory/<id>/`, where the folder is a
+ * link to the project's docs. */
 export function isOwnMemory(path: string, root: string, id: string): boolean
 {
-    return isInside(path, root) && `${path.toLowerCase()}/`.includes(`/.claude/agent-memory/${id.toLowerCase()}/`);
+    const inner = `${path.toLowerCase()}/`;
+    return isInside(path, root) && (inner.includes(`/.claude/agent-memory/${id.toLowerCase()}/`) || inner.includes(`/crew/memory/${id.toLowerCase()}/`));
 }
 
 /** The image files a text names: paths ending in .png, .jpg, .jpeg or .webp, each once, in order. */

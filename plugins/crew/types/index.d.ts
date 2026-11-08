@@ -14,10 +14,13 @@ export type Colleague = {
     openTasks: number;
     /** Changes when the portrait file changes, so drawings that show it are redrawn. */
     avatarStamp: number;
+    /** The Claude of this chat: the coordinator, who is Claude with the personality the team gave it, or plain Claude without one.
+     * Drawn with Claude's face wherever no portrait of theirs is drawn; in a meeting, Claude's turns, [Claude], are theirs. */
+    isClaude?: boolean;
 };
 
 /** What the chat draws of a colleague who speaks, kept apart from the team: a change of tasks or settings redraws no message. */
-export type Speaker = Pick<Colleague, "id" | "name" | "fullName" | "role" | "color">;
+export type Speaker = Pick<Colleague, "id" | "name" | "fullName" | "role" | "color" | "isClaude">;
 
 /** A colleague's permissions: reading the project, changing its files, running commands, searching the web. */
 export type Permissions = {
@@ -107,6 +110,8 @@ export type PanelView = {
     isMeetingCollapsed?: boolean;
     isWorkingCollapsed?: boolean;
     isTeamCollapsed?: boolean;
+    /** The coordinator's section, the Claude of this chat, after the team. */
+    isChatCollapsed?: boolean;
     autoOpened: boolean;
     /** Whether the backlog shows its tasks; closed until the user opens it. */
     isBacklogOpen?: boolean;

@@ -9,7 +9,7 @@
 
 Realistic and anime need an image generator (a connector or Codex); pixel art and vector Claude can also draw itself.
 
-**Doing them again**: the user may ask for new portraits in a style, for the whole team or for some colleagues (`/crew:portraits`, which the panel's buttons run, asks the style first). Make only those asked for. When the whole team changes, change the style line too; when only some change, the team mixes styles, as the user chose.
+**Doing them again**: the user may ask for new portraits in a style, for the whole team or for some colleagues (`/crew:portraits`, which the panel's buttons run, asks the style first). Make only those asked for. The coordinator has a portrait only when the user asks for theirs: without one they have Claude's face. When the whole team changes, change the style line too; when only some change, the team mixes styles, as the user chose.
 
 **A made-up person**: never the likeness of a real person, nor the style of a named artist or series.
 

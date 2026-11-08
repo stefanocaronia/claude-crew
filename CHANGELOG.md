@@ -2,6 +2,15 @@
 
 What changes for whoever uses Crew, version by version. Plugins update in a new chat: `/plugin`, Marketplaces, claude-crew, Update marketplace, or turn its auto-update on there.
 
+## 0.15.1
+
+- **The coordinator is the Claude of your chat, one person everywhere**: you talk with them in the chat as you always did with Claude, in plain messages; in a meeting, Claude's turns are theirs, under their first name, with their face and color; without a coordinator, Claude speaks as Claude, as before. Asking to talk with them says they are here already.
+- **The coordinator is your assistant**: hired, their role is «your assistant» in the project's language, unless you pick another; a coordinator whose profile names no role is drawn as your assistant too, as Claude is.
+- **The coordinator's card after the team**, in a section of their own, «The Claude of this chat», no longer on top of the panel.
+- **Claude's face for the coordinator**: without a portrait, the coordinator has Claude's face, the orange pixel critter, wherever they are drawn (the panel, their card, the backlog, the meetings), never initials. A portrait is theirs only if you ask for one.
+- **One coordinator with Project**: the backlog's Claude is the first of Project's `people:`, whatever its name, and a task written in the coordinator's card goes to them. Claude's tasks are matched before any colleague who shares the name. The `people:` list is read as YAML writes it: with its quotes, apostrophes and comments, its items indented or not. What Claude adds to the backlog for itself is added without `--to`, so the backlog gives it to the first of its people, whatever its name. A small portrait is `avatar-small.jpg`, else `avatar.svg`, as Project reads it.
+- **One profile for both plugins**: Crew and Project read a colleague's or the coordinator's profile the same way, written in both guides: name, full name and role from the heading (without one, the id's first part), the color from one table, names compared without case or accents, so «Nicolo» in an old backlog is Nicolò.
+
 ## 0.15.0
 
 - **A coordinator**: the Claude of your chat can have a name, a character and a memory. Ask Claude to hire a coordinator: their profile says `coordinator: true`, and the panel puts it in the chat's system prompt at every turn, with their memory's index, never in a colleague's. They are drawn on top of the team, their card with their tasks, memory and profile, and nothing that starts them or sets them up; they are never started as a subagent, nor in a round or a meeting. With Project, Claude's tasks of the backlog are theirs, and a task written in their card is Claude's. Fire them and the chat is plain Claude again.

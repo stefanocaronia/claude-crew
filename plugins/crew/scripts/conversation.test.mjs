@@ -116,10 +116,31 @@ describe("the commands", () => {
 
     it("never hands the chat to the coordinator, who is the chat itself", () => {
         writeColleague("elena-rossi", "Elena Rossi, coordinator", "Elena remembers the plan.", "- [ ] the release", { coordinator: true });
-        assert.match(run("ten", "talk", "Elena"), /No colleague named Elena/);
+        const asked = run("ten", "talk", "Elena");
+        assert.match(asked, /Elena is the coordinator, the Claude of this chat: here already, and speaks in the conversation as Elena\./);
+        assert.doesNotMatch(asked, /No colleague named/);
         assert.doesNotMatch(run("ten", "talk", "Pippo"), /Elena/);
+        // Names are alike without accents: «Elodie» is Élodie.
+        assert.match(run("ten", "talk", "Elodie"), /From here on Élodie speaks/);
+        run("ten", "end");
         rmSync(join(project, ".claude", "agents", "elena-rossi.md"));
         rmSync(join(project, ".claude", "agent-memory", "elena-rossi"), { recursive: true });
+    });
+
+    it("has the chat's Claude speak under the coordinator's name, or as Claude without one", () => {
+        assert.match(run("twelve", "talk", "Matteo"), /When Claude itself speaks to the user \(an answer, a question, what it is about to do\), the turn starts with \[Claude\]/);
+        run("twelve", "end");
+        writeColleague("elena-rossi", "Elena Rossi, coordinator", "Elena remembers the plan.", "", { coordinator: true });
+        assert.match(run("twelve", "talk", "Matteo e Giulia"), /the turn starts with \[Elena\]/);
+        assert.doesNotMatch(run("twelve", "invite", "Élodie"), /starts with \[Claude\]/);
+        run("twelve", "end");
+        rmSync(join(project, ".claude", "agents", "elena-rossi.md"));
+        rmSync(join(project, ".claude", "agent-memory", "elena-rossi"), { recursive: true });
+        // A coordinator called Claude is the coordinator too, not a colleague missing.
+        writeColleague("claude-coordinator", "Claude, coordinator", "Claude remembers the plan.", "", { coordinator: true });
+        assert.match(run("twelve", "talk", "Claude"), /^\[Crew\] Claude is the coordinator, the Claude of this chat: here already, and speaks in the conversation as Claude\. Nothing changed\.$/);
+        rmSync(join(project, ".claude", "agents", "claude-coordinator.md"));
+        rmSync(join(project, ".claude", "agent-memory", "claude-coordinator"), { recursive: true });
     });
 
     it("reads the permissions as the panel does: a tools list in brackets, and commands that change files", () => {

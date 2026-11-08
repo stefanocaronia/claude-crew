@@ -8,18 +8,19 @@ import type { Activity, Colleague, Meeting, Permissions, Preferences, Run, Speak
 import type { Task } from "./team.ts";
 
 import { avatarSvg, barEndSvg, blankSvg, checkboxSvg, chipSvg, headingSvg, pickedTint, captionSvg, claudeSvg, effortSvg, iconSvg, idleButtonSvg, nameSvg, prioritySvg, thumbnailSvg, typeColor, typeSvg, wideBarSvg } from "./draw.ts";
-import { claudeId, segmentsOf, speakersOf } from "./meeting.ts";
+import { segmentsOf, speakersOf, withoutClaudeMark } from "./meeting.ts";
 import { imagePathsIn, imageTypeOf, isInside, isOwnMemory, resolvedPath } from "./paths.ts";
 import { cached, dataUri, filesIn, type FileStamp, forgetAll, forgetFiles, projectRoot, tempFolder } from "./files.ts";
 import { contextShare, progressOf, withCount } from "./progress.ts";
-import { changeBacklog, projectBacklog, projectMe, projectOwner, projectTypes } from "./project.ts";
+import { changeBacklog, projectBacklog, projectClaude, projectMe, projectOwner, projectTypes } from "./project.ts";
 import { ageOf, agentSpecFrom, backlogLinesOf, backlogOf, blockersOf, cardFrom, colleagueFrom, colleagueOf, coordinatorPromptOf, daysBetween, isBacklogId, isCoordinatorProfile, memorySizeOf, openIdsOf, openTasks, retestsOf, taskOf as todoTask, whoseRule, withEffort, withNextPriority, withPermissions, withText } from "./team.ts";
 import { addTodoLine, changeTodoLine, removeTodoLine, taskWords } from "./todo.ts";
 import { contextWindowOf, dateOf, formatTime, formatTokens, isoWeek, languageNames, languageOf, linksIn, listNames, modelName, slugOf, words } from "./text.ts";
 import type { Language, WebLink, Words } from "./text.ts";
 
 const pane = "crew";
-// Claude's name and face in a meeting's chat.
+// Plain Claude in a meeting's chat, where the team gave it no personality (no coordinator): its id among the speakers, and its color.
+const claudeId = "claude";
 const claudeOrange = "#D97757";
 const stepTool = "mcp__crew__step";
 // How often a panel shares who works in its chat, and reads who works in the others: who starts, stops or changes step shows at once;
@@ -74,7 +75,7 @@ const smallLimit = 3_000;
 // How long a colleague who finished stays among the finished before the coffee break.
 const restAfter = 5 * 60_000;
 // The sections' icons, drawn as text (U+FE0E) so they stay monochrome like the buttons' symbols.
-const sectionIcons = { meeting: "☰", working: "⚒\uFE0E", finished: "✓", resting: "☕\uFE0E" };
+const sectionIcons = { meeting: "☰", working: "⚒\uFE0E", finished: "✓", resting: "☕\uFE0E", chat: "💬" };
 // The error color, readable on both themes: the firing buttons.
 const errorColor = "#D0453F";
 // A task's priority on the terminal, as the desktop draws it: two arrows up in red, an equals in orange, an arrow down in blue.
@@ -925,8 +926,8 @@ export const register: Register = (on, options) => {
                 if (latest.backlog) {
                     // Created by who is in this chat as the project names them, else by the project's owner.
                     const owner = (await projectMe($, await projectRoot($))) ?? (await projectOwner($));
-                    // The coordinator's tasks are Claude's in the backlog, as the project plugin names them.
-                    const holder = colleague.id === chat?.id ? "Claude" : colleague.name;
+                    // The coordinator's tasks are Claude's in the backlog, as the project plugin names Claude: the first of its people.
+                    const holder = colleague.id === chat?.id ? await projectClaude($, await projectRoot($)) : colleague.name;
                     await changeBacklogTask(colleague, ["add", written, "--type", newTaskType, "--to", holder, ...(owner ? ["--by", owner] : [])]);
                     return;
                 }
@@ -1415,22 +1416,21 @@ export const register: Register = (on, options) => {
                 : latest.folders?.due === "conflict"
                 ? <Text key="folders" color={warningColor}>{say.foldersConflict(latest.folders.docs)}</Text>
                 : null;
-            // The coordinator, apart from the team and on top: the Claude of this chat, whose card opens as a colleague's.
-            const chatRow = chat
-                ? colleagueCard(`coordinator-${chat.id}`, [
+            // The coordinator, after the team in a section of their own: the Claude of this chat, whose card opens as a colleague's.
+            const chatRows = chat
+                ? [colleagueCard(`coordinator-${chat.id}`, [
                     face(chat, 40, true),
                     <Box key={`lines-${chat.id}`} flexDirection="column" flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
                         {nameRow(`open-${chat.id}`, chat, [opener(`open-${chat.id}`, chat)])}
                         <Text key={`role-${chat.id}`} dimColor wrap="truncate-end">{roleOf(chat)}</Text>
-                        <Text key={`about-${chat.id}`} dimColor wrap="truncate-end">{`${capitalized(say.coordinatorAbout)} · ${about(chat)}`}</Text>
+                        <Text key={`about-${chat.id}`} dimColor wrap="truncate-end">{about(chat)}</Text>
                     </Box>,
-                ], chat.color)
-                : null;
+                ], chat.color)]
+                : [];
             return (
                 <Box flexDirection="column" gap={1}>
                     {latest.error ? <Text key="error" dimColor>{say.readError(latest.error)}</Text> : null}
                     {folders}
-                    {chatRow}
                     {heavy.length ? <Text key="heavy" dimColor>{say.heavyPortraits(listNames(heavy, say.and, say.comma))}</Text> : null}
                     {latest.hasCommands ? null : <Text key="install" dimColor>{say.installSkill}</Text>}
                     {colleagues.length ? <Box key="dash" flexDirection="row" flexWrap="wrap" gap={1}>{tiles}</Box> : null}
@@ -1438,6 +1438,7 @@ export const register: Register = (on, options) => {
                     {fold("working", sectionIcons.working, say.working, running.map(runRow), Boolean(panel.isWorkingCollapsed), current => ({ ...current, isWorkingCollapsed: !current.isWorkingCollapsed }))}
                     {fold("finished-section", sectionIcons.finished, say.finished, finished.map(runRow), panel.isFinishedCollapsed, current => ({ ...current, isFinishedCollapsed: !current.isFinishedCollapsed }), <Button key="all-back" label={`↩ ${say.allBack}`} plain dimColor onPress={() => sendBack(finished.map(run => run.colleague))} />)}
                     {fold("team", sectionIcons.resting, say.resting, idle.map(colleague => teamRow(colleague)), Boolean(panel.isTeamCollapsed), current => ({ ...current, isTeamCollapsed: !current.isTeamCollapsed }))}
+                    {fold("chat", sectionIcons.chat, capitalized(say.coordinatorAbout), chatRows, Boolean(panel.isChatCollapsed), current => ({ ...current, isChatCollapsed: !current.isChatCollapsed }))}
                     <Box key="actions" flexDirection="row" flexWrap="wrap" gap={1}>
                         <Button key="act-round" variant="primary" label={`↻ ${pickedNames ? say.roundWith(pickedNames) : say.startRound}`} onPress={() => runCommand("crew:review", pickedTeam)} />
                         {canMeet ? <Button key="act-meeting" label={`☰ ${pickedNames ? say.meetWith(pickedNames) : say.meetAll}`} onPress={() => runCommand("crew:meeting", pickedTeam.length ? pickedTeam : free)} /> : null}
@@ -1507,13 +1508,17 @@ export const register: Register = (on, options) => {
                 return next(e);
             }
 
-            // Claude speaks too, with [Claude], when it answers the user in a meeting.
-            const claude = { id: claudeId, name: "Claude", fullName: "Claude", role: words[language].claudeRole, color: claudeOrange };
+            // Claude speaks too, with [Claude], when it answers the user in a meeting: the one Claude of this chat, the coordinator when
+            // the team gave it a personality (among the speakers, with their name, face and color), else plain Claude.
+            const voices = await read($, speakers);
+            const team = voices.some(voice => voice.isClaude) ? voices : [...voices, { id: claudeId, name: "Claude", fullName: "Claude", role: words[language].claudeRole, color: claudeOrange, isClaude: true }];
             // In a meeting, a reply that names nobody is still Claude's, drawn as such.
-            const segments = segmentsOf(e.props.text, [...(await read($, speakers)), claude], (await read($, meeting)).members.length > 0);
+            const segments = segmentsOf(e.props.text, team, (await read($, meeting)).members.length > 0);
 
+            // Claude's reply alone is a plain message, as always, without a name it may have put in front.
             if (!segments) {
-                return next(e);
+                const plain = withoutClaudeMark(e.props.text, team);
+                return next(plain === e.props.text ? e : { ...e, props: { ...e.props, text: plain } });
             }
 
             const ui = $.ui.resolve(e);
@@ -1603,10 +1608,12 @@ function spacer(ui: Table, surface: string, colleague: Speaker)
     return <ui.Svg key={`face-${colleague.id}`} source={blankSvg(chatFace, 1)} alt={colleague.name} width={chatFace} height={1} />;
 }
 
-// A colleague's role as the panel and the chat write it, with a capital.
+// A colleague's role as the panel and the chat write it, with a capital. Claude's, the coordinator's without one in their heading
+// included, is "your assistant".
 function roleOf(colleague: Speaker): string
 {
-    return colleague.role.charAt(0).toLocaleUpperCase() + colleague.role.slice(1);
+    const role = colleague.role || (colleague.isClaude ? say().claudeRole : "");
+    return role.charAt(0).toLocaleUpperCase() + role.slice(1);
 }
 
 // A colleague's name in their color, a little larger than the text around it; on the terminal, bold text.
@@ -1629,11 +1636,14 @@ function faceOf(ui: Table, surface: string, colleague: Speaker, size: number, st
         return <Text key={`face-${colleague.id}`} color={colleague.color}>{isWorking ? "◉" : isRinged ? "◎" : "●"}</Text>;
     }
 
-    if (colleague.id === claudeId) {
-        return <ui.Svg key="face-claude" source={claudeSvg(size)} alt="Claude" width={size} height={size} />;
+    const portrait = picture === "initials" ? undefined : (picture === "small" ? smallPortraits : portraits).get(colleague.id);
+
+    // The Claude of this chat, with the coordinator's personality or none, has Claude's face wherever no portrait of theirs is drawn.
+    if (colleague.isClaude && !portrait) {
+        return <ui.Svg key={`face-claude-${colleague.id}`} source={claudeSvg(size, isRinged ? colleague.color : undefined)} alt={colleague.fullName} width={size} height={size} />;
     }
 
-    return <ui.Svg key={`face-${colleague.id}-${stamp}`} source={avatarSvg(colleague, picture === "initials" ? undefined : (picture === "small" ? smallPortraits : portraits).get(colleague.id), size, isRinged, isWorking)} alt={colleague.fullName} width={size} height={size} />;
+    return <ui.Svg key={`face-${colleague.id}-${stamp}`} source={avatarSvg(colleague, portrait, size, isRinged, isWorking)} alt={colleague.fullName} width={size} height={size} />;
 }
 
 // A progress bar as wide as the card: its square middle stretches to the room the surface gives it, between two rounded ends of
@@ -1791,7 +1801,7 @@ async function refresh($: EngineInterface): Promise<void>
         const text = await readProfile();
 
         if (isChat) {
-            chat = colleagueFrom(id, text, todo, portrait?.stamp ?? 0);
+            chat = { ...colleagueFrom(id, text, todo, portrait?.stamp ?? 0), isClaude: true };
             chatProfile = text;
             chatMemory = memory;
             chatTasks.push(...lines);
@@ -1840,8 +1850,9 @@ async function refresh($: EngineInterface): Promise<void>
     const types = backlog ? await projectTypes($, root) : undefined;
     const fromBacklog: string[] = [];
 
-    // The backlog's tasks of Claude are the coordinator's: the project plugin writes them so, whatever name they were given by.
-    const holders = chat ? [...loaded, { id: chat.id, name: "Claude" }, { id: chat.id, name: chat.name }] : loaded;
+    // The backlog's tasks of Claude, the first of the project's people, are the coordinator's: the project plugin writes them so,
+    // whatever name they were given by. Before the colleagues, since Claude is the first of the people there too.
+    const holders = chat ? [{ id: chat.id, name: await projectClaude($, root) }, { id: chat.id, name: chat.name }, ...loaded] : loaded;
 
     for (const [id, lines] of backlogLinesOf(backlog ?? [], holders)) {
         fromBacklog.push(...lines.map(line => `${id}:${line}`));
@@ -1904,8 +1915,9 @@ async function refresh($: EngineInterface): Promise<void>
         await update($, coordinator, () => shown);
     }
 
-    // Every message in the chat draws its speakers: they are written apart from the team, and only when they changed.
-    const voices: Speaker[] = sorted.map(({ id, name, fullName, role, color }) => ({ id, name, fullName, role, color }));
+    // Every message in the chat draws its speakers: they are written apart from the team, and only when they changed. The coordinator
+    // among them: the Claude of this chat, who speaks in a meeting with [Claude].
+    const voices: Speaker[] = [...sorted, ...(chat ? [chat] : [])].map(({ id, name, fullName, role, color, isClaude }) => ({ id, name, fullName, role, color, ...(isClaude ? { isClaude } : {}) }));
 
     if (JSON.stringify(voices) !== JSON.stringify(await read($, speakers))) {
         await update($, speakers, () => voices);
@@ -1981,12 +1993,14 @@ async function personOf($: EngineInterface): Promise<string | undefined>
     return personRead;
 }
 
-// The portrait as a data URI (avatar.jpg, .webp, .png or .svg) with the file's time, so a new one is drawn again, and the 32 px
-// avatar-small.jpg when there is one.
+// The portrait as a data URI (avatar.jpg, .webp, .png or .svg) with the file's time, so a new one is drawn again, and the small one,
+// as the project plugin reads it too: the 32 px avatar-small.jpg, else the drawn avatar.svg.
 async function portraitIn($: EngineInterface, folder: string, files: Map<string, FileStamp>): Promise<{ uri: string; stamp: number; small?: string } | undefined>
 {
     const smallFile = files.get("avatar-small.jpg");
-    const small = smallFile ? await cached(`${folder}/avatar-small.jpg`, smallFile, () => dataUri($, `${folder}/avatar-small.jpg`, "image/jpeg")) : undefined;
+    const svgFile = files.get("avatar.svg");
+    const small = smallFile ? await cached(`${folder}/avatar-small.jpg`, smallFile, () => dataUri($, `${folder}/avatar-small.jpg`, "image/jpeg"))
+        : svgFile ? await cached(`${folder}/avatar.svg`, svgFile, () => dataUri($, `${folder}/avatar.svg`, "image/svg+xml")) : undefined;
 
     for (const [name, type] of [["avatar.jpg", "image/jpeg"], ["avatar.webp", "image/webp"], ["avatar.png", "image/png"], ["avatar.svg", "image/svg+xml"]] as const) {
         const file = files.get(name);

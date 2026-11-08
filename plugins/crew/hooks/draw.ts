@@ -25,14 +25,20 @@ export function avatarSvg(colleague: Speaker, uri: string | undefined, size: num
     return svg(size, size, face + ring + dot, isWorking);
 }
 
-/** Claude in a meeting's chat: an orange pixel critter of our own, on a round cream background as the colleagues' portraits are round. */
-export function claudeSvg(size: number): string
+/** Claude's face, the coordinator's too without a portrait: an orange pixel critter of our own, on a round cream background as the
+ * colleagues' portraits are round; with `ring`, drawn smaller inside a ring of that color, as a ringed portrait is. */
+export function claudeSvg(size: number, ring?: string): string
 {
     const rows = [".X........X.", "..X......X..", "..XXXXXXXX..", ".XXXXXXXXXX.", ".XXEEXXEEXX.", "XXXEEXXEEXXX", "XXXXXXXXXXXX", ".XXXXXXXXXX.", "..X.X..X.X..", "..X.X..X.X.."];
     // Each run of one color on a row is one rectangle, so no seam shows between pixels.
     const runs = rows.flatMap((row, y) => [...row.matchAll(/X+|E+/g)].map(run => `<rect x="${(run.index ?? 0) + 2}" y="${y + 3}" width="${run[0].length}" height="1" fill="${run[0][0] === "E" ? "#2B1D17" : "#D97757"}"/>`));
+    // The ring's sizes in pixels, as avatarSvg draws them, in the drawing's 16 units.
+    const unit = 16 / size;
+    const radius = ring ? 8 - 3 * unit : 8;
+    const shrink = ring ? ` transform="translate(8 8) scale(${radius / 8}) translate(-8 -8)"` : "";
+    const halo = ring ? `<circle cx="8" cy="8" r="${radius + 1.5 * unit}" fill="none" stroke="${ring}" stroke-width="${2 * unit}"/>` : "";
     // A smooth circle; only the critter inside is drawn in pixels.
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="${size}" height="${size}"><circle cx="8" cy="8" r="8" fill="#F3E6DC"/><g shape-rendering="crispEdges">${runs.join("")}</g></svg>`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="${size}" height="${size}"><circle cx="8" cy="8" r="${radius}" fill="#F3E6DC"/><g shape-rendering="crispEdges"${shrink}>${runs.join("")}</g>${halo}</svg>`;
 }
 
 /** A small line icon: a clock for time, a calendar, a bolt for the colleagues' work, a pencil, their memory. */

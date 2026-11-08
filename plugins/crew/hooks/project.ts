@@ -2,7 +2,7 @@
 import type { EngineInterface } from "claude-code";
 
 import { cached, filesIn, type FileStamp, projectRoot } from "./files.ts";
-import { type BacklogTask, typesOf } from "./team.ts";
+import { type BacklogTask, peopleOf, typesOf } from "./team.ts";
 
 // The project backlog's open tasks as last asked, and what the project's docs were then.
 let backlogRead: { signature: string; tasks: BacklogTask[] | undefined } | undefined;
@@ -116,11 +116,17 @@ async function backlogScript($: EngineInterface): Promise<string | undefined>
 // The project's owner as its backlog names people, `people` of .claude/project.yaml: the first who is not Claude; undefined without one.
 export async function projectOwner($: EngineInterface): Promise<string | undefined>
 {
-    const config = await $.fs.read(`${await projectRoot($)}/.claude/project.yaml`).catch(() => "");
-    const inline = /^people:\s*\[([^\]]*)\]/m.exec(config)?.[1]?.split(",");
-    const listed = inline ?? [.../^people:\s*\n((?:[ \t]+-.*\n?)*)/m.exec(config)?.[1]?.matchAll(/^[ \t]+-\s*(.+)$/gm) ?? []].map(match => match[1] ?? "");
-    return listed.map(name => name.trim().replace(/^["']|["']$/g, "")).find(name => name && name !== "Claude");
+    const people = peopleOf(await $.fs.read(`${await projectRoot($)}/.claude/project.yaml`).catch(() => ""));
+    return people.find((name, index) => index > 0 && name !== people[0]);
 }
+
+// Claude as the project's backlog names it, the first of `people` of .claude/project.yaml, "Claude" without the list: one person with
+// the coordinator, whose tasks these are.
+export async function projectClaude($: EngineInterface, root: string): Promise<string>
+{
+    return peopleOf(await $.fs.read(`${root}/.claude/project.yaml`).catch(() => ""))[0] ?? "Claude";
+}
+
 
 // Who is in this chat as the project plugin names them, `me:` of .claude/project.local.yaml, which it writes at the start of a
 // session from the GitHub login; undefined without it.

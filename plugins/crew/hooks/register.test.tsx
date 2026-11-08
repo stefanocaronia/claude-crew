@@ -1394,7 +1394,9 @@ test("the coordinator is the chat's Claude: on top of the team with the backlog'
     for (const surface of surfaces) {
         const ui = await $.ui.mount({ plugin, surface, component: "Pane", requestId: "crew", props: pane });
         expect(await ui.find({ key: "coordinator-elena-rossi" })).toBeDefined();
-        expect(await ui.find({ type: "Text", text: "The Claude of this chat · 2 to do" })).toBeDefined();
+        // After the team, in a section of their own.
+        expect(await headingOf(ui, "chat-toggle")).toBe("▾ 💬 The Claude of this chat (1)");
+        expect(await ui.find({ type: "Text", text: "2 to do" })).toBeDefined();
         // Not one of the team: no row among them, nobody to pick for a meeting.
         expect(await ui.find({ key: "idle-elena-rossi" })).toBeUndefined();
         expect(await ui.find({ key: "pick-elena-rossi" })).toBeUndefined();
@@ -1426,6 +1428,110 @@ test("the coordinator is the chat's Claude: on top of the team with the backlog'
     const spawned = await $.agent.spawn({ prompt: "Plan the release.", description: "plan", subagentType: "elena-rossi" } as never);
     expect((spawned as { deny?: string }).deny).toBe("Elena is the coordinator: the Claude of this chat, never started as a subagent. Do this yourself, or give it to a colleague of the field.");
     expect(sent.briefs).toEqual([]);
+});
+
+// The drawings of a mounted tree with this alt text, each as its SVG source.
+async function drawnOf(ui: { findAll: (query: { type: string }) => Promise<{ props: unknown }[]> }, alt: string): Promise<string[]>
+{
+    return (await ui.findAll({ type: "Svg" })).map(element => element.props as { alt?: string; source: string }).filter(props => props.alt === alt).map(props => props.source);
+}
+
+test("the coordinator is the backlog's Claude, the first of the project's people, whatever its name", async ($, on) => {
+    const sent = world(on, []);
+    sent.files["/p/.claude/project.local.yaml"] = "me: Anna\n";
+    const asked = withCoordinator(sent, on, argv => (argv.includes("list") ? { exitCode: 0, stdout: JSON.stringify([
+        { id: 80, to: "Max", priority: "P2", created: "2026-10-09", text: "the release", after: [] },
+        { id: 81, to: "Elena", priority: "P1", created: "2026-10-09", text: "the guide", after: [] },
+        { id: 82, to: "Claude", priority: "P1", created: "2026-10-09", text: "not hers", after: [] },
+    ]), stderr: "" } : undefined));
+    sent.files["/p/.claude/project.yaml"] = "docs: project\npeople: [Max, Anna]\n";
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+    const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
+    expect(await headingOf(ui, "chat-toggle")).toBe("▾ 💬 The Claude of this chat (1)");
+    expect(await ui.find({ type: "Text", text: "2 to do" })).toBeDefined();
+    await ui.press({ key: "open-elena-rossi" });
+    await ui.press({ key: "card-new-task" });
+    await ui.input({ key: "card-new-task", text: "the notes" });
+    expect(asked).toContainEqual(["node", "/plugins/project/scripts/backlog.mjs", "add", "the notes", "--type", "feature", "--to", "Max", "--by", "Anna"]);
+    await ui.unmount();
+});
+
+test("the coordinator without a portrait has Claude's face, and in a meeting Claude's turns are theirs: their name, face and color", async ($, on) => {
+    const sent = world(on, ["matteo-conti"]);
+    withCoordinator(sent, on);
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+    const panel = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
+    // On top of the team, ringed in their color as their row is.
+    expect((await drawnOf(panel, "Elena Rossi")).find(source => source.includes("#F3E6DC"))).toContain('stroke="#3F7CC4"');
+    await panel.unmount();
+
+    for (const text of ["[Claude] Ci penso io.\n\n[Matteo] Regge.", "Registro la decisione."]) {
+        for (const surface of surfaces) {
+            const ui = await $.ui.mount({ plugin, surface, component: "AssistantMessage", props: { text, isFirstOfReply: true } });
+
+            if (surface === "desktop") {
+                expect((await drawnOf(ui, "Elena Rossi")).some(source => source.includes("#F3E6DC"))).toBe(true);
+                expect(await drawnOf(ui, "Coordinator")).toHaveLength(1);
+            } else {
+                expect(await ui.find({ type: "Text", text: "Elena Rossi" })).toBeDefined();
+            }
+
+            // Nobody else is Claude in the meeting.
+            expect(await drawnOf(ui, "Claude")).toEqual([]);
+            expect(await ui.find({ type: "Text", text: "Claude" })).toBeUndefined();
+            await ui.unmount();
+        }
+    }
+});
+
+test("outside a meeting the coordinator's reply is a plain message, as before, even with their name in front", async ($, on) => {
+    const sent = world(on, []);
+    withCoordinator(sent, on);
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+
+    for (const surface of surfaces) {
+        const ui = await $.ui.mount({ plugin, surface, component: "AssistantMessage", props: { text: "[Elena] Ho passato la domanda a Matteo.", isFirstOfReply: true } });
+        expect(await drawnOf(ui, "Elena Rossi")).toEqual([]);
+        expect(await ui.find({ type: "Text", text: "Elena Rossi" })).toBeUndefined();
+        // The engine's own drawing of the message, which the name in front is taken from (meeting.ts, withoutClaudeMark).
+        expect(await ui.find({ type: "Text", text: "engine" })).toBeDefined();
+        await ui.unmount();
+    }
+});
+
+test("the coordinator's portrait, once they have one, is drawn where Claude's face was", async ($, on) => {
+    const sent = world(on, ["matteo-conti"]);
+    withCoordinator(sent, on);
+    sent.files["/p/.claude/agent-memory/elena-rossi/avatar.png"] = "p".repeat(500);
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+    const ui = await $.ui.mount({ plugin, surface: "desktop", component: "AssistantMessage", props: { text: "[Claude] Ci penso io.", isFirstOfReply: true } });
+    const faces = await drawnOf(ui, "Elena Rossi");
+    expect(faces.some(source => source.includes("<image"))).toBe(true);
+    expect(faces.some(source => source.includes("#F3E6DC"))).toBe(false);
+    await ui.unmount();
+});
+
+test("the coordinator's role is the one in their heading, else Claude's: your assistant", async ($, on) => {
+    const sent = world(on, ["matteo-conti"]);
+    withCoordinator(sent, on);
+    sent.files["/p/.claude/agents/elena-rossi.md"] = coordinatorProfile.replace("# Elena Rossi, coordinator", "# Elena Rossi");
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+    const panel = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
+    expect(await panel.find({ type: "Text", text: "Your assistant" })).toBeDefined();
+    await panel.unmount();
+    const ui = await $.ui.mount({ plugin, surface: "desktop", component: "AssistantMessage", props: { text: "[Claude] Ci penso io.\n\n[Matteo] Regge.", isFirstOfReply: true } });
+    expect(await drawnOf(ui, "Your assistant")).toHaveLength(1);
+    await ui.unmount();
+});
+
+test("without a coordinator, Claude speaks in a meeting as itself", async ($, on) => {
+    world(on, ["matteo-conti"]);
+    await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
+    const ui = await $.ui.mount({ plugin, surface: "desktop", component: "AssistantMessage", props: { text: "[Claude] Ci penso io.\n\n[Matteo] Regge.", isFirstOfReply: true } });
+    const faces = await drawnOf(ui, "Claude");
+    expect(faces.some(source => source.includes("#F3E6DC") && !source.includes("stroke="))).toBe(true);
+    expect(await drawnOf(ui, "Your assistant")).toHaveLength(1);
+    await ui.unmount();
 });
 
 test("without a backlog, the coordinator's own todo: a colleague's task waits for their line, and Tidy takes them when it is long", async ($, on) => {

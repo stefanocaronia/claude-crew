@@ -39,9 +39,9 @@ Where several people work on one project, each with their own Claude, the memori
 
 ## The coordinator
 
-The Claude of your chat can have a name, a character and a memory: ask Claude to hire a coordinator. Their profile says `coordinator: true`, and the panel puts it in the chat's system prompt at every turn, with their memory's index, and draws them on top of the team with Claude's tasks of the backlog.
+The Claude of your chat can have a personality, a name, a character and a memory: ask Claude to hire a coordinator. There is still one Claude in the chat, and the coordinator is who it is. Their role is «your assistant», unless you pick another when hiring them. Their profile says `coordinator: true`, and the panel puts it in the chat's system prompt at every turn, with their memory's index, and draws them after the team, in a section of their own, with Claude's tasks of the backlog, with their portrait or, without one, Claude's face.
 
-They are not a colleague: never started as a subagent, never in a round or a meeting. When you talk with colleagues, the colleagues speak; the coordinator is back when the conversation ends. Fire them and the chat is plain Claude again.
+They are not a colleague: never started as a subagent, never in a round, and nobody holds a talk or a meeting with them, since they are the chat. Outside a meeting you talk with them in the chat as you always did with Claude. In a meeting the colleagues speak, and when Claude speaks to you it is the coordinator, under their name, with their face and color; without a coordinator, it is Claude. Fire them and the chat is plain Claude again.
 
 ## Tasks
 
@@ -99,9 +99,10 @@ Painted by an image-generation connector, or by the Codex CLI logged in with Cha
 
 - **Crew reads of Project**: `.claude/project.yaml`, its `docs:` (`project` when it does not say), `prefixes:`, `people:` and `types:`; `.claude/project.local.yaml`, its `me:`; the backlog through `backlog.mjs list --atomic --json` and `show`.
 - **Crew writes of Project**: the backlog only through `backlog.mjs`: `add "<text>" --type <type> --to <who> --by <who>`, `comment --by <who>`, `set`, `archive`.
-- **Project reads of Crew**: the colleagues' profiles, `.claude/agents/<id>.md` (the first name from the id, the full name and role from `description:`, `color:`, and `coordinator: true` for the coordinator); their portraits, `.claude/agent-memory/<id>/avatar-small.jpg`, or `avatar.svg`; their `todo.md` and its done and archived notes.
+- **Project reads of Crew**: the colleagues' profiles, `.claude/agents/<id>.md` (the first name, full name and role from the heading `# <First> <Last>, <role>`, the color from `color:`, a name of Claude Code's or a hex, and `coordinator: true` for the coordinator); their portraits, `.claude/agent-memory/<id>/avatar-small.jpg`, or `avatar.svg`; their `todo.md` and its done and archived notes.
+- **Colors**: a profile's `color:` is one of Claude Code's names, drawn red `#C0453A`, blue `#3F7CC4`, green `#4E9A6B`, yellow `#C9A227`, purple `#8A63C9`, orange `#D9773A`, pink `#D0679B`, cyan `#2FA3B5`, or a hex; anything else gray `#888780`.
 - **Shared folders**: where the docs are a repo of their own, Crew keeps the colleagues in `<docs>/crew/agents` and `<docs>/crew/memory`, with `.claude/agents` and `.claude/agent-memory` as links that Crew makes and keeps out of the code's repo. Project's sync commits and pushes them with the docs: the memories and todos merge line by line, a profile changed by two at once is a clash to mend.
-- **The coordinator**: Crew hires them. In the backlog they are Claude: `--to <their name>` is Claude's, the panel and the page draw Claude's tasks with their name and portrait, and no ▶ hands them a task as a colleague.
+- **The coordinator**: Crew hires them, and they are Claude with a personality: in the backlog, the first of `people:`, and `--to <their name>` is theirs too. Their role is the one in their heading, else «your assistant», as Claude's. The panel and the page draw Claude with their name, color and portrait; without a portrait, or without a coordinator, with Claude's face, the orange pixel critter on a cream circle; without a coordinator, in Claude's orange, `#D97757`. No ▶ hands them a task as a colleague.
 - **Colleagues** hold tasks by first name. Their `todo.md` is their own notebook; a line that is work for the project becomes a task when you tidy the backlog.
 
 ## Cost

@@ -45,9 +45,16 @@ function command(action, sessionId, text, topic = "")
     const active = readActive(sessionId).filter(id => byId.has(id));
     const { ids, unknown } = namesIn(text, colleagues);
     const team = colleagues.map(colleague => colleague.name).join(", ") || "nobody yet";
+    // The coordinator is named apart: the Claude of this chat, here already, whom no conversation hands the chat to.
+    const claude = coordinatorName();
+    const fold = word => word.normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase();
+    const isClaude = word => claude !== undefined && fold(word) === fold(claude);
+    const others = unknown.filter(word => !isClaude(word));
+    const aboutClaude = unknown.some(isClaude) ? `${claude} is the coordinator, the Claude of this chat: here already, and speaks in the conversation as ${claude}.` : "";
 
     if (action !== "end" && !ids.length) {
-        return `[Crew] No colleague ${unknown.length ? `named ${unknown.join(", ")}` : "named"} in this project: the team is ${team}. Nothing changed.`;
+        const nobody = others.length || !aboutClaude ? `No colleague ${others.length ? `named ${others.join(", ")}` : "named"} in this project: the team is ${team}.` : "";
+        return `[Crew] ${[aboutClaude, nobody].filter(Boolean).join(" ")} Nothing changed.`;
     }
 
     if (action === "ask") {
@@ -66,7 +73,7 @@ function command(action, sessionId, text, topic = "")
 
     const leaving = active.filter(id => !next.includes(id));
     const joining = next.filter(id => !active.includes(id));
-    const note = unknown.length ? `\n\n(No colleague named ${unknown.join(", ")}: the team is ${team}.)` : "";
+    const note = (aboutClaude ? `\n\n(${aboutClaude})` : "") + (others.length ? `\n\n(No colleague named ${others.join(", ")}: the team is ${team}.)` : "");
     writeActive(sessionId, next);
 
     if (!next.length) {
@@ -174,21 +181,47 @@ function onSessionStart(input, colleagues)
 // coordinator, `coordinator: true` in their profile, is the chat itself: never a colleague the chat is handed to.
 function loadColleagues()
 {
-    const agentsFolder = join(root, ".claude", "agents");
-
-    if (!existsSync(agentsFolder)) {
-        return [];
-    }
-
-    return readdirSync(agentsFolder)
-        .filter(file => file.endsWith(".md") && existsSync(join(root, memoryPath(file.slice(0, -".md".length)), "todo.md")))
-        .filter(file => !/^coordinator:[ \t]*true[ \t]*$/m.test(/^---\r?\n([\s\S]*?)\r?\n---/.exec(read(agentPath(file.slice(0, -".md".length))))?.[1] ?? ""))
-        .map(file => {
-            const id = file.slice(0, -".md".length);
+    return profileIds()
+        .filter(id => existsSync(join(root, memoryPath(id), "todo.md")) && !isCoordinator(read(agentPath(id))))
+        .map(id => {
             const profile = read(agentPath(id));
-            const heading = /^# (.+)$/m.exec(withoutFrontmatter(profile))?.[1].trim() ?? id;
-            return { id, name: heading.split(/[\s,]/)[0], permissions: permissionsOf(profile) };
+            return { id, name: firstNameOf(id, profile), permissions: permissionsOf(profile) };
         });
+}
+
+// The name the chat's Claude speaks by in a conversation: the coordinator's first name, when the team gave it a personality, else
+// Claude.
+function claudeName()
+{
+    return coordinatorName() ?? "Claude";
+}
+
+// The coordinator's first name; undefined without a coordinator.
+function coordinatorName()
+{
+    const id = profileIds().find(one => isCoordinator(read(agentPath(one))));
+    return id ? firstNameOf(id, read(agentPath(id))) : undefined;
+}
+
+// The ids of the profiles in .claude/agents/.
+function profileIds()
+{
+    const agentsFolder = join(root, ".claude", "agents");
+    return existsSync(agentsFolder) ? readdirSync(agentsFolder).filter(file => file.endsWith(".md")).map(file => file.slice(0, -".md".length)) : [];
+}
+
+function isCoordinator(profile)
+{
+    return /^coordinator:[ \t]*true[ \t]*$/m.test(/^---\r?\n([\s\S]*?)\r?\n---/.exec(profile)?.[1] ?? "");
+}
+
+// The first word of the heading, `# <First> <Last>, <role>`, the name the user calls them by; without a heading, the id's first part,
+// capitalized, as the panel and the project plugin read it too.
+function firstNameOf(id, profile)
+{
+    const first = id.split("-")[0];
+    const heading = /^# (.+)$/m.exec(withoutFrontmatter(profile))?.[1].trim() || first.charAt(0).toUpperCase() + first.slice(1);
+    return heading.split(/[\s,]/)[0];
 }
 
 // "Matteo e Giulia", "matteo-conti, Sara": the colleagues named, by first name or id, and the words that named nobody.
@@ -196,7 +229,8 @@ function namesIn(text, colleagues)
 {
     const ids = [];
     const unknown = [];
-    const fold = word => word.normalize("NFC").toLocaleLowerCase();
+    // Without case or accents, as the project plugin compares names: «Nicolo» is «Nicolò».
+    const fold = word => word.normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase();
 
     for (const word of text.split(/[\s,;:.!?()"«»]+|\s+(?:e|ed|and|&)\s+/u).filter(Boolean)) {
         const colleague = colleagues.find(candidate => fold(candidate.name) === fold(word) || candidate.id === fold(word));
@@ -236,7 +270,7 @@ function rules(people)
         "- Claude stays out of the dialogue as a narrator: its lines, the notes between tools included, are in italics, with no name in front, "
             + "and say what happens (tools, files, errors), never the colleagues' opinions. Each line names who acts: *Joseph opens style.css*, *Matteo runs the tests*; "
             + "Claude names itself only for what it does in its own name. When Claude itself speaks to the user (an answer, a question, "
-            + "what it is about to do), the turn starts with [Claude] and is as short as the others'. A colleague's words, their plans and what they are about to do "
+            + `what it is about to do), the turn starts with [${claudeName()}] and is as short as the others'. A colleague's words, their plans and what they are about to do `
             + "included, are their own turn under their name: never plain lines in their first person.",
         "- Answer in the language the user writes in.",
         `- ${commands}`,
@@ -323,8 +357,8 @@ function remind(people)
 {
     const names = people.map(person => person.name);
     const who = people.length > 1
-        ? `Still a meeting with ${listNames(names)}: each turn starts with the speaker's name, each in their own voice, as short as a chat message at work (two to five lines, one point, no lists); what happens, notes between tools too, in italics, naming who acts; each acts only within their permissions; Claude speaking to the user starts with [Claude].`
-        : `${names[0]} is still speaking: start with [${names[0]}], as short as a chat message at work (two to five lines, one point, no lists); what happens, notes between tools too, in italics, naming who acts; ${names[0]} acts only within their permissions; Claude speaking to the user starts with [Claude].`;
+        ? `Still a meeting with ${listNames(names)}: each turn starts with the speaker's name, each in their own voice, as short as a chat message at work (two to five lines, one point, no lists); what happens, notes between tools too, in italics, naming who acts; each acts only within their permissions; Claude speaking to the user starts with [${claudeName()}].`
+        : `${names[0]} is still speaking: start with [${names[0]}], as short as a chat message at work (two to five lines, one point, no lists); what happens, notes between tools too, in italics, naming who acts; ${names[0]} acts only within their permissions; Claude speaking to the user starts with [${claudeName()}].`;
     const files = people.map(person => `${agentPath(person.id)} and ${memoryPath(person.id)}/`).join("; ");
     const work = "A colleague's plans are their turn, under their name. Long work asked of one goes in the background: /crew:leave <name>, then the task.";
     return `[Crew] ${who} ${work} If no longer in the context, read again ${files}.`;

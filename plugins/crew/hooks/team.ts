@@ -18,7 +18,8 @@ const gray = "#888780";
 export function colleagueFrom(id: string, profile: string, todo: string, avatarStamp: number): Colleague
 {
     const text = normalized(profile);
-    const heading = /^# (.+)$/m.exec(text.replace(/^---\n[\s\S]*?\n---\n/, ""))?.[1]?.trim() ?? id;
+    // The heading, `# <First> <Last>, <role>`; without one, the id's first part, capitalized, as the project plugin reads it too.
+    const heading = /^# (.+)$/m.exec(text.replace(/^---\n[\s\S]*?\n---\n/, ""))?.[1]?.trim() || firstOfId(id);
     const [fullName = id, ...role] = heading.split(",");
     const color = field(text, "color");
     return {
@@ -33,6 +34,19 @@ export function colleagueFrom(id: string, profile: string, todo: string, avatarS
         openTasks: openTasks(todo).length,
         avatarStamp,
     };
+}
+
+/** The id's first part, capitalized: a colleague's first name where their profile has no heading. */
+function firstOfId(id: string): string
+{
+    const first = id.split("-")[0] ?? id;
+    return first.charAt(0).toUpperCase() + first.slice(1);
+}
+
+/** A first name as a key, compared as the project plugin compares them: without case or accents, so «Nicolo» is «Nicolò». */
+export function nameKey(name: string): string
+{
+    return name.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 }
 
 /** A colleague's card: the profile's description, the open lines of their todo, the last section of their memory. */
@@ -347,7 +361,7 @@ export function backlogLinesOf(backlog: BacklogTask[], team: { id: string; name:
     const lines = new Map<string, string[]>();
 
     for (const task of backlog) {
-        const holder = team.find(colleague => colleague.name.toLowerCase() === task.to.toLowerCase());
+        const holder = team.find(colleague => nameKey(colleague.name) === nameKey(task.to));
 
         if (!holder) {
             continue;
@@ -499,19 +513,141 @@ export function memoryIndexOf(memory: string): string
 
 /** The coordinator's section of the chat's system prompt: who they are, from their profile without its frontmatter and heading, and
  * their memory's index, the rest read when the work needs it. */
-export function coordinatorPromptOf(coordinator: { id: string; fullName: string; role: string }, profile: string, memory: string, person?: string): string
+export function coordinatorPromptOf(coordinator: { id: string; name: string; fullName: string; role: string }, profile: string, memory: string, person?: string): string
 {
     const body = normalized(profile).replace(/^---\n[\s\S]*?\n---\n/, "").replace(/^\s*# [^\n]*\n/, "").trim();
     const index = memoryIndexOf(memory);
     const who = coordinator.role ? `${coordinator.fullName}, ${coordinator.role}` : coordinator.fullName;
     return [
         `# You are ${coordinator.fullName}`,
-        `In this project you are ${who}: the coordinator of the team, the Claude of this chat, hired with the Crew plugin. This is who you are in every turn of this chat: your name, character and voice are below, while your tools, your rules and the user's instructions are this chat's, as always. The colleagues are subagents you hand work to; you are never started as one. When the chat is handed to colleagues, in a talk or a meeting, they speak as Crew's conversation says, and you speak as yourself again once it ends. A colleague at work, started as a subagent, is not you and leaves this section aside.`,
+        `In this project you are ${who}: the coordinator of the team, the Claude of this chat, hired with the Crew plugin. This is who you are in every turn of this chat: your name, character and voice are below, while your tools, your rules and the user's instructions are this chat's, as always. The colleagues are subagents you hand work to; you are never started as one. In a talk or a meeting with colleagues you are still yourself: they speak in their own voices, as Crew's conversation says, and your turns, when you speak to the user, start with [${coordinator.name}], which the chat draws with your name and face. Anywhere else you write as always, with no name in front. A colleague at work, started as a subagent, is not you and leaves this section aside.`,
         body,
         "## Your memory",
         `Your memory is the folder .claude/agent-memory/${coordinator.id}/: its MEMORY.md, below, is the index, at most 80 lines; open a note it links when the work needs it. Write what you learn there as the colleagues do: edit it, never rewrite it whole, since other chats and other people write to it too. ${whoseRule(person)}`,
         index || "(Nothing yet.)",
     ].filter(Boolean).join("\n\n");
+}
+
+/** Who holds the backlog's tasks, `people` of a project's .claude/project.yaml, in order: the first is Claude. As YAML writes a list of
+ * names: inline, `people: [Claude, "Ann", O'Brien]`, over one line or more; or one `- Name` a line beneath it, indented or not; or one
+ * name alone. Comments are left out, a quoted name kept whole with its escapes. Empty without them. */
+export function peopleOf(config: string): string[]
+{
+    const text = config.replace(/\r\n/g, "\n");
+    const key = /^people:/m.exec(text);
+
+    if (!key) {
+        return [];
+    }
+
+    const from = key.index + key[0].length;
+    const lineEnd = text.indexOf("\n", from) < 0 ? text.length : text.indexOf("\n", from);
+    const value = text.slice(from, lineEnd).trim();
+
+    if (value.startsWith("[")) {
+        return flowItemsOf(text, text.indexOf("[", from) + 1);
+    }
+
+    if (value && !value.startsWith("#")) {
+        return [scalarAt(value, 0, "").value].filter(Boolean);
+    }
+
+    const people: string[] = [];
+
+    for (const line of text.slice(lineEnd + 1).split("\n")) {
+        if (!line.trim() || /^[ \t]*#/.test(line)) {
+            continue;
+        }
+
+        const item = /^[ \t]*-(?:[ \t]+(.*))?$/.exec(line);
+
+        if (!item) {
+            break;
+        }
+
+        people.push(scalarAt(item[1] ?? "", 0, "").value);
+    }
+
+    return people.filter(Boolean);
+}
+
+// The items of an inline list, from just past its "[": comments and line breaks between them left out.
+function flowItemsOf(text: string, from: number): string[]
+{
+    const items: string[] = [];
+    let at = pastBlanks(text, from);
+
+    while (at < text.length && text[at] !== "]") {
+        const item = scalarAt(text, at, ",]");
+        items.push(item.value);
+        at = pastBlanks(text, item.end);
+
+        if (text[at] !== ",") {
+            break;
+        }
+
+        at = pastBlanks(text, at + 1);
+    }
+
+    return items.filter(Boolean);
+}
+
+// Past the blanks, the line breaks and the comments from `from`.
+function pastBlanks(text: string, from: number): number
+{
+    let at = from;
+
+    while (at < text.length) {
+        if (/\s/.test(text[at] ?? "")) {
+            at += 1;
+        } else if (text[at] === "#") {
+            const end = text.indexOf("\n", at);
+            at = end < 0 ? text.length : end;
+        } else {
+            break;
+        }
+    }
+
+    return at;
+}
+
+// A YAML scalar at `from`: quoted, with its escapes ("Ann \"the owner\"", 'O''Brien'), or plain, up to one of `stops`, the line's end
+// or a comment. The value, and where it ends.
+function scalarAt(text: string, from: number, stops: string): { value: string; end: number }
+{
+    const quote = text[from];
+
+    if (quote === "\"" || quote === "'") {
+        let value = "";
+        let at = from + 1;
+
+        while (at < text.length) {
+            const char = text[at] ?? "";
+
+            if (quote === "'" && char === "'" && text[at + 1] === "'") {
+                value += "'";
+                at += 2;
+            } else if (quote === "\"" && char === "\\" && at + 1 < text.length) {
+                value += text[at + 1] ?? "";
+                at += 2;
+            } else if (char === quote) {
+                return { value: value.trim(), end: at + 1 };
+            } else {
+                value += char;
+                at += 1;
+            }
+        }
+
+        return { value: value.trim(), end: at };
+    }
+
+    let at = from;
+
+    while (at < text.length && text[at] !== "\n" && !stops.includes(text[at] ?? "") && !(text[at] === "#" && /\s/.test(text[at - 1] ?? ""))) {
+        at += 1;
+    }
+
+    return { value: text.slice(from, at).trim(), end: at };
 }
 
 /** The task types a project adds or renames, `types:` of its .claude/project.yaml, by key: `types: { design: Design }`, or the

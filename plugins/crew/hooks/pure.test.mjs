@@ -2,10 +2,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { segmentsOf, speakersOf } from "./meeting.ts";
+import { claudeSvg } from "./draw.ts";
+import { segmentsOf, speakersOf, withoutClaudeMark } from "./meeting.ts";
 import { imagePathsIn, isInside, isOwnMemory, resolvedPath } from "./paths.ts";
 import { withCount } from "./progress.ts";
-import { ageOf, agentSpecFrom, backlogLinesOf, backlogOf, blockersOf, coordinatorPromptOf, daysBetween, cardFrom, colleagueFrom, colleagueOf, isCoordinatorProfile, memoryIndexOf, memorySizeOf, openIdsOf, openTasks, permissionsOf, retestsOf, taskOf, typesOf, whoseRule, withEffort, withNextPriority, withPermissions, withText } from "./team.ts";
+import { ageOf, agentSpecFrom, backlogLinesOf, backlogOf, blockersOf, coordinatorPromptOf, daysBetween, cardFrom, colleagueFrom, colleagueOf, isCoordinatorProfile, memoryIndexOf, memorySizeOf, nameKey, openIdsOf, openTasks, peopleOf, permissionsOf, retestsOf, taskOf, typesOf, whoseRule, withEffort, withNextPriority, withPermissions, withText } from "./team.ts";
 import { taskWords } from "./todo.ts";
 import { dateOf, formatTokens, isoWeek, languageOf, linksIn, listNames, modelName, slugOf, words } from "./text.ts";
 
@@ -196,13 +197,18 @@ describe("meetings in the chat", () => {
     });
 
     it("gives Claude's own words a turn of its own, [Claude] or plain text before the first name, the narration still apart", () => {
-        const claude = { id: "claude", name: "Claude", fullName: "Claude", role: "Your assistant", color: "#D97757" };
+        const claude = { id: "claude", name: "Claude", fullName: "Claude", role: "Your assistant", color: "#D97757", isClaude: true };
         assert.deepEqual(segmentsOf("*Claude legge.*\n\nConfermo.\n\n[Matteo] Regge.", [matteo, claude])?.map(segment => [segment.speaker?.name, segment.text]), [
             [undefined, "*Claude legge.*"],
             ["Claude", "Confermo."],
             ["Matteo", "Regge."],
         ]);
-        assert.deepEqual(segmentsOf("[Claude] Fatto.", [matteo, claude])?.map(segment => [segment.speaker?.name, segment.text]), [["Claude", "Fatto."]]);
+        assert.deepEqual(segmentsOf("[Claude] Fatto.", [matteo, claude], true)?.map(segment => [segment.speaker?.name, segment.text]), [["Claude", "Fatto."]]);
+        // Outside a meeting, Claude naming itself alone is a plain reply: no group chat, and the name it put in front left out.
+        assert.equal(segmentsOf("[Claude] Fatto.", [matteo, claude]), undefined);
+        assert.equal(withoutClaudeMark("**[Claude]:** Fatto.\n\nE i test passano.", [matteo, claude]), "Fatto.\n\nE i test passano.");
+        assert.equal(withoutClaudeMark("Fatto.\n\n[Claude] dopo", [matteo, claude]), "Fatto.\n\n[Claude] dopo");
+        assert.equal(withoutClaudeMark("[Matteo] Regge.", [matteo, claude]), "[Matteo] Regge.");
         // Without Claude among the speakers, plain text before the first name stays narration, as before.
         assert.equal(segmentsOf("Confermo.\n\n[Matteo] Regge.", [matteo])?.[0]?.speaker, undefined);
     });
@@ -210,7 +216,7 @@ describe("meetings in the chat", () => {
     it("leaves alone a reply with no colleague in it, or a bracket that is not a colleague", () => {
         assert.equal(segmentsOf("Ecco il piano.", [matteo]), undefined);
         // In a meeting, a reply that names nobody is Claude's; one that carries italics is the narrator's note between tools, all of it.
-        const claude = { id: "claude", name: "Claude", fullName: "Claude", role: "Your assistant", color: "#D97757" };
+        const claude = { id: "claude", name: "Claude", fullName: "Claude", role: "Your assistant", color: "#D97757", isClaude: true };
         assert.deepEqual(segmentsOf("*Tommaso aggiunge le scelte.*\n\nRegistro la decisione.", [matteo, claude], true)?.map(segment => [segment.speaker?.name, segment.text]), [
             [undefined, "*Tommaso aggiunge le scelte.*\n\nRegistro la decisione."],
         ]);
@@ -225,6 +231,61 @@ describe("meetings in the chat", () => {
 
     it("names the speakers once each, in order", () => {
         assert.deepEqual(speakersOf("[Giulia] a\n\n[Matteo] b\n\n[Giulia] c", [matteo, giulia]).map(speaker => speaker.name), ["Giulia", "Matteo"]);
+    });
+
+    it("makes the coordinator the Claude who speaks: their turns start with [Claude] or their own name, and they are never a colleague who speaks", () => {
+        const elena = { id: "elena-rossi", name: "Elena", fullName: "Elena Rossi", role: "coordinator", color: "#3F7CC4", isClaude: true };
+        assert.deepEqual(segmentsOf("Ci siamo.\n\n[Claude] Fatto.\n\n[Matteo] Regge.\n\n[Elena] Allora si va.", [matteo, elena])?.map(segment => [segment.speaker?.id, segment.text]), [
+            ["elena-rossi", "Ci siamo."],
+            ["elena-rossi", "Fatto."],
+            ["matteo-conti", "Regge."],
+            ["elena-rossi", "Allora si va."],
+        ]);
+        assert.deepEqual(segmentsOf("Registro la decisione.", [matteo, elena], true)?.map(segment => segment.speaker?.id), ["elena-rossi"]);
+        // Outside a meeting the coordinator's own reply is a plain message, whatever name they put in front.
+        assert.equal(segmentsOf("[Elena] Ho passato la domanda a Matteo.", [matteo, elena]), undefined);
+        assert.equal(withoutClaudeMark("[Elena] Ho passato la domanda a Matteo.", [matteo, elena]), "Ho passato la domanda a Matteo.");
+        // A colleague called Claude stays theirs: the coordinator answers to [Claude] only where no colleague does.
+        const other = { ...giulia, id: "claude-bianchi", name: "Claude", fullName: "Claude Bianchi" };
+        assert.deepEqual(segmentsOf("[Claude] Io.", [other, elena])?.map(segment => segment.speaker?.id), ["claude-bianchi"]);
+        // A name in brackets is theirs without case or accents.
+        const nicolo = { ...elena, id: "nicolo-ferri", name: "Nicolò", fullName: "Nicolò Ferri" };
+        assert.deepEqual(segmentsOf("[Matteo] Agreed.\n\n[Nicolo] I will ship it.", [matteo, nicolo])?.map(segment => segment.speaker?.id), ["matteo-conti", "nicolo-ferri"]);
+        // The meeting is the colleagues who speak: the coordinator is the chat, never one of them.
+        assert.deepEqual(speakersOf("[Claude] Fatto.\n\n[Elena] Sì.\n\n[Matteo] Regge.", [matteo, elena]).map(speaker => speaker.id), ["matteo-conti"]);
+    });
+
+    it("reads a profile as the project plugin does: the heading's name, else the id's first part; names alike without case or accents", () => {
+        const nameless = colleagueFrom("nicolo-ferri", "---\ncolor: \"#123abc\"\n---\n\nNo heading.\n", "", 0);
+        assert.deepEqual([nameless.name, nameless.fullName, nameless.role, nameless.color], ["Nicolo", "Nicolo", "", "#123abc"]);
+        assert.equal(colleagueFrom("x", "---\ncolor: teal\n---\n# Nicolò Ferri, typographer\n", "", 0).color, "#888780");
+        assert.equal(nameKey("Nicolò"), nameKey("NICOLO"));
+        const nicolo = colleagueFrom("nicolo-ferri", "# Nicolò Ferri, typographer\n", "", 0);
+        assert.deepEqual([...backlogLinesOf([{ id: "T-9", to: "Nicolo", text: "the kerning" }], [nicolo]).keys()], ["nicolo-ferri"]);
+    });
+
+    it("reads the project's people in order, the first being Claude, inline or a line each, without quotes or comments", () => {
+        assert.deepEqual(peopleOf("docs: project\npeople: [Claude, \"Ann\"]  # who holds tasks\n"), ["Claude", "Ann"]);
+        assert.deepEqual(peopleOf("people:   # who holds tasks\r\n  - \"Max\" # Claude here\r\n  - Ann\r\ntypes: { design: Design }\r\n"), ["Max", "Ann"]);
+        assert.deepEqual(peopleOf("docs: project\n"), []);
+        assert.deepEqual(peopleOf("people:\n  # Claude first\n  - Max\n\n  - \"Ann # the owner\"\nname: x\n  - not one\n"), ["Max", "Ann # the owner"]);
+        assert.deepEqual(peopleOf("people: [\"Max, the bot\", Ann]\n"), ["Max, the bot", "Ann"]);
+        // YAML's other ways: comments at the line's start, items not indented, apostrophes and their escapes, a list over lines, one name.
+        assert.deepEqual(peopleOf("people:\n# owners\n  - Max\n# the rest\n  - Ann\n"), ["Max", "Ann"]);
+        assert.deepEqual(peopleOf("people:\n- Max\n- Ann\nname: x\n"), ["Max", "Ann"]);
+        assert.deepEqual(peopleOf("people: [Max, O'Connor]\n"), ["Max", "O'Connor"]);
+        assert.deepEqual(peopleOf("people: ['O''Connor', \"Ann \\\"the owner\\\"\"]\n"), ["O'Connor", "Ann \"the owner\""]);
+        assert.deepEqual(peopleOf("people: [Max,  # Claude\n  Ann]\n"), ["Max", "Ann"]);
+        assert.deepEqual(peopleOf("people: Max # alone\n"), ["Max"]);
+    });
+
+    it("draws Claude's face, ringed in a color as a ringed portrait is", () => {
+        assert.doesNotMatch(claudeSvg(40), /stroke=/);
+        assert.match(claudeSvg(40), /<circle cx="8" cy="8" r="8" fill="#F3E6DC"\/>/);
+        const ringed = claudeSvg(40, "#3F7CC4");
+        assert.match(ringed, /stroke="#3F7CC4"/);
+        assert.match(ringed, /<circle cx="8" cy="8" r="6\.8" fill="#F3E6DC"\/>/);
+        assert.match(ringed, /scale\(0\.85\)/);
     });
 });
 
@@ -367,14 +428,15 @@ describe("the coordinator", () => {
     });
 
     it("is in the chat's system prompt with their profile, without frontmatter and heading, and their memory's index", () => {
-        const text = coordinatorPromptOf({ id: "elena-rossi", fullName: "Elena Rossi", role: "coordinator" }, elena, "# Elena: memory\n\n- [the plan](notes/plan.md)\n", "Stefano");
+        const text = coordinatorPromptOf({ id: "elena-rossi", name: "Elena", fullName: "Elena Rossi", role: "coordinator" }, elena, "# Elena: memory\n\n- [the plan](notes/plan.md)\n", "Stefano");
+        assert.match(text, /your turns, when you speak to the user, start with \[Elena\]/);
         assert.match(text, /^# You are Elena Rossi\n\nIn this project you are Elena Rossi, coordinator: the coordinator of the team, the Claude of this chat/);
         assert.match(text, /you are never started as one/);
         assert.match(text, /\*\*Who you are\.\*\* Calm and precise\./);
         assert.doesNotMatch(text, /coordinator: true|# Elena Rossi, coordinator/);
         assert.match(text, /## Your memory\n\nYour memory is the folder \.claude\/agent-memory\/elena-rossi\/: its MEMORY\.md, below, is the index/);
         assert.match(text, /The person in this chat is Stefano\.\n\n# Elena: memory\n\n- \[the plan\]\(notes\/plan\.md\)$/);
-        assert.match(coordinatorPromptOf({ id: "elena-rossi", fullName: "Elena Rossi", role: "" }, elena, ""), /In this project you are Elena Rossi: the coordinator[\s\S]*by name when you know it, never "the user"\.\n\n\(Nothing yet\.\)$/);
+        assert.match(coordinatorPromptOf({ id: "elena-rossi", name: "Elena", fullName: "Elena Rossi", role: "" }, elena, ""), /In this project you are Elena Rossi: the coordinator[\s\S]*by name when you know it, never "the user"\.\n\n\(Nothing yet\.\)$/);
     });
 
     it("hands Claude the memory's index as Claude Code does: 80 lines at most, within 10 KB", () => {

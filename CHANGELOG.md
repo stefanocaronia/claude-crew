@@ -2,6 +2,10 @@
 
 What changes for whoever uses Crew, version by version. Plugins update in a new chat: `/plugin`, Marketplaces, claude-crew, Update marketplace, or turn its auto-update on there.
 
+## 0.15.4
+
+- **First and last name, unless you choose one**: colleagues and the coordinator are hired with a first and a last name; a single name only when you choose it, as for an AI.
+
 ## 0.15.3
 
 - **An international team**: unless you ask otherwise, about half the colleagues come from your country and background and half from other countries, and each new hire keeps that balance.

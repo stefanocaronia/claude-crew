@@ -1,8 +1,8 @@
 // The project plugin's backlog, where the project keeps one: its open tasks asked of its own command, and changed by it.
 import type { EngineInterface } from "claude-code";
 
-import { cached, filesIn, type FileStamp, projectRoot } from "./files.ts";
-import { type BacklogTask, peopleOf, typesOf } from "./team.ts";
+import { cached, filesIn, type FileStamp, projectRoot } from "../files/index.ts";
+import { type BacklogTask, peopleOf, typesOf } from "./profile.ts";
 
 // The project backlog's open tasks as last asked, and what the project's docs were then.
 let backlogRead: { signature: string; tasks: BacklogTask[] | undefined } | undefined;

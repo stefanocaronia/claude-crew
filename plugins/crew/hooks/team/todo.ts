@@ -1,8 +1,8 @@
 // A colleague's todo changed by the panel itself: a line added, changed or removed to the archive, the file's line ends kept.
 import type { EngineInterface } from "claude-code";
 
-import { projectRoot } from "./files.ts";
-import { dateOf } from "./text.ts";
+import { projectRoot } from "../files/index.ts";
+import { dateOf } from "../text/index.ts";
 
 // One open line of a colleague's todo changed in place, or removed when `change` gives nothing back; the file keeps its line ends.
 // False when the line is no longer there: another session changed the todo meanwhile.

@@ -617,13 +617,13 @@ test("a task that waits for another's open task shows who it waits for, and is f
     const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
     await ui.press({ key: "backlog-toggle" });
     expect(await ui.find({ type: "Text", text: "⛓︎ waits for Matteo" })).toBeDefined();
-    expect(await ui.find({ type: "Text", text: "blocked tasks" })).toBeDefined();
+    // The dashboard has no tile of the tasks that wait: the chain mark on the row says it.
+    expect(await ui.find({ key: "dash-blocked" })).toBeUndefined();
     await ui.unmount();
     files["/p/.claude/agent-memory/matteo-conti/todo.md"] = "- [x] 2026-10-29 · #matteo-3 · correct lootNote\n";
     await $.turn.complete({ reason: "answer", answer: "", durationMs: 1000, isAborted: false, turnId: "t1" } as never);
     const after = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
     expect(await after.find({ type: "Text", text: /waits for/ })).toBeUndefined();
-    expect(await after.find({ type: "Text", text: "blocked tasks" })).toBeUndefined();
     await after.unmount();
 });
 
@@ -1397,7 +1397,7 @@ function withCoordinator(sent: ReturnType<typeof world>, on: On, extra: (argv: r
     return asked;
 }
 
-test("the coordinator is the chat's Claude: on top of the team with the backlog's tasks of Claude, a card that neither starts nor sets them, never started as a subagent", async ($, on) => {
+test("the coordinator is the chat's Claude: under the counts, no heading, with the backlog's tasks of Claude, a card that neither starts nor sets them, never started as a subagent", async ($, on) => {
     const sent = world(on, []);
     sent.files["/p/.claude/project.local.yaml"] = "me: Stefano  # from GitHub\n";
     const asked = withCoordinator(sent, on);
@@ -1407,7 +1407,7 @@ test("the coordinator is the chat's Claude: on top of the team with the backlog'
         const ui = await $.ui.mount({ plugin, surface, component: "Pane", requestId: "crew", props: pane });
         expect(await ui.find({ key: "coordinator-elena-rossi" })).toBeDefined();
         // After the team, in a section of their own.
-        expect(await headingOf(ui, "chat-toggle")).toBe("▾ 💬 Coordinator (1)");
+        expect(await headingOf(ui, "chat-toggle")).toBeUndefined();
         expect(await ui.find({ type: "Text", text: "2 to do" })).toBeDefined();
         // Not one of the team: no row among them, nobody to pick for a meeting.
         expect(await ui.find({ key: "idle-elena-rossi" })).toBeUndefined();
@@ -1459,7 +1459,7 @@ test("the coordinator is the backlog's Claude, the first of the project's people
     sent.files["/p/.claude/project.yaml"] = "docs: project\npeople: [Max, Anna]\n";
     await $.session.start({ cwd: "/p", surface: null, isInteractive: true } as never);
     const ui = await $.ui.mount({ plugin, surface: "desktop", component: "Pane", requestId: "crew", props: pane });
-    expect(await headingOf(ui, "chat-toggle")).toBe("▾ 💬 Coordinator (1)");
+    expect(await headingOf(ui, "chat-toggle")).toBeUndefined();
     expect(await ui.find({ type: "Text", text: "2 to do" })).toBeDefined();
     await ui.press({ key: "open-elena-rossi" });
     await ui.press({ key: "card-new-task" });

@@ -389,7 +389,7 @@ function persona(id)
     return withoutFrontmatter(read(agentPath(id))).replace(roundOnlySections, "").trim();
 }
 
-// What a colleague may do, from the profile's tools, as the panel reads them (permissionsOf in hooks/team.ts, which this script
+// What a colleague may do, from the profile's tools, as the panel reads them (permissionsOf in hooks/team/profile.ts, which this script
 // cannot import): Grep or Glob read the project, Edit or Write change it, Bash runs commands and so changes it too, WebSearch or
 // WebFetch search the web. The tools as a comma line, a [list] or YAML items; a profile without a tools line inherits every tool.
 function permissionsOf(profile)

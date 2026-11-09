@@ -2,13 +2,13 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { claudeSvg } from "./draw.ts";
-import { segmentsOf, speakersOf, withoutClaudeMark } from "./meeting.ts";
-import { imagePathsIn, isInside, isOwnMemory, resolvedPath } from "./paths.ts";
-import { withCount } from "./progress.ts";
-import { ageOf, agentSpecFrom, backlogLinesOf, backlogOf, blockersOf, coordinatorPromptOf, daysBetween, cardFrom, colleagueFrom, colleagueOf, isCoordinatorProfile, memoryIndexOf, memorySizeOf, nameKey, openIdsOf, openTasks, peopleOf, permissionsOf, retestsOf, taskOf, typesOf, whoseRule, withEffort, withNextPriority, withPermissions, withText } from "./team.ts";
-import { taskWords } from "./todo.ts";
-import { dateOf, formatTokens, isoWeek, languageOf, linksIn, listNames, modelName, slugOf, words } from "./text.ts";
+import { claudeSvg } from "./draw/svg.ts";
+import { segmentsOf, speakersOf, withoutClaudeMark } from "./meeting/segments.ts";
+import { imagePathsIn, isInside, isOwnMemory, resolvedPath } from "./files/paths.ts";
+import { withCount } from "./work/progress.ts";
+import { ageOf, agentSpecFrom, backlogLinesOf, backlogOf, blockersOf, coordinatorPromptOf, daysBetween, cardFrom, colleagueFrom, colleagueOf, isCoordinatorProfile, memoryIndexOf, memorySizeOf, openIdsOf, openTasks, peopleOf, permissionsOf, retestsOf, taskOf, typesOf, whoseRule, withEffort, withNextPriority, withPermissions, withText } from "./team/profile.ts";
+import { taskWords } from "./team/todo.ts";
+import { dateOf, formatTokens, isoWeek, languageOf, linksIn, listNames, modelName, nameKey, slugOf, words } from "./text/index.ts";
 
 const profile = "---\r\nname: matteo-conti\r\ndescription: \"Matteo Conti, architetto TypeScript. Usalo per le revisioni.\"\r\ntools: Read\r\nmemory: project\r\neffort: high\r\ncolor: red\r\n---\r\n\r\n# Matteo Conti, architetto TypeScript\r\n\r\nChi sei.";
 const matteo = colleagueFrom("matteo-conti", profile, "# todo\n- [ ] uno\n- [x] fatto\n- [ ] due\n", 7);

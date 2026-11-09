@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = process.argv[2];
-const scripts = fileURLToPath(new URL("../plugins/crew/scripts", import.meta.url));
+const portraitScripts = fileURLToPath(new URL("../plugins/crew/scripts/portrait", import.meta.url));
 
 if (!root) {
     console.error("Usage: node tools/demo.mjs <folder>");
@@ -91,7 +91,7 @@ A made-up colleague of the Trailmap demo project.
 `);
     writeFileSync(join(memory, "todo.md"), `${colleague.todo.join("\n")}\n`);
     writeFileSync(join(memory, "MEMORY.md"), `# ${colleague.name}\n\n${colleague.memory.join("\n")}\n`);
-    execFileSync(process.execPath, [join(scripts, "vector-portrait.mjs"), join(memory, "avatar.svg"), JSON.stringify(colleague.traits)]);
+    execFileSync(process.execPath, [join(portraitScripts, "vector.mjs"), join(memory, "avatar.svg"), JSON.stringify(colleague.traits)]);
 }
 
 console.log(`demo in ${root}`);

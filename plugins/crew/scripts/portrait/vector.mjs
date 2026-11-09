@@ -1,12 +1,12 @@
 // A flat geometric cartoon portrait in SVG: a big rounded head, big eyes, flat colors, no outlines.
-// node vector-portrait.mjs <out.svg> '<json>' with the same traits as pixel-portrait.mjs: background, skin, hair, hairStyle (short,
+// node vector.mjs <out.svg> '<json>' with the same traits as pixel.mjs: background, skin, hair, hairStyle (short,
 // bob, long, curly, bun, ponytail, bald), clothes, neckline (crew, v, collar), glasses (none, square, round), beard (none,
 // stubble, full), accessory (none, pencil, headphones, earrings, scarf). Square, no text, for panels that crop it to a circle.
 import { writeFileSync } from "node:fs";
 
-import { shade, traitsFrom } from "./portrait-traits.mjs";
+import { shade, traitsFrom } from "./traits.mjs";
 
-const { output, traits: t } = traitsFrom("vector-portrait.mjs");
+const { output, traits: t } = traitsFrom("vector.mjs");
 const ink = "#2B2421";
 const parts = [
     `<rect width="128" height="128" fill="${t.background}"/>`,

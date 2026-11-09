@@ -2,6 +2,12 @@
 
 What changes for whoever uses Crew, version by version. Plugins update in a new chat: `/plugin`, Marketplaces, claude-crew, Update marketplace, or turn its auto-update on there.
 
+## 0.15.5
+
+- **The coordinator under the counts**: their card sits right below the team's counts, the width of the panel, with no heading of its own.
+- **No tile of blocked tasks**: a task that waits for another still says whom it waits for, with its chain mark on its row.
+- Nothing else changes: the panel's code is now split by area, for whoever works on it.
+
 ## 0.15.4
 
 - **First and last name, unless you choose one**: colleagues and the coordinator are hired with a first and a last name; a single name only when you choose it, as for an AI.

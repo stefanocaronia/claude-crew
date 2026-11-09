@@ -16,7 +16,7 @@ Claude Code runs a copy from its cache: after a change, raise the version (below
 ## Test
 
 ```
-node --test plugins/crew/scripts/conversation.test.mjs plugins/crew/scripts/portraits.test.mjs plugins/crew/scripts/folders.test.mjs plugins/crew/hooks/pure.test.mjs
+node --test plugins/crew/scripts/conversation.test.mjs plugins/crew/scripts/portrait/portrait.test.mjs plugins/crew/scripts/folders.test.mjs plugins/crew/hooks/pure.test.mjs
 claude plugin test plugins/crew
 claude plugin validate .
 ```
@@ -30,7 +30,7 @@ node tools/preview.mjs <folder>    the panel as the desktop app draws it, as an 
 
 ## Rules
 
-- **Words** the panel shows go in all eleven languages of `plugins/crew/hooks/text.ts`.
+- **Words** the panel shows go in all eleven languages of `plugins/crew/hooks/text/`, one file a language, English's first.
 - **Behavior** the colleagues follow goes in the skills, under `plugins/crew/skills/`.
 - **Your own project** stays out: `/project/` and `/.claude/` are ignored.
 

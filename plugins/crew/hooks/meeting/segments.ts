@@ -1,6 +1,6 @@
 // A conversation with the colleagues as the chat shows it: each turn starts with "[Matteo]", Claude's narrator lines are in italics.
-import type { Speaker } from "../types";
-import { nameKey } from "./team.ts";
+import type { Speaker } from "../../types";
+import { nameKey } from "../text/index.ts";
 
 /** One piece of a reply: a colleague's turn, or a narrator line when `speaker` is absent. */
 export type Segment = {

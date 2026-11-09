@@ -1,4 +1,4 @@
-// The two portrait scripts as the portrait reference runs them: node --test plugins/crew/scripts/portraits.test.mjs
+// The two portrait scripts as the portrait reference runs them: node --test plugins/crew/scripts/portrait/portrait.test.mjs
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
@@ -41,7 +41,7 @@ function draw(kind, json)
 {
     const out = join(folder, `${kind}.svg`);
     rmSync(out, { force: true });
-    const script = fileURLToPath(new URL(`./${kind}-portrait.mjs`, import.meta.url));
+    const script = fileURLToPath(new URL(`./${kind}.mjs`, import.meta.url));
     const result = spawnSync(process.execPath, [script, out, json], { encoding: "utf8" });
     const svg = result.status === 0 ? readFileSync(out, "utf8") : "";
     return { status: result.status, svg, error: result.stderr };

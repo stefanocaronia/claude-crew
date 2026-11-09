@@ -1,4 +1,4 @@
-// Makes one picture with the Codex CLI and saves it as a PNG: node codex-image.mjs <out.png> < brief.txt
+// Makes one picture with the Codex CLI and saves it as a PNG: node codex.mjs <out.png> < brief.txt
 // Only with Codex logged in with ChatGPT, never with an API key, which pays by the picture. Codex runs in an empty folder of its own,
 // so it reads nothing of the project; the picture lands in its generated_images folder, from which it is moved to <out.png>.
 import { spawn, spawnSync } from "node:child_process";
@@ -11,7 +11,7 @@ const longest = 3 * 60 * 1000;
 const output = process.argv[2];
 
 if (!output) {
-    fail("Usage: node codex-image.mjs <out.png> < brief.txt (the brief describes the picture)");
+    fail("Usage: node codex.mjs <out.png> < brief.txt (the brief describes the picture)");
 }
 
 const brief = readFileSync(0, "utf8").trim();

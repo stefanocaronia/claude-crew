@@ -1,12 +1,12 @@
-// A pixel-art portrait, 32×32 cells, from a few traits: node pixel-portrait.mjs <out.svg> '<json>'
+// A pixel-art portrait, 32×32 cells, from a few traits: node pixel.mjs <out.svg> '<json>'
 // Traits: background, skin, hair (color), hairStyle (short, bob, long, curly, bun, ponytail, bald), clothes, neckline (crew, v,
 // collar), glasses (none, square, round), beard (none, stubble, full), accessory (none, pencil, headphones, earrings, scarf).
 // Unknown traits fall back to the defaults; the portrait is square, with no text, for panels that crop it to a circle.
 import { writeFileSync } from "node:fs";
 
-import { shade, traitsFrom } from "./portrait-traits.mjs";
+import { shade, traitsFrom } from "./traits.mjs";
 
-const { output, traits } = traitsFrom("pixel-portrait.mjs");
+const { output, traits } = traitsFrom("pixel.mjs");
 const grid = Array.from({ length: 32 }, () => Array(32).fill(traits.background));
 const paint = (x, y, color) => {
     if (x >= 0 && x < 32 && y >= 0 && y < 32) {

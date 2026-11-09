@@ -9,3 +9,11 @@ Crew and [Project](https://github.com/stefanocaronia/claude-project) are sibling
 - A change to what one reads or writes of the other (Project's configuration keys, the backlog's commands and their options, the folders under the docs, the colleagues' files) is agreed with Project's side first, and lands in both, released together when it breaks the other.
 - The contract between them is written in both guides, in the same words: what each reads and writes of the other, and the folders they share.
 - Before a release, check that the released Project still works with it: Crew's calls of `backlog.mjs`, and the files it reads.
+
+## Coding guidelines
+
+The code follows Stefano's shared guidelines (`F:\sviluppo\shared\coding`: `principles.md`, `languages/typescript.md`). Crew's own:
+
+- The hooks run in the engine's sandbox (no DOM, no Node, everything through `$`), the scripts in Node.
+- Folders by area, not prefixes in file names; a folder is a module with one entry file.
+- [docs/structure.md](docs/structure.md) says what each folder holds and where new code goes, and changes with the folders.

@@ -1,5 +1,7 @@
 // The project's colleagues as their files describe them: .claude/agents/<id>.md, and .claude/agent-memory/<id>/ with todo.md.
-import type { Card, Colleague, Permissions } from "../types";
+import type { Card, Colleague, Permissions } from "../../types";
+
+import { nameKey } from "../text/index.ts";
 
 /** Claude Code's agent colors, as the panel draws them. */
 const colors: Record<string, string> = {
@@ -41,12 +43,6 @@ function firstOfId(id: string): string
 {
     const first = id.split("-")[0] ?? id;
     return first.charAt(0).toUpperCase() + first.slice(1);
-}
-
-/** A first name as a key, compared as the project plugin compares them: without case or accents, so «Nicolo» is «Nicolò». */
-export function nameKey(name: string): string
-{
-    return name.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 }
 
 /** A colleague's card: the profile's description, the open lines of their todo, the last section of their memory. */

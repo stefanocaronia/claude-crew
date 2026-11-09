@@ -1,6 +1,6 @@
 // The panel's drawings: portraits, names, icons, marks and bars, each at a fixed size, so the window's width never shrinks them;
 // the text around them is the surface's own. The bars' light and dark colors follow savvy-progress by johnnyvizz (MIT).
-import type { Speaker } from "../types";
+import type { Speaker } from "../../types";
 
 const font = "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif";
 const theme = `<style>

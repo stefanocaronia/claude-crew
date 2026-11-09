@@ -110,8 +110,6 @@ export type PanelView = {
     isMeetingCollapsed?: boolean;
     isWorkingCollapsed?: boolean;
     isTeamCollapsed?: boolean;
-    /** The coordinator's section, the Claude of this chat, after the team. */
-    isChatCollapsed?: boolean;
     autoOpened: boolean;
     /** Whether the backlog shows its tasks; closed until the user opens it. */
     isBacklogOpen?: boolean;

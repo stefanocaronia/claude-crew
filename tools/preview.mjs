@@ -73,7 +73,10 @@ function fixture()
         const id = name.replace(/\.md$/, "");
         const folder = join(project, ".claude", "agent-memory", id);
 
-        if (!name.endsWith(".md") || !existsSync(join(folder, "todo.md"))) {
+        // A colleague has a todo; the coordinator needs none, as the panel reads them.
+        const isCoordinator = name.endsWith(".md") && existsSync(folder) && /^coordinator:\s*true\s*$/m.test(readFileSync(join(agents, name), "utf8"));
+
+        if (!name.endsWith(".md") || (!existsSync(join(folder, "todo.md")) && !isCoordinator)) {
             continue;
         }
 
